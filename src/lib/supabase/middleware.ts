@@ -2,6 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { createServerClient } from "@supabase/ssr";
 
+const protectedPaths = ["/dashboard", "/search", "/food", "/log", "/settings", "/review"];
+const authPaths = ["/login", "/register"];
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -28,8 +31,25 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refreshing the auth token
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+
+  // Redirect unauthenticated users away from protected routes
+  if (!user && protectedPaths.some((p) => pathname.startsWith(p))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Redirect authenticated users away from auth pages
+  if (user && authPaths.some((p) => pathname.startsWith(p))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
