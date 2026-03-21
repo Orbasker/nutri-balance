@@ -238,13 +238,13 @@
 
 > Admin interface for managing food data.
 
-- [ ] Admin layout with role check (query profiles for role = 'admin')
-- [ ] List of foods with CRUD
-- [ ] Add/edit food + variants + nutrient values manually
-- [ ] Review queue: list observations with `pending` status
-- [ ] Approve/reject with notes
-- [ ] View evidence items per observation
-- [ ] Uses `SUPABASE_SERVICE_ROLE_KEY` for admin writes (bypasses RLS) or admin RLS policies
+- [x] Admin layout with role check (query profiles for role = 'admin')
+- [x] List of foods with CRUD
+- [x] Add/edit food + variants + nutrient values manually
+- [x] Review queue: list observations with `pending` status
+- [x] Approve/reject with notes
+- [x] View evidence items per observation
+- [x] Uses `SUPABASE_SERVICE_ROLE_KEY` for admin writes (bypasses RLS) or admin RLS policies
 
 **Deliverable**: Admin can manage food data and review observations.
 

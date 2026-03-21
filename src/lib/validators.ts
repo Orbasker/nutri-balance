@@ -100,6 +100,54 @@ export const updateConsumptionLogSchema = z.object({
   nutrientSnapshot: z.record(z.string(), z.number()),
 });
 
+// Admin validators
+
+export const createFoodSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  category: z.string().max(100).optional(),
+  description: z.string().max(1000).optional(),
+});
+
+export const updateFoodSchema = z.object({
+  foodId: z.string().uuid(),
+  name: z.string().min(1, "Name is required").max(200),
+  category: z.string().max(100).optional(),
+  description: z.string().max(1000).optional(),
+});
+
+export const deleteFoodSchema = z.object({
+  foodId: z.string().uuid(),
+});
+
+export const addVariantSchema = z.object({
+  foodId: z.string().uuid(),
+  preparationMethod: z.string().min(1),
+  description: z.string().max(500).optional(),
+  isDefault: z.boolean().default(false),
+});
+
+export const deleteVariantSchema = z.object({
+  variantId: z.string().uuid(),
+});
+
+export const saveNutrientValueSchema = z.object({
+  foodVariantId: z.string().uuid(),
+  nutrientId: z.string().uuid(),
+  valuePer100g: z.number().nonnegative("Value must be non-negative"),
+  confidenceScore: z.number().int().min(0).max(100).default(50),
+  resolvedId: z.string().uuid().optional(),
+});
+
+export const deleteNutrientValueSchema = z.object({
+  resolvedId: z.string().uuid(),
+});
+
+export const reviewObservationSchema = z.object({
+  observationId: z.string().uuid(),
+  status: z.enum(["approved", "rejected", "needs_revision"]),
+  notes: z.string().max(1000).optional(),
+});
+
 /**
  * Turns validated input into DB-ready numeric strings.
  * For stability mode, `daily_limit` is set to `range_max` so existing strict-style consumers stay consistent until the app reads ranges.

@@ -122,3 +122,70 @@ export interface LogEntryNutrientInfo {
   displayName: string;
   unit: string;
 }
+
+// Admin types
+
+export interface AdminFoodListItem {
+  id: string;
+  name: string;
+  category: string | null;
+  variantCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminFoodDetail {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  variants: AdminFoodVariant[];
+}
+
+export interface AdminFoodVariant {
+  id: string;
+  preparationMethod: string;
+  description: string | null;
+  isDefault: boolean;
+  nutrients: AdminNutrientValue[];
+}
+
+export interface AdminNutrientValue {
+  resolvedId: string;
+  nutrientId: string;
+  nutrientName: string;
+  nutrientDisplayName: string;
+  nutrientUnit: string;
+  valuePer100g: number;
+  confidenceScore: number;
+}
+
+export interface PendingObservation {
+  id: string;
+  foodVariantId: string;
+  foodName: string;
+  preparationMethod: string;
+  nutrientName: string;
+  nutrientDisplayName: string;
+  value: number;
+  unit: string;
+  derivationType: string;
+  confidenceScore: number;
+  reviewStatus: string;
+  evidenceItems: EvidenceItem[];
+}
+
+export interface EvidenceItem {
+  id: string;
+  snippet: string | null;
+  pageRef: string | null;
+  rowLocator: string | null;
+  url: string | null;
+}
+
+export interface NutrientOption {
+  id: string;
+  name: string;
+  displayName: string;
+  unit: string;
+}
