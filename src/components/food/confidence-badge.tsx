@@ -6,18 +6,21 @@ import { cn } from "@/lib/utils";
 
 const confidenceConfig: Record<ConfidenceLabel, { className: string; label: string }> = {
   high: {
-    className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    className: "bg-[#72fe88]/15 text-[#00531c] dark:bg-[#68f47f]/15 dark:text-[#68f47f]",
     label: "High",
   },
   good: {
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    className: "bg-[#d8e2ff] text-[#004493] dark:bg-[#adc6ff]/15 dark:text-[#adc6ff]",
     label: "Good",
   },
   moderate: {
-    className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+    className: "bg-[#e2dfff] text-[#4c4aca] dark:bg-[#c2c1ff]/15 dark:text-[#c2c1ff]",
     label: "Moderate",
   },
-  low: { className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", label: "Low" },
+  low: {
+    className: "bg-[#ffdad6] text-[#ba1a1a] dark:bg-[#ffb4ab]/15 dark:text-[#ffb4ab]",
+    label: "Low",
+  },
 };
 
 interface ConfidenceBadgeProps {

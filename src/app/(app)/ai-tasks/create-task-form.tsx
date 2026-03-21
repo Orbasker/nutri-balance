@@ -61,7 +61,9 @@ export function CreateTaskForm({ nutrients }: { nutrients: Nutrient[] }) {
           </p>
         )}
         {state?.ok && (
-          <p className="mt-2 text-sm text-green-600">Task created. You can run it below.</p>
+          <p className="mt-2 text-sm text-[#00531c] dark:text-[#68f47f]">
+            Task created. You can run it below.
+          </p>
         )}
       </CardContent>
     </Card>

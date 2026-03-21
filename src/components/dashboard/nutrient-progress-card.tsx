@@ -13,15 +13,15 @@ import {
 import { cn } from "@/lib/utils";
 
 const statusColors: Record<NutrientProgress["status"], string> = {
-  safe: "bg-green-500",
-  caution: "bg-yellow-500",
-  exceed: "bg-red-500",
+  safe: "bg-[#00531c] dark:bg-[#68f47f]",
+  caution: "bg-[#4c4aca] dark:bg-[#c2c1ff]",
+  exceed: "bg-[#ba1a1a] dark:bg-[#ffb4ab]",
 };
 
 const statusTrackColors: Record<NutrientProgress["status"], string> = {
-  safe: "bg-green-100 dark:bg-green-950",
-  caution: "bg-yellow-100 dark:bg-yellow-950",
-  exceed: "bg-red-100 dark:bg-red-950",
+  safe: "bg-[#e9e7ed] dark:bg-[#2f3034]",
+  caution: "bg-[#e9e7ed] dark:bg-[#2f3034]",
+  exceed: "bg-[#ffdad6] dark:bg-[#93000a]",
 };
 
 function formatAmount(value: number, unit: string): string {
