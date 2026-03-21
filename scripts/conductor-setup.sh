@@ -13,16 +13,19 @@ bun install
 echo "[nutri-balance] Setting up husky hooks..."
 bun run prepare
 
-# Copy .env.local from main worktree if missing
-if [ ! -f .env.local ] && [ -f .env.local.example ]; then
-  MAIN_PATH=$(git worktree list | awk '/\[main\]$/ { print $1; exit }')
-  if [ -n "$MAIN_PATH" ] && [ "$MAIN_PATH" != "$(pwd)" ] && [ -f "$MAIN_PATH/.env.local" ]; then
-    cp "$MAIN_PATH/.env.local" .env.local
-    echo "Copied .env.local from main worktree"
-  else
-    cp .env.local.example .env.local
-    echo "Created .env.local from example — fill in your Supabase credentials"
+# Copy env files from main worktree if missing
+MAIN_PATH=$(git worktree list | awk '/\[main\]$/ { print $1; exit }')
+
+for envfile in .env .env.local; do
+  if [ ! -f "$envfile" ]; then
+    if [ -n "$MAIN_PATH" ] && [ "$MAIN_PATH" != "$(pwd)" ] && [ -f "$MAIN_PATH/$envfile" ]; then
+      cp "$MAIN_PATH/$envfile" "$envfile"
+      echo "Copied $envfile from main worktree"
+    elif [ -f "$envfile.example" ]; then
+      cp "$envfile.example" "$envfile"
+      echo "Created $envfile from example — fill in your credentials"
+    fi
   fi
-fi
+done
 
 echo "Setup complete."
