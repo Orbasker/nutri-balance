@@ -24,6 +24,8 @@ if [ ! -f .env.local ] && [ -f .env.local.example ]; then
   else
     cp .env.local.example .env.local
     echo "Created .env.local from example — fill in your Supabase credentials"
+    cp .env.example .env
+    echo "Created .env from example — fill in your Supabase credentials"
   fi
 fi
 
