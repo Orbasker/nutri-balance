@@ -94,3 +94,31 @@ export interface RecentLogEntry {
   mealLabel: string | null;
   loggedAt: string;
 }
+
+export interface LogEntry {
+  id: string;
+  foodVariantId: string;
+  foodName: string;
+  preparationMethod: string;
+  quantity: number;
+  servingLabel: string | null;
+  mealLabel: string | null;
+  loggedAt: string;
+  nutrientSnapshot: Record<string, number>;
+}
+
+export interface DailyNutrientTotal {
+  nutrientId: string;
+  displayName: string;
+  unit: string;
+  total: number;
+  dailyLimit: number | null;
+  mode: "strict" | "stability" | null;
+  status: NutrientStatus;
+}
+
+export interface LogEntryNutrientInfo {
+  nutrientId: string;
+  displayName: string;
+  unit: string;
+}
