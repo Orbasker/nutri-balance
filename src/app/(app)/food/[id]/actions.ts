@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { FoodDetail, FoodVariantDetail, NutrientDetail, NutrientImpact } from "@/types";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
@@ -37,14 +37,11 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
       nutrientSortOrder: nutrients.sortOrder,
     })
     .from(foods)
-    .leftJoin(foodVariants, sql`${foodVariants.foodId} = ${foods.id}`)
-    .leftJoin(servingMeasures, sql`${servingMeasures.foodVariantId} = ${foodVariants.id}`)
-    .leftJoin(
-      resolvedNutrientValues,
-      sql`${resolvedNutrientValues.foodVariantId} = ${foodVariants.id}`,
-    )
-    .leftJoin(nutrients, sql`${nutrients.id} = ${resolvedNutrientValues.nutrientId}`)
-    .where(sql`${foods.id} = ${foodId}`)
+    .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
+    .leftJoin(servingMeasures, eq(servingMeasures.foodVariantId, foodVariants.id))
+    .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
+    .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .where(eq(foods.id, foodId))
     .orderBy(nutrients.sortOrder);
 
   if (rows.length === 0) return null;

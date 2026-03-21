@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { DailyNutrientTotal, LogEntry, LogEntryNutrientInfo } from "@/types";
-import { sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { getNutrientStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
@@ -55,8 +55,8 @@ export async function getLogEntries(dateStr: string): Promise<LogEntry[]> {
       foodName: foods.name,
     })
     .from(foodVariants)
-    .innerJoin(foods, sql`${foods.id} = ${foodVariants.foodId}`)
-    .where(sql`${foodVariants.id} IN ${variantIds}`);
+    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
+    .where(inArray(foodVariants.id, variantIds));
 
   const variantMap = new Map(variantRows.map((r) => [r.variantId, r]));
 
@@ -66,7 +66,7 @@ export async function getLogEntries(dateStr: string): Promise<LogEntry[]> {
     const servingRows = await db
       .select({ id: servingMeasures.id, label: servingMeasures.label })
       .from(servingMeasures)
-      .where(sql`${servingMeasures.id} IN ${servingIds}`);
+      .where(inArray(servingMeasures.id, servingIds));
     servingMap = new Map(servingRows.map((r) => [r.id, r.label]));
   }
 
@@ -101,7 +101,7 @@ export async function getNutrientInfo(nutrientIds: string[]): Promise<LogEntryNu
       unit: nutrients.unit,
     })
     .from(nutrients)
-    .where(sql`${nutrients.id} IN ${nutrientIds}`)
+    .where(inArray(nutrients.id, nutrientIds))
     .orderBy(nutrients.sortOrder);
 
   return rows.map((r) => ({
@@ -148,7 +148,7 @@ export async function getDailySummary(entries: LogEntry[]): Promise<DailyNutrien
       unit: nutrients.unit,
     })
     .from(nutrients)
-    .where(sql`${nutrients.id} IN ${limitNutrientIds}`)
+    .where(inArray(nutrients.id, limitNutrientIds))
     .orderBy(nutrients.sortOrder);
 
   const nutrientMap = new Map(nutrientRows.map((r) => [r.id, r]));
@@ -186,7 +186,7 @@ export async function getVariantNutrientValues(
       valuePer100g: resolvedNutrientValues.valuePer100g,
     })
     .from(resolvedNutrientValues)
-    .where(sql`${resolvedNutrientValues.foodVariantId} = ${foodVariantId}`);
+    .where(eq(resolvedNutrientValues.foodVariantId, foodVariantId));
 
   const result: Record<string, number> = {};
   for (const row of rows) {

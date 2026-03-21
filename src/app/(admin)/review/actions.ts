@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { PendingObservation } from "@/types";
-import { sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
@@ -50,10 +50,10 @@ export async function getPendingObservations(): Promise<PendingObservation[]> {
       reviewStatus: nutrientObservations.reviewStatus,
     })
     .from(nutrientObservations)
-    .innerJoin(foodVariants, sql`${foodVariants.id} = ${nutrientObservations.foodVariantId}`)
-    .innerJoin(foods, sql`${foods.id} = ${foodVariants.foodId}`)
-    .innerJoin(nutrients, sql`${nutrients.id} = ${nutrientObservations.nutrientId}`)
-    .where(sql`${nutrientObservations.reviewStatus} = 'pending'`)
+    .innerJoin(foodVariants, eq(foodVariants.id, nutrientObservations.foodVariantId))
+    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
+    .innerJoin(nutrients, eq(nutrients.id, nutrientObservations.nutrientId))
+    .where(eq(nutrientObservations.reviewStatus, "pending"))
     .orderBy(foods.name, nutrients.sortOrder);
 
   if (rows.length === 0) return [];
@@ -70,7 +70,7 @@ export async function getPendingObservations(): Promise<PendingObservation[]> {
       url: evidenceItems.url,
     })
     .from(evidenceItems)
-    .where(sql`${evidenceItems.observationId} IN ${observationIds}`);
+    .where(inArray(evidenceItems.observationId, observationIds));
 
   const evidenceMap = new Map<string, typeof evidence>();
   for (const e of evidence) {
