@@ -22,3 +22,27 @@ export interface FoodSearchResult {
   category: string | null;
   variants: FoodVariantSummary[];
 }
+
+export type NutrientStatus = "safe" | "caution" | "exceed";
+
+export interface NutrientProgress {
+  nutrientId: string;
+  name: string;
+  displayName: string;
+  unit: string;
+  dailyLimit: number;
+  consumed: number;
+  remaining: number;
+  percentage: number;
+  status: NutrientStatus;
+}
+
+export interface RecentLogEntry {
+  id: string;
+  foodName: string;
+  preparationMethod: string;
+  quantity: string;
+  servingLabel: string | null;
+  mealLabel: string | null;
+  loggedAt: string;
+}
