@@ -4,9 +4,6 @@ import { useCallback, useRef, useState, useTransition } from "react";
 
 import { searchFoods } from "@/app/(app)/search/actions";
 import type { FoodSearchResult } from "@/types";
-import { SearchIcon } from "lucide-react";
-
-import { Input } from "@/components/ui/input";
 
 import { SearchResults } from "./search-results";
 
@@ -44,21 +41,54 @@ export function SearchInput({ initialResults = [] }: SearchInputProps) {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="relative">
-        <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Search foods by name (e.g., spinach, chicken, rice)..."
+    <div className="space-y-8">
+      {/* Search Bar */}
+      <div className="relative group">
+        <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+          <span className="material-symbols-outlined text-md-outline">search</span>
+        </div>
+        <input
+          type="text"
           value={query}
           onChange={(e) => handleChange(e.target.value)}
-          className="pl-9"
+          className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-6 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
+          placeholder="Search ingredients or dishes..."
         />
       </div>
 
-      {isPending && <p className="text-center text-sm text-muted-foreground">Searching...</p>}
+      {/* Loading State */}
+      {isPending && (
+        <div className="text-center py-8">
+          <div className="inline-flex items-center gap-3 text-md-on-surface-variant">
+            <div className="w-5 h-5 border-2 border-md-primary/30 border-t-md-primary rounded-full animate-spin" />
+            <span className="text-sm font-medium">Searching...</span>
+          </div>
+        </div>
+      )}
 
+      {/* Results */}
       {!isPending && hasSearched && <SearchResults results={results} />}
+
+      {/* Nutrient Wisdom (show when no search) */}
+      {!hasSearched && !isPending && (
+        <div className="bg-gradient-to-br from-md-primary to-md-primary-container p-6 rounded-3xl text-white relative overflow-hidden group">
+          <div className="relative z-10">
+            <h4 className="text-2xl font-bold mb-2">Nutrient Wisdom</h4>
+            <p className="text-md-primary-fixed-dim text-sm max-w-[70%] leading-relaxed">
+              Adding a squeeze of lemon to your spinach helps your body absorb iron more
+              efficiently.
+            </p>
+          </div>
+          <div className="absolute -right-8 -bottom-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <span
+              className="material-symbols-outlined !text-9xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              tips_and_updates
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,13 +2,9 @@
 
 import { useRouter } from "next/navigation";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-
 interface DaySelectorProps {
-  currentDate: string; // YYYY-MM-DD
-  todayStr: string; // YYYY-MM-DD
+  currentDate: string;
+  todayStr: string;
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -44,26 +40,21 @@ export function DaySelector({ currentDate, todayStr }: DaySelectorProps) {
   };
 
   return (
-    <div className="flex items-center justify-between">
-      <Button variant="ghost" size="sm" onClick={() => goTo(addDays(currentDate, -1))}>
-        <ChevronLeft className="mr-1 h-4 w-4" />
-        Prev
-      </Button>
-      <div className="text-center">
-        <span className="text-sm font-medium">{formatDateLabel(currentDate, todayStr)}</span>
-        {currentDate !== todayStr && (
-          <span className="text-muted-foreground ml-2 text-xs">{currentDate}</span>
-        )}
-      </div>
-      <Button
-        variant="ghost"
-        size="sm"
+    <div className="flex items-center bg-md-surface-container-low rounded-xl p-1">
+      <button
+        className="p-2 text-md-outline hover:text-md-primary transition-colors"
+        onClick={() => goTo(addDays(currentDate, -1))}
+      >
+        <span className="material-symbols-outlined">chevron_left</span>
+      </button>
+      <span className="px-4 font-semibold text-sm">{formatDateLabel(currentDate, todayStr)}</span>
+      <button
+        className="p-2 text-md-outline hover:text-md-primary transition-colors disabled:opacity-30"
         onClick={() => goTo(addDays(currentDate, 1))}
         disabled={isToday}
       >
-        Next
-        <ChevronRight className="ml-1 h-4 w-4" />
-      </Button>
+        <span className="material-symbols-outlined">chevron_right</span>
+      </button>
     </div>
   );
 }

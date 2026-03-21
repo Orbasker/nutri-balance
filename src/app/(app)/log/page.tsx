@@ -1,11 +1,8 @@
 import Link from "next/link";
 
-import { Search } from "lucide-react";
-
 import { DailySummary } from "@/components/log/daily-summary";
 import { DaySelector } from "@/components/log/day-selector";
 import { LogEntryList } from "@/components/log/log-entry-list";
-import { Button } from "@/components/ui/button";
 
 import { getDailySummary, getLogEntries, getNutrientInfo } from "./actions";
 
@@ -29,36 +26,37 @@ export default async function LogPage({
     getNutrientInfo([...new Set(entries.flatMap((e) => Object.keys(e.nutrientSnapshot)))]),
   ]);
 
-  const dateLabel =
-    currentDate === todayStr
-      ? "Today's nutrient intake"
-      : `Intake for ${new Date(currentDate + "T12:00:00").toLocaleDateString(undefined, {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-        })}`;
-
   return (
-    <div className="container mx-auto max-w-2xl p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Daily Log</h1>
-        <Link href="/search">
-          <Button variant="outline" size="sm">
-            <Search className="mr-1 h-4 w-4" />
-            Add food
-          </Button>
-        </Link>
-      </div>
+    <div className="px-6 max-w-screen-xl mx-auto">
+      {/* Editorial Header + Date Selector */}
+      <section className="mb-10 pt-4">
+        <div className="flex justify-between items-end">
+          <div>
+            <p className="text-md-outline uppercase tracking-widest text-[10px] font-bold mb-1">
+              Timeline
+            </p>
+            <h2 className="font-extrabold text-3xl text-md-primary">History</h2>
+          </div>
+          <DaySelector currentDate={currentDate} todayStr={todayStr} />
+        </div>
+      </section>
 
-      <div className="mb-6">
-        <DaySelector currentDate={currentDate} todayStr={todayStr} />
-      </div>
+      {/* Summary Cards */}
+      <DailySummary totals={summary} />
 
-      <div className="mb-6">
-        <DailySummary totals={summary} dateLabel={dateLabel} />
-      </div>
+      {/* Meal Log */}
+      <section className="space-y-8 mt-8">
+        <h3 className="font-bold text-xl px-2">Meal Log</h3>
+        <LogEntryList entries={entries} nutrientInfo={nutrientInfo} />
+      </section>
 
-      <LogEntryList entries={entries} nutrientInfo={nutrientInfo} />
+      {/* FAB */}
+      <Link
+        href="/search"
+        className="fixed right-6 bottom-24 w-14 h-14 bg-md-primary text-md-on-primary rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(0,68,147,0.3)] active:scale-90 transition-transform z-40"
+      >
+        <span className="material-symbols-outlined">add</span>
+      </Link>
     </div>
   );
 }

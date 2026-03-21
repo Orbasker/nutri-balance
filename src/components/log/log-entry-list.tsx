@@ -14,6 +14,13 @@ type MealGroup = {
   entries: LogEntry[];
 };
 
+const mealColors: Record<string, string> = {
+  breakfast: "bg-md-primary/10 text-md-primary",
+  lunch: "bg-md-secondary/10 text-md-secondary",
+  dinner: "bg-md-tertiary/10 text-md-tertiary",
+  snack: "bg-md-tertiary/10 text-md-tertiary",
+};
+
 function groupByMeal(entries: LogEntry[]): MealGroup[] {
   const groups = new Map<string, LogEntry[]>();
 
@@ -37,8 +44,14 @@ export function LogEntryList({ entries, nutrientInfo }: LogEntryListProps) {
   if (entries.length === 0) {
     return (
       <div className="py-12 text-center">
-        <p className="text-muted-foreground">No entries logged for this day.</p>
-        <a href="/search" className="text-primary mt-2 inline-block text-sm underline">
+        <div className="w-16 h-16 rounded-full bg-md-surface-container-high flex items-center justify-center mx-auto mb-4">
+          <span className="material-symbols-outlined text-3xl text-md-outline">restaurant</span>
+        </div>
+        <p className="text-md-on-surface-variant">No entries logged for this day.</p>
+        <a
+          href="/search"
+          className="text-md-primary mt-2 inline-block text-sm font-semibold underline"
+        >
           Search for food to add
         </a>
       </div>
@@ -48,17 +61,19 @@ export function LogEntryList({ entries, nutrientInfo }: LogEntryListProps) {
   const groups = groupByMeal(entries);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {groups.map((group) => (
         <div key={group.label}>
-          <h3 className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
-            {group.label}
-          </h3>
-          <div className="space-y-2">
-            {group.entries.map((entry) => (
-              <LogEntryRow key={entry.id} entry={entry} nutrientInfo={nutrientInfo} />
-            ))}
-          </div>
+          {group.entries.map((entry) => (
+            <LogEntryRow
+              key={entry.id}
+              entry={entry}
+              nutrientInfo={nutrientInfo}
+              mealColorClass={
+                mealColors[group.label.toLowerCase()] ?? "bg-md-surface-container text-md-outline"
+              }
+            />
+          ))}
         </div>
       ))}
     </div>

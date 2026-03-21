@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { BottomNav } from "@/components/layout/bottom-nav";
+import { TopAppBar } from "@/components/layout/top-app-bar";
+
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -12,5 +15,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen pb-24">
+      <TopAppBar />
+      <main className="pt-20">{children}</main>
+      <BottomNav />
+    </div>
+  );
 }

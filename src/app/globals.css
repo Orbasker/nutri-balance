@@ -46,6 +46,63 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Material Design 3 color tokens */
+  --color-md-primary: #004493;
+  --color-md-primary-container: #005bc0;
+  --color-md-on-primary: #ffffff;
+  --color-md-on-primary-container: #c9d8ff;
+  --color-md-primary-fixed: #d8e2ff;
+  --color-md-primary-fixed-dim: #adc6ff;
+  --color-md-on-primary-fixed: #001a41;
+  --color-md-on-primary-fixed-variant: #004493;
+
+  --color-md-secondary: #4c4aca;
+  --color-md-secondary-container: #6664e4;
+  --color-md-on-secondary: #ffffff;
+  --color-md-on-secondary-container: #fffbff;
+  --color-md-secondary-fixed: #e2dfff;
+  --color-md-secondary-fixed-dim: #c2c1ff;
+  --color-md-on-secondary-fixed: #0c006a;
+  --color-md-on-secondary-fixed-variant: #3631b4;
+
+  --color-md-tertiary: #00531c;
+  --color-md-tertiary-container: #006e28;
+  --color-md-on-tertiary: #ffffff;
+  --color-md-tertiary-fixed: #72fe88;
+  --color-md-tertiary-fixed-dim: #53e16f;
+  --color-md-on-tertiary-fixed: #002107;
+  --color-md-on-tertiary-fixed-variant: #00531c;
+
+  --color-md-error: #ba1a1a;
+  --color-md-on-error: #ffffff;
+  --color-md-error-container: #ffdad6;
+  --color-md-on-error-container: #93000a;
+
+  --color-md-surface: #faf9fe;
+  --color-md-on-surface: #1a1b1f;
+  --color-md-surface-variant: #e3e2e7;
+  --color-md-on-surface-variant: #414750;
+  --color-md-surface-dim: #dad9df;
+  --color-md-surface-bright: #faf9fe;
+  --color-md-surface-container: #eeedf3;
+  --color-md-surface-container-low: #f4f3f8;
+  --color-md-surface-container-high: #e9e7ed;
+  --color-md-surface-container-highest: #e3e2e7;
+  --color-md-surface-container-lowest: #ffffff;
+  --color-md-surface-tint: #005bc1;
+
+  --color-md-outline: #717782;
+  --color-md-outline-variant: #c1c7d2;
+
+  --color-md-inverse-surface: #2f3034;
+  --color-md-inverse-on-surface: #f1f0f5;
+  --color-md-inverse-primary: #adc6ff;
+
+  /* Font families */
+  --font-headline: var(--font-manrope);
+  --font-body: var(--font-inter);
+  --font-label: var(--font-inter);
 }
 
 :root {
@@ -123,9 +180,51 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-md-surface text-md-on-surface;
+    font-family: var(--font-body), "Inter", sans-serif;
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     @apply font-sans;
   }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-headline), "Manrope", sans-serif;
+  }
+}
+
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 200,
+    "GRAD" 0,
+    "opsz" 24;
+  vertical-align: middle;
+}
+
+/* Stitch design utilities */
+.nutrient-glass {
+  background: linear-gradient(135deg, #004493 0%, #005bc0 100%);
+}
+
+.liquid-track {
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+.liquid-inner-glow {
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+.hero-gradient {
+  background: linear-gradient(135deg, #004493 0%, #005bc0 100%);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
 }

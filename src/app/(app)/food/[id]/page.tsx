@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ArrowLeft } from "lucide-react";
-
 import { getFoodDetail, getTodaysConsumption, getUserNutrientLimits } from "./actions";
 import { FoodDetailClient } from "./food-detail-client";
 
@@ -18,24 +16,37 @@ export default async function FoodDetailPage({ params }: { params: Promise<{ id:
   if (!food) notFound();
 
   return (
-    <div className="container mx-auto max-w-4xl p-6">
-      <div className="mb-6">
-        <Link
-          href="/search"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center text-sm transition-colors"
-        >
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to search
-        </Link>
-      </div>
+    <div className="pb-32 px-6 max-w-2xl mx-auto space-y-10">
+      {/* Back Button */}
+      <Link
+        href="/search"
+        className="inline-flex items-center gap-1 text-md-primary hover:opacity-80 transition-opacity"
+      >
+        <span className="material-symbols-outlined">arrow_back</span>
+        <span className="text-sm font-medium">Back to search</span>
+      </Link>
 
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold">{food.name}</h1>
-        {food.category && <p className="text-muted-foreground text-sm">{food.category}</p>}
-        {food.description && (
-          <p className="text-muted-foreground mt-1 text-sm">{food.description}</p>
-        )}
-      </div>
+      {/* Hero Section: Food Title & Confidence */}
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-md-outline">
+            {food.category && (
+              <>
+                <span className="text-xs uppercase tracking-widest font-semibold">
+                  {food.category}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-md-outline-variant" />
+              </>
+            )}
+          </div>
+          <h2 className="text-4xl font-extrabold text-md-primary tracking-tight leading-tight">
+            {food.name}
+          </h2>
+          {food.description && (
+            <p className="text-md-on-surface-variant text-sm">{food.description}</p>
+          )}
+        </div>
+      </section>
 
       <FoodDetailClient food={food} todaysConsumption={todaysConsumption} userLimits={userLimits} />
     </div>
