@@ -7,8 +7,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 import { type AuthState, register } from "../actions";
+import { GoogleButton } from "../google-button";
 
 export default function RegisterPage() {
   const [state, formAction, pending] = useActionState<AuthState, FormData>(register, null);
@@ -56,6 +58,12 @@ export default function RegisterPage() {
               {pending ? "Creating account..." : "Create account"}
             </Button>
           </form>
+          <div className="relative my-4 flex items-center">
+            <Separator className="flex-1" />
+            <span className="px-3 text-xs text-muted-foreground">or</span>
+            <Separator className="flex-1" />
+          </div>
+          <GoogleButton />
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link
