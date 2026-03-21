@@ -23,9 +23,10 @@ RETURNS boolean
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
+SET search_path = public
 AS $$
   SELECT EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+    SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'
   );
 $$;
 
@@ -149,4 +150,4 @@ CREATE POLICY "profiles_select" ON profiles FOR SELECT TO authenticated USING (i
 CREATE POLICY "profiles_insert" ON profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
 CREATE POLICY "profiles_update" ON profiles FOR UPDATE TO authenticated
   USING (id = auth.uid())
-  WITH CHECK (id = auth.uid());
+  WITH CHECK (id = auth.uid() AND role = (SELECT role FROM profiles WHERE id = auth.uid()));

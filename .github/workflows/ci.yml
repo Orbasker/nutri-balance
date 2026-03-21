@@ -67,6 +67,7 @@ jobs:
 
   db-migrations-deploy:
     name: Deploy Migrations
+    needs: [lint-format-build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
