@@ -73,7 +73,7 @@ export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
   });
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg bg-white p-3 dark:bg-zinc-900">
+    <div className="flex flex-col gap-2 rounded-lg bg-card p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -121,7 +121,7 @@ export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 dark:text-red-400"
+                className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
                 onClick={handleDelete}
                 disabled={deletePending}
               >
@@ -160,7 +160,7 @@ export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
         </div>
       )}
 
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }

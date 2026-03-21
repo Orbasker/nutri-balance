@@ -22,15 +22,15 @@ interface NutrientImpactPanelProps {
 }
 
 const statusColors = {
-  safe: "text-green-700 dark:text-green-400",
-  caution: "text-yellow-700 dark:text-yellow-400",
-  exceed: "text-red-700 dark:text-red-400",
+  safe: "text-[#00531c] dark:text-[#68f47f]",
+  caution: "text-[#4c4aca] dark:text-[#c2c1ff]",
+  exceed: "text-[#ba1a1a] dark:text-[#ffb4ab]",
 } as const;
 
 const progressColors = {
-  safe: "[&>div]:bg-green-500",
-  caution: "[&>div]:bg-yellow-500",
-  exceed: "[&>div]:bg-red-500",
+  safe: "[&>div]:bg-[#00531c] dark:[&>div]:bg-[#68f47f]",
+  caution: "[&>div]:bg-[#4c4aca] dark:[&>div]:bg-[#c2c1ff]",
+  exceed: "[&>div]:bg-[#ba1a1a] dark:[&>div]:bg-[#ffb4ab]",
 } as const;
 
 export function NutrientImpactPanel({
@@ -130,7 +130,7 @@ export function NutrientImpactPanel({
             )}
           </Button>
 
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
       </CardContent>
     </Card>
