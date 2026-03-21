@@ -139,14 +139,14 @@
 
 > Sign up, log in, session management, protected routes.
 
-- [ ] Auth callback route handler: `app/(auth)/callback/route.ts` — exchanges code for session
-- [ ] Login page (`/login`) — email/password with Supabase `signInWithPassword`
-- [ ] Register page (`/register`) — email/password with Supabase `signUp`
-- [ ] Logout action
-- [ ] Auto-create `profiles` row on signup (Supabase trigger or in callback)
-- [ ] Protected layout for `(app)` routes — check session server-side, redirect to `/login`
-- [ ] Protected layout for `(admin)` routes — check session + role = admin
-- [ ] Auth state in client components via `@supabase/ssr`
+- [x] Auth callback route handler: `app/(auth)/callback/route.ts` — exchanges code for session
+- [x] Login page (`/login`) — email/password with Supabase `signInWithPassword`
+- [x] Register page (`/register`) — email/password with Supabase `signUp`
+- [x] Logout action
+- [x] Auto-create `profiles` row on signup (Supabase trigger or in callback)
+- [x] Protected layout for `(app)` routes — check session server-side, redirect to `/login`
+- [x] Protected layout for `(admin)` routes — check session + role = admin
+- [x] Auth state in client components via `@supabase/ssr`
 
 **Deliverable**: Working Supabase auth flow, protected routes, profile creation.
 

@@ -65,7 +65,7 @@ src/
     validators.ts    # Zod schemas
   types/
     index.ts
-middleware.ts        # Next.js middleware — refreshes Supabase session on every request
+proxy.ts             # Next.js proxy — refreshes Supabase session, protects routes
 supabase/
   config.toml        # Local dev config (project: "bucharest")
   migrations/        # Drizzle-generated SQL migrations
@@ -83,7 +83,7 @@ supabase/
 
 - **Server components/actions**: `import { createClient } from "@/lib/supabase/server"` — async, uses cookies
 - **Client components**: `import { createClient } from "@/lib/supabase/client"` — browser client
-- **Middleware**: `src/lib/supabase/middleware.ts` exports `updateSession()`, called from `src/middleware.ts`
+- **Proxy**: `src/lib/supabase/middleware.ts` exports `updateSession()`, called from `src/proxy.ts`
 - **Admin writes**: Use `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS
 
 ## Environment Variables
@@ -107,4 +107,4 @@ DATABASE_URL=                   # Direct Postgres connection for Drizzle
 
 ## Implementation Status
 
-Phase 0 (scaffold) is complete. See `PLAN.md` for the full 10-phase roadmap and `PRODUCT.md` for product context.
+Phases 0–2 are complete. See `PLAN.md` for the full 10-phase roadmap and `PRODUCT.md` for product context.
