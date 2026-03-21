@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import type { FoodDetail, FoodVariantDetail, NutrientImpact } from "@/types";
 
+import { ConfidenceBadge } from "@/components/food/confidence-badge";
 import { NutrientBreakdown } from "@/components/food/nutrient-breakdown";
 import { NutrientImpactPanel } from "@/components/food/nutrient-impact-panel";
 import { ServingSelector } from "@/components/food/serving-selector";
@@ -117,17 +118,37 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
   };
 
   if (!selectedVariant) {
-    return <p className="text-muted-foreground">No variants available for this food.</p>;
+    return <p className="text-md-on-surface-variant">No variants available for this food.</p>;
   }
 
+  // Get average confidence from nutrients
+  const avgConfidence =
+    selectedVariant.nutrients.length > 0
+      ? selectedVariant.nutrients.reduce((s, n) => s + n.confidenceScore, 0) /
+        selectedVariant.nutrients.length
+      : 0;
+  const confidenceLabel =
+    avgConfidence >= 90
+      ? "high"
+      : avgConfidence >= 80
+        ? "good"
+        : avgConfidence >= 60
+          ? "moderate"
+          : "low";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Confidence Indicator */}
+      <ConfidenceBadge level={confidenceLabel} score={avgConfidence} />
+
+      {/* Variant Selector (Cooking Method Chips) */}
       <VariantSelector
         variants={food.variants}
         selectedVariantId={selectedVariant.id}
         onSelect={handleVariantChange}
       />
 
+      {/* Serving Selector */}
       <ServingSelector
         servingMeasures={selectedVariant.servingMeasures}
         selectedMeasureId={servingMeasureId}
@@ -149,8 +170,10 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
         }}
       />
 
+      {/* Nutrient Breakdown */}
       <NutrientBreakdown nutrients={selectedVariant.nutrients} portionGrams={portionGrams} />
 
+      {/* Impact Panel */}
       <NutrientImpactPanel
         impacts={impacts}
         portionGrams={portionGrams}

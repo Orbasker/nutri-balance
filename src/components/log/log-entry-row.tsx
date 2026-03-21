@@ -4,20 +4,16 @@ import { useState, useTransition } from "react";
 
 import { deleteLogEntry, getVariantNutrientValues, updateLogEntry } from "@/app/(app)/log/actions";
 import type { LogEntry, LogEntryNutrientInfo } from "@/types";
-import { Pencil, Trash2, X } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 import { calculateNutrientAmount } from "@/lib/calculations";
 
 interface LogEntryRowProps {
   entry: LogEntry;
   nutrientInfo: LogEntryNutrientInfo[];
+  mealColorClass: string;
 }
 
-export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
+export function LogEntryRow({ entry, nutrientInfo, mealColorClass }: LogEntryRowProps) {
   const [editing, setEditing] = useState(false);
   const [editGrams, setEditGrams] = useState(String(entry.quantity));
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +37,6 @@ export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
     }
 
     startEditTransition(async () => {
-      // Recalculate nutrient snapshot based on new grams
       const valuesPerHundred = await getVariantNutrientValues(entry.foodVariantId);
       const newSnapshot: Record<string, number> = {};
       for (const [nutrientId, per100g] of Object.entries(valuesPerHundred)) {
@@ -62,7 +57,6 @@ export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
     });
   };
 
-  // Show top nutrient amounts from snapshot
   const topNutrients = nutrientInfo
     .filter((n) => entry.nutrientSnapshot[n.nutrientId] != null)
     .slice(0, 3);
@@ -73,94 +67,94 @@ export function LogEntryRow({ entry, nutrientInfo }: LogEntryRowProps) {
   });
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg bg-card p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-medium">{entry.foodName}</span>
-            {entry.preparationMethod !== "raw" && (
-              <Badge variant="secondary" className="shrink-0 text-xs">
-                {entry.preparationMethod}
-              </Badge>
-            )}
-          </div>
-          <div className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
-            <span>{time}</span>
-            {!editing && (
-              <span>
-                {entry.quantity.toFixed(0)}g{entry.servingLabel ? ` (${entry.servingLabel})` : ""}
-              </span>
-            )}
-          </div>
+    <div className="group relative bg-md-surface-container-low hover:bg-md-surface-container transition-all duration-300 rounded-3xl p-6 flex flex-col md:flex-row md:items-center gap-6 mb-4">
+      {/* Food Thumbnail Placeholder */}
+      <div className="flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden bg-md-surface-container-highest flex items-center justify-center">
+        <span className="material-symbols-outlined text-3xl text-md-primary">restaurant</span>
+      </div>
+
+      {/* Content */}
+      <div className="flex-grow">
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className={`${mealColorClass} text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter`}
+          >
+            {entry.mealLabel || "Other"}
+          </span>
+          <span className="text-md-outline text-xs">{time}</span>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {editing ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
+        <h4 className="font-bold text-lg">{entry.foodName}</h4>
+
+        {editing ? (
+          <div className="flex items-center gap-2 mt-2">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={editGrams}
+              onChange={(e) => setEditGrams(e.target.value)}
+              className="h-8 w-24 text-sm bg-md-surface-container-lowest border border-md-outline-variant rounded-lg px-2 focus:border-md-primary focus:ring-1 focus:ring-md-primary/20 outline-none"
+              placeholder="grams"
+            />
+            <span className="text-md-on-surface-variant text-xs">g</span>
+            <button
+              className="h-8 px-3 bg-md-primary text-white text-sm font-semibold rounded-lg disabled:opacity-50"
+              onClick={handleSaveEdit}
+              disabled={editPending}
+            >
+              {editPending ? "Saving..." : "Save"}
+            </button>
+            <button
+              className="h-8 px-2 text-md-outline hover:text-md-on-surface"
               onClick={() => {
                 setEditing(false);
                 setEditGrams(String(entry.quantity));
                 setError(null);
               }}
             >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => setEditing(true)}
-                disabled={deletePending}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
-                onClick={handleDelete}
-                disabled={deletePending}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </>
-          )}
-        </div>
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-4 mt-2">
+            {topNutrients.map((n) => (
+              <div key={n.nutrientId} className="text-xs text-md-outline-variant">
+                <span className="font-bold text-md-on-surface">
+                  {entry.nutrientSnapshot[n.nutrientId]!.toFixed(1)}
+                </span>{" "}
+                {n.unit}
+              </div>
+            ))}
+            {topNutrients.length === 0 && (
+              <div className="text-xs text-md-outline-variant">
+                <span className="font-bold text-md-on-surface">{entry.quantity.toFixed(0)}</span>g
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {editing && (
-        <div className="flex items-center gap-2">
-          <Input
-            type="number"
-            min="1"
-            step="1"
-            value={editGrams}
-            onChange={(e) => setEditGrams(e.target.value)}
-            className="h-8 w-24 text-sm"
-            placeholder="grams"
-          />
-          <span className="text-muted-foreground text-xs">g</span>
-          <Button size="sm" className="h-8" onClick={handleSaveEdit} disabled={editPending}>
-            {editPending ? "Saving..." : "Save"}
-          </Button>
+      {/* Edit/Delete Buttons */}
+      {!editing && (
+        <div className="flex items-center gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className="w-10 h-10 rounded-full bg-md-surface-container-lowest flex items-center justify-center text-md-outline hover:text-md-primary shadow-sm transition-all active:scale-90"
+            onClick={() => setEditing(true)}
+            disabled={deletePending}
+          >
+            <span className="material-symbols-outlined text-sm">edit</span>
+          </button>
+          <button
+            className="w-10 h-10 rounded-full bg-md-surface-container-lowest flex items-center justify-center text-md-outline hover:text-md-error shadow-sm transition-all active:scale-90"
+            onClick={handleDelete}
+            disabled={deletePending}
+          >
+            <span className="material-symbols-outlined text-sm">delete</span>
+          </button>
         </div>
       )}
 
-      {topNutrients.length > 0 && (
-        <div className="text-muted-foreground flex flex-wrap gap-x-3 text-xs">
-          {topNutrients.map((n) => (
-            <span key={n.nutrientId}>
-              {n.displayName}: {entry.nutrientSnapshot[n.nutrientId]!.toFixed(1)} {n.unit}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-xs text-md-error mt-1">{error}</p>}
     </div>
   );
 }

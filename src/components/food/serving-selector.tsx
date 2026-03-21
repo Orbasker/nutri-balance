@@ -2,9 +2,7 @@
 
 import type { ServingMeasure } from "@/types";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface ServingSelectorProps {
   servingMeasures: ServingMeasure[];
@@ -27,77 +25,80 @@ export function ServingSelector({
 }: ServingSelectorProps) {
   const isCustom = customGrams !== null;
   const selectedMeasure = servingMeasures.find((s) => s.id === selectedMeasureId);
-
   const totalGrams = isCustom
     ? (customGrams ?? 0) * quantity
     : (selectedMeasure?.gramsEquivalent ?? 100) * quantity;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Serving size</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {servingMeasures.map((measure) => (
-            <Button
-              key={measure.id}
-              variant={selectedMeasureId === measure.id && !isCustom ? "default" : "outline"}
-              size="sm"
-              onClick={() => onMeasureChange(measure.id)}
-            >
-              {measure.label}
-              <span className="text-muted-foreground ml-1 text-xs">
-                ({measure.gramsEquivalent}g)
-              </span>
-            </Button>
-          ))}
-          <Button
-            variant={isCustom ? "default" : "outline"}
-            size="sm"
-            onClick={() => onCustomGramsChange(customGrams ?? 100)}
-          >
-            Custom
-          </Button>
-        </div>
-
-        {isCustom && (
-          <div className="flex items-center gap-2">
-            <Input
+    <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Amount */}
+      <div className="bg-md-surface-container-lowest p-6 rounded-xl space-y-4">
+        <label className="block text-xs font-bold text-md-outline uppercase tracking-wider">
+          Amount
+        </label>
+        {isCustom ? (
+          <input
+            className="w-full bg-transparent border-0 border-b-2 border-md-outline-variant focus:border-md-primary focus:ring-0 text-3xl font-bold p-0 transition-colors outline-none"
+            type="number"
+            min={1}
+            value={customGrams ?? ""}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val > 0) onCustomGramsChange(val);
+            }}
+          />
+        ) : (
+          <div className="flex items-center">
+            <input
+              className="w-full bg-transparent border-0 border-b-2 border-md-outline-variant focus:border-md-primary focus:ring-0 text-3xl font-bold p-0 transition-colors outline-none"
               type="number"
               min={1}
-              value={customGrams ?? ""}
+              value={quantity}
               onChange={(e) => {
                 const val = Number(e.target.value);
-                if (val > 0) onCustomGramsChange(val);
+                if (val > 0) onQuantityChange(val);
               }}
-              className="w-24"
-              placeholder="grams"
             />
-            <span className="text-muted-foreground text-sm">grams</span>
           </div>
         )}
+      </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm">Quantity:</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
-            disabled={quantity <= 1}
+      {/* Serving Unit */}
+      <div className="bg-md-surface-container-lowest p-6 rounded-xl space-y-4">
+        <label className="block text-xs font-bold text-md-outline uppercase tracking-wider">
+          Serving Unit
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {servingMeasures.map((measure) => (
+            <button
+              key={measure.id}
+              onClick={() => onMeasureChange(measure.id)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                selectedMeasureId === measure.id && !isCustom
+                  ? "bg-md-primary text-white"
+                  : "bg-md-surface-container-high text-md-on-surface-variant hover:bg-md-surface-container-highest",
+              )}
+            >
+              {measure.label} ({measure.gramsEquivalent}g)
+            </button>
+          ))}
+          <button
+            onClick={() => onCustomGramsChange(customGrams ?? 100)}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+              isCustom
+                ? "bg-md-primary text-white"
+                : "bg-md-surface-container-high text-md-on-surface-variant hover:bg-md-surface-container-highest",
+            )}
           >
-            -
-          </Button>
-          <span className="w-8 text-center text-sm font-medium">{quantity}</span>
-          <Button variant="outline" size="sm" onClick={() => onQuantityChange(quantity + 1)}>
-            +
-          </Button>
+            Custom (g)
+          </button>
         </div>
-
-        <p className="text-muted-foreground text-sm">
-          Total: <span className="font-medium text-foreground">{totalGrams.toFixed(0)}g</span>
+        <p className="text-md-on-surface-variant text-sm mt-2">
+          Total: <span className="font-bold text-md-on-surface">{totalGrams.toFixed(0)}g</span>
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

@@ -1,13 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
 import type { NutrientDetail } from "@/types";
-import { ChevronDown, ChevronUp } from "lucide-react";
-
-import { ConfidenceBadge } from "@/components/food/confidence-badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { calculateNutrientAmount } from "@/lib/calculations";
 
@@ -17,72 +10,83 @@ interface NutrientBreakdownProps {
 }
 
 export function NutrientBreakdown({ nutrients, portionGrams }: NutrientBreakdownProps) {
-  const [showSources, setShowSources] = useState(false);
+  // Calculate calories (first nutrient or find one with 'calorie' in name)
+  const calorieNutrient = nutrients.find(
+    (n) => n.name.toLowerCase().includes("calorie") || n.name.toLowerCase().includes("energy"),
+  );
+  const calories = calorieNutrient
+    ? calculateNutrientAmount(calorieNutrient.valuePer100g, portionGrams)
+    : null;
+
+  const proteinNutrient = nutrients.find((n) => n.name.toLowerCase().includes("protein"));
+  const carbNutrient = nutrients.find(
+    (n) => n.name.toLowerCase().includes("carb") || n.name.toLowerCase().includes("carbohydrate"),
+  );
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Nutrient breakdown</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-1">
-          <div className="text-muted-foreground grid grid-cols-4 gap-2 border-b pb-1 text-xs font-medium">
-            <span>Nutrient</span>
-            <span className="text-right">Per 100g</span>
-            <span className="text-right">This serving</span>
-            <span className="text-right">Confidence</span>
-          </div>
-          {nutrients.map((n) => {
-            const amount = calculateNutrientAmount(n.valuePer100g, portionGrams);
-            return (
-              <div key={n.nutrientId} className="grid grid-cols-4 gap-2 py-1.5 text-sm">
-                <span className="font-medium">{n.displayName}</span>
-                <span className="text-muted-foreground text-right">
-                  {n.valuePer100g.toFixed(1)} {n.unit}
-                </span>
-                <span className="text-right font-medium">
-                  {amount.toFixed(1)} {n.unit}
-                </span>
-                <span className="flex justify-end">
-                  <ConfidenceBadge level={n.confidenceLabel} />
-                </span>
-              </div>
-            );
-          })}
-        </div>
+    <section className="space-y-8">
+      <div className="flex items-end justify-between">
+        <h3 className="text-2xl font-bold">Nutritional Profile</h3>
+        <span className="text-md-outline font-medium text-sm">per serving</span>
+      </div>
 
-        {nutrients.some((n) => n.sourceSummary) && (
-          <div className="mt-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSources(!showSources)}
-              className="text-muted-foreground h-auto p-0 text-xs"
-            >
-              {showSources ? (
-                <>
-                  Hide sources <ChevronUp className="ml-1 h-3 w-3" />
-                </>
-              ) : (
-                <>
-                  Show sources <ChevronDown className="ml-1 h-3 w-3" />
-                </>
-              )}
-            </Button>
-            {showSources && (
-              <div className="mt-2 space-y-1">
-                {nutrients
-                  .filter((n) => n.sourceSummary)
-                  .map((n) => (
-                    <p key={n.nutrientId} className="text-muted-foreground text-xs">
-                      <span className="font-medium">{n.displayName}:</span> {n.sourceSummary}
-                    </p>
-                  ))}
-              </div>
-            )}
+      {/* Macro Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+        {calories !== null && (
+          <div className="col-span-2 md:col-span-1 bg-md-primary-container/10 p-6 rounded-2xl">
+            <span className="text-md-primary font-bold text-3xl block">{Math.round(calories)}</span>
+            <span className="text-md-primary/70 font-semibold text-sm uppercase tracking-wider">
+              Calories
+            </span>
           </div>
         )}
-      </CardContent>
-    </Card>
+        {proteinNutrient && (
+          <div className="bg-md-surface-container-lowest p-6 rounded-2xl space-y-2">
+            <span className="text-md-on-surface font-bold text-xl block">
+              {calculateNutrientAmount(proteinNutrient.valuePer100g, portionGrams).toFixed(1)}g
+            </span>
+            <span className="text-md-outline font-medium text-xs uppercase tracking-wider">
+              Protein
+            </span>
+          </div>
+        )}
+        {carbNutrient && (
+          <div className="bg-md-surface-container-lowest p-6 rounded-2xl space-y-2">
+            <span className="text-md-on-surface font-bold text-xl block">
+              {calculateNutrientAmount(carbNutrient.valuePer100g, portionGrams).toFixed(1)}g
+            </span>
+            <span className="text-md-outline font-medium text-xs uppercase tracking-wider">
+              Carbs
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Nutrient Impact Bars */}
+      <div className="bg-md-surface-container-low p-8 rounded-3xl space-y-6">
+        {nutrients.map((n) => {
+          const amount = calculateNutrientAmount(n.valuePer100g, portionGrams);
+          // Use a rough scale where 100% of bar = 2x the per-100g value
+          const barPct = Math.min((n.valuePer100g / (n.valuePer100g * 2 || 100)) * 100, 100);
+
+          return (
+            <div key={n.nutrientId} className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-md-on-surface">{n.displayName}</span>
+                <span className="text-md-on-surface-variant text-sm font-medium">
+                  {amount.toFixed(1)} {n.unit}
+                </span>
+              </div>
+              <div className="h-2 w-full bg-md-surface-container-high rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-md-primary rounded-full liquid-track"
+                  style={{ width: `${barPct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

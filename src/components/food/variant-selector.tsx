@@ -2,7 +2,7 @@
 
 import type { FoodVariantDetail } from "@/types";
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 interface VariantSelectorProps {
   variants: FoodVariantDetail[];
@@ -14,17 +14,26 @@ export function VariantSelector({ variants, selectedVariantId, onSelect }: Varia
   if (variants.length <= 1) return null;
 
   return (
-    <div>
-      <h2 className="mb-2 text-sm font-medium">Preparation method</h2>
-      <Tabs value={selectedVariantId} onValueChange={onSelect}>
-        <TabsList>
-          {variants.map((v) => (
-            <TabsTrigger key={v.id} value={v.id} className="capitalize">
-              {v.preparationMethod}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+    <div className="space-y-4">
+      <label className="text-sm font-semibold text-md-outline tracking-wide uppercase">
+        Cooking Method
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {variants.map((v) => (
+          <button
+            key={v.id}
+            onClick={() => onSelect(v.id)}
+            className={cn(
+              "px-5 py-2.5 rounded-full font-semibold text-sm transition-all capitalize",
+              v.id === selectedVariantId
+                ? "bg-md-primary-container text-md-on-primary-container"
+                : "bg-md-surface-container-high text-md-on-surface-variant hover:bg-md-surface-container-highest",
+            )}
+          >
+            {v.preparationMethod}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -4,10 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-
 import { cn } from "@/lib/utils";
 
 import { removeNutrientLimit, saveNutrientLimit } from "./actions";
@@ -35,34 +31,31 @@ type NutrientLimitsSettingsProps = {
   limits: UserNutrientLimitDto[];
 };
 
-function TrackSwitch({
+function ToggleSwitch({
   checked,
   disabled,
   onCheckedChange,
-  id,
 }: {
   checked: boolean;
   disabled?: boolean;
   onCheckedChange: (next: boolean) => void;
-  id: string;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-labelledby={id}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative inline-flex h-6 w-10 shrink-0 rounded-full border border-transparent transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
-        checked ? "bg-primary" : "bg-muted",
+        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+        checked ? "bg-md-primary" : "bg-md-surface-container",
       )}
     >
       <span
         className={cn(
-          "pointer-events-none block size-5 translate-x-0.5 rounded-full bg-background shadow-sm ring-1 ring-foreground/10 transition-transform",
-          checked && "translate-x-[18px]",
+          "inline-block h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform",
+          checked ? "translate-x-[22px]" : "translate-x-[3px]",
         )}
       />
     </button>
@@ -89,106 +82,150 @@ export function NutrientLimitsSettings({ nutrients, limits }: NutrientLimitsSett
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Nutrient limits</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Choose which nutrients to track and set daily limits. Strict mode uses a single daily
-          maximum (MVP). Stability mode stores a target range for future guidance; the upper bound
-          is also kept as the daily limit for existing summaries.
-        </p>
-      </div>
-
-      {error ? (
-        <p className="text-destructive text-sm" role="alert">
+      {error && (
+        <p className="text-md-error text-sm" role="alert">
           {error}
         </p>
-      ) : null}
+      )}
 
-      <div className="flex flex-col gap-4">
-        {nutrients.map((n) => {
-          const limit = limitByNutrient.get(n.id);
-          const isTracked = !!limit;
-          const showForm = isTracked || draftNutrientIds.has(n.id);
-          const headingId = `nutrient-heading-${n.id}`;
+      {/* Daily Nutrient Limits */}
+      <section className="bg-md-surface-container-lowest p-8 rounded-xl shadow-[0_10px_30px_rgba(0,68,147,0.06)]">
+        <div className="flex items-center gap-3 mb-8">
+          <span className="material-symbols-outlined text-md-primary">clinical_notes</span>
+          <h3 className="font-bold text-lg">Daily Nutrient Limits</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {nutrients.map((n, i) => {
+            const limit = limitByNutrient.get(n.id);
+            const isTracked = !!limit || draftNutrientIds.has(n.id);
 
-          return (
-            <Card key={n.id} size="sm">
-              <CardHeader className="border-b">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <CardTitle id={headingId}>{n.display_name}</CardTitle>
-                    <CardDescription>Unit: {n.unit}</CardDescription>
-                  </div>
-                  <TrackSwitch
-                    id={headingId}
-                    checked={showForm}
-                    disabled={pending}
-                    onCheckedChange={(on) => {
-                      setError(null);
-                      if (on) {
-                        setDraftNutrientIds((prev) => new Set(prev).add(n.id));
-                        return;
-                      }
-                      setDraftNutrientIds((prev) => {
-                        const next = new Set(prev);
-                        next.delete(n.id);
-                        return next;
-                      });
-                      if (limit) {
-                        startTransition(async () => {
-                          const res = await removeNutrientLimit({ limitId: limit.id });
-                          if ("error" in res) {
-                            setError(res.error);
-                            return;
-                          }
-                          refresh();
-                        });
-                      }
-                    }}
-                  />
-                </div>
-              </CardHeader>
-              {showForm ? (
-                <NutrientLimitFields
-                  key={limit?.id ?? `${n.id}-new`}
-                  nutrient={n}
-                  limit={limit}
-                  disabled={pending}
-                  onSave={async (payload) => {
-                    setError(null);
+            return (
+              <NutrientLimitField
+                key={n.id}
+                nutrient={n}
+                limit={limit}
+                isTracked={isTracked}
+                isFirst={i === 0}
+                disabled={pending}
+                onToggle={(on) => {
+                  setError(null);
+                  if (on) {
+                    setDraftNutrientIds((prev) => new Set(prev).add(n.id));
+                    return;
+                  }
+                  setDraftNutrientIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(n.id);
+                    return next;
+                  });
+                  if (limit) {
                     startTransition(async () => {
-                      const res = await saveNutrientLimit(payload);
+                      const res = await removeNutrientLimit({ limitId: limit.id });
                       if ("error" in res) {
                         setError(res.error);
                         return;
                       }
-                      setDraftNutrientIds((prev) => {
-                        const next = new Set(prev);
-                        next.delete(n.id);
-                        return next;
-                      });
                       refresh();
                     });
-                  }}
-                />
-              ) : null}
-            </Card>
-          );
-        })}
+                  }
+                }}
+                onSave={async (payload) => {
+                  setError(null);
+                  startTransition(async () => {
+                    const res = await saveNutrientLimit(payload);
+                    if ("error" in res) {
+                      setError(res.error);
+                      return;
+                    }
+                    setDraftNutrientIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(n.id);
+                      return next;
+                    });
+                    refresh();
+                  });
+                }}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        {/* Tracking Modes */}
+        <section className="md:col-span-2 bg-md-surface-container-low p-8 rounded-xl flex flex-col justify-between space-y-8">
+          <div>
+            <h3 className="font-bold text-lg mb-6">Tracking Modes</h3>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-md-on-surface">Strict Mode</p>
+                  <p className="text-xs text-md-on-surface-variant max-w-[150px]">
+                    Hard stop notifications when limits are hit.
+                  </p>
+                </div>
+                <ToggleSwitch checked={true} onCheckedChange={() => {}} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-md-on-surface">Stability Mode</p>
+                  <p className="text-xs text-md-on-surface-variant max-w-[150px]">
+                    Focuses on consistent day-to-day variance.
+                  </p>
+                </div>
+                <ToggleSwitch checked={false} onCheckedChange={() => {}} />
+              </div>
+            </div>
+          </div>
+          <div className="bg-md-primary/5 p-4 rounded-lg">
+            <p className="text-[10px] uppercase font-extrabold tracking-tighter text-md-primary">
+              Status
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
+                <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
+                <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
+              </div>
+              <span className="text-xs font-bold text-md-primary">High Confidence Active</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Medical Notes */}
+        <section className="md:col-span-3 bg-md-surface-container-lowest p-8 rounded-xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] flex flex-col">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="material-symbols-outlined text-md-outline">description</span>
+            <h3 className="font-bold text-lg">Medical Notes</h3>
+          </div>
+          <textarea
+            className="w-full flex-grow bg-md-surface-container-low border-none rounded-xl p-5 text-md-on-surface text-sm leading-relaxed placeholder:text-md-outline/50 focus:ring-2 focus:ring-md-primary/20 min-h-[200px] outline-none"
+            placeholder="Add context for your physician or personal record... e.g., 'Currently on Coumadin, monitoring Vitamin K intake for INR stability.'"
+          />
+          <button className="mt-6 w-full bg-md-primary text-white font-bold py-4 rounded-xl active:scale-95 transition-all duration-200">
+            Save Configurations
+          </button>
+        </section>
       </div>
     </div>
   );
 }
 
-function NutrientLimitFields({
+function NutrientLimitField({
   nutrient,
   limit,
+  isTracked,
+  isFirst,
   disabled,
+  onToggle,
   onSave,
 }: {
   nutrient: NutrientDto;
   limit: UserNutrientLimitDto | undefined;
+  isTracked: boolean;
+  isFirst: boolean;
   disabled: boolean;
+  onToggle: (on: boolean) => void;
   onSave: (payload: {
     nutrientId: string;
     limitId?: string;
@@ -198,109 +235,45 @@ function NutrientLimitFields({
     rangeMax?: string;
   }) => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"strict" | "stability">(limit?.mode ?? "strict");
   const [dailyLimit, setDailyLimit] = useState(limit?.daily_limit ?? "");
-  const [rangeMin, setRangeMin] = useState(limit?.range_min ?? "");
-  const [rangeMax, setRangeMax] = useState(limit?.range_max ?? "");
 
   return (
-    <CardContent className="pt-4">
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void onSave({
-            nutrientId: nutrient.id,
-            limitId: limit?.id,
-            mode,
-            dailyLimit: mode === "strict" ? dailyLimit : undefined,
-            rangeMin: mode === "stability" ? rangeMin : undefined,
-            rangeMax: mode === "stability" ? rangeMax : undefined,
-          });
-        }}
-      >
-        <div className="grid gap-2 sm:max-w-xs">
-          <label
-            className="text-muted-foreground text-xs font-medium"
-            htmlFor={`mode-${nutrient.id}`}
-          >
-            Mode
-          </label>
-          <select
-            id={`mode-${nutrient.id}`}
-            value={mode}
-            disabled={disabled}
-            onChange={(e) => setMode(e.target.value as "strict" | "stability")}
-            className="border-input bg-background h-8 w-full rounded-lg border px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30"
-          >
-            <option value="strict">Strict (daily maximum)</option>
-            <option value="stability">Stability (target range)</option>
-          </select>
+    <div className="group border-b border-md-outline-variant/15 pb-4 focus-within:border-md-primary transition-all">
+      <div className="flex justify-between items-start mb-1">
+        <label
+          className={cn(
+            "block text-xs font-bold uppercase tracking-widest",
+            isFirst ? "text-md-primary" : "text-md-outline",
+          )}
+        >
+          {nutrient.display_name}
+        </label>
+        <ToggleSwitch checked={isTracked} disabled={disabled} onCheckedChange={onToggle} />
+      </div>
+      {isTracked && (
+        <div className="flex items-baseline gap-2">
+          <input
+            className="w-full bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
+            placeholder="0"
+            type="text"
+            value={dailyLimit}
+            onChange={(e) => setDailyLimit(e.target.value)}
+            onBlur={() => {
+              if (dailyLimit) {
+                void onSave({
+                  nutrientId: nutrient.id,
+                  limitId: limit?.id,
+                  mode: "strict",
+                  dailyLimit,
+                });
+              }
+            }}
+          />
+          <span className="text-md-on-surface-variant font-medium whitespace-nowrap">
+            {nutrient.unit}/day
+          </span>
         </div>
-
-        {mode === "strict" ? (
-          <div className="grid gap-2 sm:max-w-xs">
-            <label
-              className="text-muted-foreground text-xs font-medium"
-              htmlFor={`daily-${nutrient.id}`}
-            >
-              Daily limit ({nutrient.unit})
-            </label>
-            <Input
-              id={`daily-${nutrient.id}`}
-              inputMode="decimal"
-              disabled={disabled}
-              value={dailyLimit}
-              onChange={(e) => setDailyLimit(e.target.value)}
-              placeholder="e.g. 120"
-              required
-            />
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-            <div className="grid gap-2">
-              <label
-                className="text-muted-foreground text-xs font-medium"
-                htmlFor={`rmin-${nutrient.id}`}
-              >
-                Range min ({nutrient.unit})
-              </label>
-              <Input
-                id={`rmin-${nutrient.id}`}
-                inputMode="decimal"
-                disabled={disabled}
-                value={rangeMin}
-                onChange={(e) => setRangeMin(e.target.value)}
-                placeholder="e.g. 80"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <label
-                className="text-muted-foreground text-xs font-medium"
-                htmlFor={`rmax-${nutrient.id}`}
-              >
-                Range max ({nutrient.unit})
-              </label>
-              <Input
-                id={`rmax-${nutrient.id}`}
-                inputMode="decimal"
-                disabled={disabled}
-                value={rangeMax}
-                onChange={(e) => setRangeMax(e.target.value)}
-                placeholder="e.g. 120"
-                required
-              />
-            </div>
-          </div>
-        )}
-
-        <div>
-          <Button type="submit" disabled={disabled}>
-            {limit ? "Save changes" : "Save and track"}
-          </Button>
-        </div>
-      </form>
-    </CardContent>
+      )}
+    </div>
   );
 }

@@ -2,14 +2,19 @@ import { SearchInput } from "@/components/food/search-input";
 
 export default function SearchPage() {
   return (
-    <div className="container mx-auto max-w-4xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Food Search</h1>
-        <p className="text-sm text-muted-foreground">
-          Search for foods to check their nutrient content and track your intake.
+    <div className="px-6 max-w-screen-xl mx-auto">
+      {/* Hero Search Section */}
+      <section className="mt-8 mb-12">
+        <h2 className="text-3xl font-extrabold text-md-primary mb-2 tracking-tight">
+          Explore Food
+        </h2>
+        <p className="text-md-on-surface-variant font-medium">
+          Identify nutrients in your daily meals.
         </p>
-      </div>
-      <SearchInput />
+        <div className="mt-8">
+          <SearchInput />
+        </div>
+      </section>
     </div>
   );
 }
