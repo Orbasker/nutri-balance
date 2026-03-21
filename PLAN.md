@@ -271,6 +271,21 @@
 
 ---
 
+## Cross-Cutting: Langfuse Observability
+
+> Integrate [Langfuse](https://langfuse.com) for tracing and observability of any LLM-powered features (e.g. food search suggestions, nutrient reasoning, confidence scoring).
+
+- [x] Install `langfuse` SDK (`bun add langfuse`)
+- [x] Configure Langfuse environment variables (`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`) in `.env.local.example` and `.env.local`
+- [x] Create `src/lib/langfuse.ts` — singleton Langfuse client
+- [ ] Instrument LLM calls with Langfuse traces (generations, spans, scores)
+- [ ] Add user feedback scores to traces where applicable
+- [ ] Dashboard: Langfuse Cloud or self-hosted for monitoring latency, cost, and quality
+
+**When**: Wire in as soon as the first LLM-backed feature is added. Langfuse tracing should wrap every LLM call from day one.
+
+---
+
 ## Summary
 
 | Phase | Focus           | Depends On |
