@@ -5,5 +5,5 @@
     "archive": "./scripts/conductor-archive.sh"
   },
   "runScriptMode": "nonconcurrent",
-  "filesToCopy": [".env.local", "node_modules"]
+  "filesToCopy": [".env.local", "node_modules", ".env"]
 }
