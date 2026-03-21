@@ -37,6 +37,9 @@ yarn-error.log*
 # context
 .context/
 
+# claude
+.claude/
+
 # vercel
 .vercel
 
