@@ -5,16 +5,24 @@ import { NutrientLimitsSettings } from "./nutrient-limits-settings";
 export default async function SettingsPage() {
   const supabase = await createClient();
 
-  const [{ data: nutrients, error: nutrientsError }, { data: limits, error: limitsError }] =
-    await Promise.all([
-      supabase
-        .from("nutrients")
-        .select("id, name, unit, display_name, sort_order")
-        .order("sort_order", {
-          ascending: true,
-        }),
-      supabase.from("user_nutrient_limits").select("*"),
-    ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [
+    { data: nutrients, error: nutrientsError },
+    { data: limits, error: limitsError },
+    { data: profile },
+  ] = await Promise.all([
+    supabase
+      .from("nutrients")
+      .select("id, name, unit, display_name, sort_order")
+      .order("sort_order", {
+        ascending: true,
+      }),
+    supabase.from("user_nutrient_limits").select("*"),
+    supabase.from("profiles").select("clinical_notes").eq("id", user!.id).single(),
+  ]);
 
   if (nutrientsError || limitsError) {
     return (
@@ -36,7 +44,11 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <NutrientLimitsSettings nutrients={nutrients ?? []} limits={limits ?? []} />
+      <NutrientLimitsSettings
+        nutrients={nutrients ?? []}
+        limits={limits ?? []}
+        medicalNotes={profile?.clinical_notes ?? ""}
+      />
     </div>
   );
 }

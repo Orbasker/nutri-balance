@@ -97,6 +97,29 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
   return { ok: true };
 }
 
+export async function saveMedicalNotes(notes: string): Promise<NutrientLimitActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ clinical_notes: notes })
+    .eq("id", user.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 export async function removeNutrientLimit(raw: unknown): Promise<NutrientLimitActionResult> {
   const parsed = deleteUserNutrientLimitSchema.safeParse(raw);
   if (!parsed.success) {

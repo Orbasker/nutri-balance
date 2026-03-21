@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import { removeNutrientLimit, saveNutrientLimit } from "./actions";
+import { removeNutrientLimit, saveMedicalNotes, saveNutrientLimit } from "./actions";
 
 export type NutrientDto = {
   id: string;
@@ -29,6 +29,7 @@ export type UserNutrientLimitDto = {
 type NutrientLimitsSettingsProps = {
   nutrients: NutrientDto[];
   limits: UserNutrientLimitDto[];
+  medicalNotes: string;
 };
 
 function ToggleSwitch({
@@ -62,11 +63,17 @@ function ToggleSwitch({
   );
 }
 
-export function NutrientLimitsSettings({ nutrients, limits }: NutrientLimitsSettingsProps) {
+export function NutrientLimitsSettings({
+  nutrients,
+  limits,
+  medicalNotes: initialNotes,
+}: NutrientLimitsSettingsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [draftNutrientIds, setDraftNutrientIds] = useState<Set<string>>(() => new Set());
+  const [notes, setNotes] = useState(initialNotes);
+  const [notesSaved, setNotesSaved] = useState(false);
 
   const limitByNutrient = useMemo(() => {
     const m = new Map<string, UserNutrientLimitDto>();
@@ -201,9 +208,30 @@ export function NutrientLimitsSettings({ nutrients, limits }: NutrientLimitsSett
           <textarea
             className="w-full flex-grow bg-md-surface-container-low border-none rounded-xl p-5 text-md-on-surface text-sm leading-relaxed placeholder:text-md-outline/50 focus:ring-2 focus:ring-md-primary/20 min-h-[200px] outline-none"
             placeholder="Add context for your physician or personal record... e.g., 'Currently on Coumadin, monitoring Vitamin K intake for INR stability.'"
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              setNotesSaved(false);
+            }}
           />
-          <button className="mt-6 w-full bg-md-primary text-white font-bold py-4 rounded-xl active:scale-95 transition-all duration-200">
-            Save Configurations
+          <button
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              setNotesSaved(false);
+              startTransition(async () => {
+                const res = await saveMedicalNotes(notes);
+                if ("error" in res) {
+                  setError(res.error);
+                  return;
+                }
+                setNotesSaved(true);
+                refresh();
+              });
+            }}
+            className="mt-6 w-full bg-md-primary text-white font-bold py-4 rounded-xl active:scale-95 transition-all duration-200 disabled:opacity-60"
+          >
+            {pending ? "Saving..." : notesSaved ? "Saved!" : "Save Configurations"}
           </button>
         </section>
       </div>

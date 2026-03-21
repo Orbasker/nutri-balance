@@ -12,6 +12,7 @@ export const profiles = pgTable("profiles", {
   id: uuid().primaryKey(),
   displayName: text("display_name"),
   role: userRoleEnum().default("user").notNull(),
+  clinicalNotes: text("clinical_notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
