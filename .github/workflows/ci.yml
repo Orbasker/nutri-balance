@@ -32,3 +32,59 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  db-migrations-check:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start -x realtime,storage,imgproxy,inbucket,postgrest,pgadmin-schema-diff,migra,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Verify migrations apply
+        run: supabase db push --local
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check Drizzle migration consistency
+        run: bunx drizzle-kit check
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop
+
+  db-migrations-deploy:
+    name: Deploy Migrations
+    needs: [lint-format-build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Push migrations to production
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

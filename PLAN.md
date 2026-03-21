@@ -4,18 +4,18 @@
 
 > Set up Next.js + Supabase + Drizzle + shadcn, all wired together.
 
-- [ ] Initialize Next.js 15 with App Router, TypeScript, Tailwind CSS 4, ESLint
-- [ ] Install and configure shadcn/ui (init + base components: button, input, card, badge, progress, dialog, dropdown-menu, separator, sheet, tabs, command)
-- [ ] Initialize Supabase project locally: `supabase init`
-- [ ] Install `@supabase/supabase-js` + `@supabase/ssr`
-- [ ] Create Supabase client utilities:
+- [x] Initialize Next.js 15 with App Router, TypeScript, Tailwind CSS 4, ESLint
+- [x] Install and configure shadcn/ui (init + base components: button, input, card, badge, progress, dialog, dropdown-menu, separator, sheet, tabs, command)
+- [x] Initialize Supabase project locally: `supabase init`
+- [x] Install `@supabase/supabase-js` + `@supabase/ssr`
+- [x] Create Supabase client utilities:
   - `lib/supabase/server.ts` — server-side client (cookies-based)
   - `lib/supabase/client.ts` — browser client
   - `lib/supabase/middleware.ts` — session refresh middleware
-- [ ] Install and configure Drizzle ORM + drizzle-kit (driver: `postgres`)
+- [x] Install and configure Drizzle ORM + drizzle-kit (driver: `postgres`)
   - `lib/db/index.ts` — drizzle client connecting via `DATABASE_URL`
   - `drizzle.config.ts`
-- [ ] Set up project structure:
+- [x] Set up project structure:
   ```
   src/
     app/
@@ -64,18 +64,18 @@
     migrations/
     seed.sql
   ```
-- [ ] Replace .gitignore with Node/Next.js version (include `.env.local`)
-- [ ] Add `.env.local.example` with:
+- [x] Replace .gitignore with Node/Next.js version (include `.env.local`)
+- [x] Add `.env.local.example` with:
   ```
   NEXT_PUBLIC_SUPABASE_URL=
   NEXT_PUBLIC_SUPABASE_ANON_KEY=
   SUPABASE_SERVICE_ROLE_KEY=
   DATABASE_URL=
   ```
-- [ ] Next.js middleware that refreshes Supabase session on every request
-- [ ] Verify `npm run dev` works
-- [ ] Verify `supabase start` works (local Postgres + Auth + Studio)
-- [ ] Verify Drizzle can connect to local Supabase DB
+- [x] Next.js middleware that refreshes Supabase session on every request
+- [x] Verify `npm run dev` works
+- [x] Verify `supabase start` works (local Postgres + Auth + Studio)
+- [x] Verify Drizzle can connect to local Supabase DB
 
 **Deliverable**: Running Next.js app with Supabase local dev, Drizzle connected, shadcn ready.
 
@@ -87,49 +87,49 @@
 
 ### Tables (Drizzle schema)
 
-- [ ] `foods` — id (uuid), name, category, description, created_at, updated_at
-- [ ] `food_aliases` — id, food_id (FK), alias, language, source
-- [ ] `food_variants` — id, food_id (FK), preparation_method (enum), description, is_default
-- [ ] `nutrients` — id, name, unit, display_name, sort_order
-- [ ] `serving_measures` — id, food_variant_id (FK), label, grams_equivalent
-- [ ] `sources` — id, name, url, type (enum), trust_level
-- [ ] `source_records` — id, source_id (FK), external_id, raw_data (jsonb), imported_at
-- [ ] `nutrient_observations` — id, food_variant_id (FK), nutrient_id (FK), value, unit, basis_amount, basis_unit, source_record_id (FK), derivation_type (enum), confidence_score, review_status (enum)
-- [ ] `evidence_items` — id, observation_id (FK), snippet, page_ref, row_locator, url
-- [ ] `retention_profiles` — id, nutrient_id (FK), preparation_method (enum), retention_factor, source_id (FK)
-- [ ] `yield_profiles` — id, food_id (FK), preparation_method (enum), yield_factor
-- [ ] `variant_calculation_rules` — id, food_variant_id (FK), base_variant_id (FK), retention_profile_id (FK), yield_profile_id (FK)
-- [ ] `reviews` — id, entity_type, entity_id, reviewer_id (references auth.users), status (enum), notes, reviewed_at
-- [ ] `resolved_nutrient_values` — id, food_variant_id (FK), nutrient_id (FK), value_per_100g, confidence_score, confidence_label, source_summary, resolved_at
-- [ ] `user_nutrient_limits` — id, user_id (references auth.users), nutrient_id (FK), daily_limit, mode (strict/stability), range_min, range_max
-- [ ] `consumption_logs` — id, user_id (references auth.users), food_variant_id (FK), serving_measure_id (FK), quantity, nutrient_snapshot (jsonb), logged_at, meal_label
-- [ ] `profiles` — id (references auth.users), display_name, role (user/admin), created_at
+- [x] `foods` — id (uuid), name, category, description, created_at, updated_at
+- [x] `food_aliases` — id, food_id (FK), alias, language, source
+- [x] `food_variants` — id, food_id (FK), preparation_method (enum), description, is_default
+- [x] `nutrients` — id, name, unit, display_name, sort_order
+- [x] `serving_measures` — id, food_variant_id (FK), label, grams_equivalent
+- [x] `sources` — id, name, url, type (enum), trust_level
+- [x] `source_records` — id, source_id (FK), external_id, raw_data (jsonb), imported_at
+- [x] `nutrient_observations` — id, food_variant_id (FK), nutrient_id (FK), value, unit, basis_amount, basis_unit, source_record_id (FK), derivation_type (enum), confidence_score, review_status (enum)
+- [x] `evidence_items` — id, observation_id (FK), snippet, page_ref, row_locator, url
+- [x] `retention_profiles` — id, nutrient_id (FK), preparation_method (enum), retention_factor, source_id (FK)
+- [x] `yield_profiles` — id, food_id (FK), preparation_method (enum), yield_factor
+- [x] `variant_calculation_rules` — id, food_variant_id (FK), base_variant_id (FK), retention_profile_id (FK), yield_profile_id (FK)
+- [x] `reviews` — id, entity_type, entity_id, reviewer_id (references auth.users), status (enum), notes, reviewed_at
+- [x] `resolved_nutrient_values` — id, food_variant_id (FK), nutrient_id (FK), value_per_100g, confidence_score, confidence_label, source_summary, resolved_at
+- [x] `user_nutrient_limits` — id, user_id (references auth.users), nutrient_id (FK), daily_limit, mode (strict/stability), range_min, range_max
+- [x] `consumption_logs` — id, user_id (references auth.users), food_variant_id (FK), serving_measure_id (FK), quantity, nutrient_snapshot (jsonb), logged_at, meal_label
+- [x] `profiles` — id (references auth.users), display_name, role (user/admin), created_at
 
 ### RLS Policies (SQL migration)
 
-- [ ] Enable RLS on all tables
-- [ ] **Public read tables** (foods, food_aliases, food_variants, nutrients, serving_measures, resolved_nutrient_values, retention_profiles, yield_profiles):
+- [x] Enable RLS on all tables
+- [x] **Public read tables** (foods, food_aliases, food_variants, nutrients, serving_measures, resolved_nutrient_values, retention_profiles, yield_profiles):
   - `SELECT` for authenticated users (or anon if desired)
-- [ ] **User-scoped tables** (user_nutrient_limits, consumption_logs):
+- [x] **User-scoped tables** (user_nutrient_limits, consumption_logs):
   - `SELECT` where `user_id = auth.uid()`
   - `INSERT` where `user_id = auth.uid()`
   - `UPDATE` where `user_id = auth.uid()`
   - `DELETE` where `user_id = auth.uid()`
-- [ ] **Admin-only tables** (sources, source_records, nutrient_observations, evidence_items, reviews, variant_calculation_rules):
+- [x] **Admin-only tables** (sources, source_records, nutrient_observations, evidence_items, reviews, variant_calculation_rules):
   - `SELECT` for authenticated
   - `INSERT/UPDATE/DELETE` where user role = 'admin' (via profiles table or Supabase custom claims)
-- [ ] **Profiles**:
+- [x] **Profiles**:
   - `SELECT` own profile
   - `UPDATE` own profile (except role)
 
 ### Seed Data
 
-- [ ] Seed ~10 common foods (spinach, broccoli, banana, chicken breast, salmon, rice, potato, tomato, egg, milk)
-- [ ] Seed variants (raw, boiled, steamed for vegetables; raw, grilled, baked for proteins)
-- [ ] Seed 6 core nutrients (Vitamin K, Vitamin A, Vitamin C, Potassium, Sodium, Iron)
-- [ ] Seed resolved_nutrient_values for all food+variant+nutrient combos
-- [ ] Seed serving_measures (per 100g, per cup, per piece where applicable)
-- [ ] Seed retention_profiles for common cooking methods
+- [x] Seed ~10 common foods (spinach, broccoli, banana, chicken breast, salmon, rice, potato, tomato, egg, milk)
+- [x] Seed variants (raw, boiled, steamed for vegetables; raw, grilled, baked for proteins)
+- [x] Seed 6 core nutrients (Vitamin K, Vitamin A, Vitamin C, Potassium, Sodium, Iron)
+- [x] Seed resolved_nutrient_values for all food+variant+nutrient combos
+- [x] Seed serving_measures (per 100g, per cup, per piece where applicable)
+- [x] Seed retention_profiles for common cooking methods
 
 **Deliverable**: Complete schema, RLS policies, migration files, seed data.
 
