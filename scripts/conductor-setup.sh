@@ -19,6 +19,8 @@ if [ ! -f .env.local ] && [ -f .env.local.example ]; then
   if [ -n "$MAIN_PATH" ] && [ "$MAIN_PATH" != "$(pwd)" ] && [ -f "$MAIN_PATH/.env.local" ]; then
     cp "$MAIN_PATH/.env.local" .env.local
     echo "Copied .env.local from main worktree"
+    cp "$MAIN_PATH/.env" .env
+    echo "Copied .env from main worktree"
   else
     cp .env.local.example .env.local
     echo "Created .env.local from example — fill in your Supabase credentials"
