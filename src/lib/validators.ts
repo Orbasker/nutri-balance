@@ -77,6 +77,17 @@ export const deleteUserNutrientLimitSchema = z.object({
 
 export type DeleteUserNutrientLimitInput = z.infer<typeof deleteUserNutrientLimitSchema>;
 
+export const addConsumptionLogSchema = z.object({
+  foodVariantId: z.string().uuid(),
+  servingMeasureId: z.string().uuid().nullable(),
+  quantity: z.number().positive("Quantity must be positive"),
+  gramsAmount: z.number().positive("Grams must be positive"),
+  nutrientSnapshot: z.record(z.string(), z.number()),
+  mealLabel: z.string().optional(),
+});
+
+export type AddConsumptionLogInput = z.infer<typeof addConsumptionLogSchema>;
+
 /**
  * Turns validated input into DB-ready numeric strings.
  * For stability mode, `daily_limit` is set to `range_max` so existing strict-style consumers stay consistent until the app reads ranges.

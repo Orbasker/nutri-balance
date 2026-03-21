@@ -1,5 +1,7 @@
 export type ConfidenceLabel = "high" | "good" | "moderate" | "low";
 
+export type NutrientStatus = "safe" | "caution" | "exceed";
+
 export interface NutrientSummary {
   name: string;
   displayName: string;
@@ -23,7 +25,53 @@ export interface FoodSearchResult {
   variants: FoodVariantSummary[];
 }
 
-export type NutrientStatus = "safe" | "caution" | "exceed";
+export interface ServingMeasure {
+  id: string;
+  label: string;
+  gramsEquivalent: number;
+}
+
+export interface NutrientDetail {
+  nutrientId: string;
+  name: string;
+  displayName: string;
+  unit: string;
+  valuePer100g: number;
+  confidenceScore: number;
+  confidenceLabel: ConfidenceLabel;
+  sourceSummary: string | null;
+}
+
+export interface FoodVariantDetail {
+  id: string;
+  preparationMethod: string;
+  description: string | null;
+  isDefault: boolean;
+  servingMeasures: ServingMeasure[];
+  nutrients: NutrientDetail[];
+}
+
+export interface FoodDetail {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  variants: FoodVariantDetail[];
+}
+
+export interface NutrientImpact {
+  nutrientId: string;
+  displayName: string;
+  unit: string;
+  consumedToday: number;
+  addedAmount: number;
+  newTotal: number;
+  dailyLimit: number | null;
+  mode: "strict" | "stability" | null;
+  rangeMin: number | null;
+  rangeMax: number | null;
+  status: NutrientStatus;
+}
 
 export interface NutrientProgress {
   nutrientId: string;

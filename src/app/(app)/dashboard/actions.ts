@@ -113,7 +113,7 @@ export async function fetchDashboardData(): Promise<{
         consumed,
         remaining,
         percentage,
-        status: getNutrientStatus(percentage),
+        status: getNutrientStatus(consumed, dailyLimit),
         sortOrder: nutrient.sort_order ?? 0,
       };
     })

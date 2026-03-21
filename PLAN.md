@@ -156,11 +156,11 @@
 
 > Users configure which nutrients they track and their limits.
 
-- [ ] Settings page UI: list of available nutrients, toggle tracking, set limit
-- [ ] Add/remove tracked nutrients
-- [ ] Mode selector per nutrient (strict vs stability — stability stores range_min/range_max)
-- [ ] Server action to save/update `user_nutrient_limits` (RLS ensures user can only write own)
-- [ ] Zod validation on inputs
+- [x] Settings page UI: list of available nutrients, toggle tracking, set limit
+- [x] Add/remove tracked nutrients
+- [x] Mode selector per nutrient (strict vs stability — stability stores range_min/range_max)
+- [x] Server action to save/update `user_nutrient_limits` (RLS ensures user can only write own)
+- [x] Zod validation on inputs
 
 **Deliverable**: Users can set and persist nutrient limits.
 
@@ -170,13 +170,13 @@
 
 > Search foods by name/alias, show results with prep methods.
 
-- [ ] Server action or API route for search
+- [x] Server action or API route for search
   - Query `foods` + `food_aliases` with ILIKE (or Supabase full-text search)
   - Join `food_variants` and `resolved_nutrient_values`
   - Return food name, variants, top nutrient indicator, confidence badge
-- [ ] Search page with debounced input
-- [ ] Autocomplete dropdown using shadcn Command component
-- [ ] Result cards showing food name, prep type, nutrient level badge, confidence
+- [x] Search page with debounced input
+- [x] Autocomplete dropdown using shadcn Command component
+- [x] Result cards showing food name, prep type, nutrient level badge, confidence
 
 **Deliverable**: Working food search with results.
 
@@ -186,17 +186,17 @@
 
 > Core decision screen: see nutrients, choose serving, see impact on daily limits.
 
-- [ ] Food detail page: `/food/[id]`
-- [ ] Variant selector (tabs or dropdown for prep methods)
-- [ ] Serving selector (serving_measures for the variant + custom grams input)
-- [ ] Nutrient breakdown table for selected serving
-- [ ] "If you eat this" panel:
+- [x] Food detail page: `/food/[id]`
+- [x] Variant selector (tabs or dropdown for prep methods)
+- [x] Serving selector (serving_measures for the variant + custom grams input)
+- [x] Nutrient breakdown table for selected serving
+- [x] "If you eat this" panel:
   - Current consumed today (from consumption_logs, scoped by RLS)
   - Added amount from this food
   - New total
   - Status per nutrient: safe / caution / exceed (color coded)
-- [ ] Confidence/source section (collapsible)
-- [ ] "Add to Today" button → server action → insert consumption_log (RLS handles user scoping)
+- [x] Confidence/source section (collapsible)
+- [x] "Add to Today" button → server action → insert consumption_log (RLS handles user scoping)
 
 **Deliverable**: Full food detail page with live calculation and logging.
 

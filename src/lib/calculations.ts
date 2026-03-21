@@ -13,12 +13,21 @@ export function getConfidenceLabel(score: number): ConfidenceLabel {
 }
 
 /**
- * Determine nutrient status from consumed percentage of daily limit.
- *
+ * Calculate the nutrient amount for a given serving.
+ * Formula: (value_per_100g) × (portion_g / 100)
+ */
+export function calculateNutrientAmount(valuePer100g: number, portionGrams: number): number {
+  return (valuePer100g * portionGrams) / 100;
+}
+
+/**
+ * Determine the status of a nutrient relative to its daily limit.
  * safe: <80%, caution: 80-100%, exceed: >100%
  */
-export function getNutrientStatus(percentage: number): NutrientStatus {
-  if (percentage > 100) return "exceed";
-  if (percentage >= 80) return "caution";
+export function getNutrientStatus(total: number, dailyLimit: number | null): NutrientStatus {
+  if (dailyLimit === null || dailyLimit <= 0) return "safe";
+  const pct = (total / dailyLimit) * 100;
+  if (pct > 100) return "exceed";
+  if (pct >= 80) return "caution";
   return "safe";
 }
