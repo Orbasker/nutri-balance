@@ -6,6 +6,15 @@ const protectedPaths = ["/dashboard", "/search", "/food", "/log", "/settings", "
 const authPaths = ["/login", "/register"];
 
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip Supabase session refresh for auth pages when there are no auth cookies.
+  // This prevents redirect loops for unauthenticated users hitting /login or /register.
+  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+  if (!hasAuthCookie && authPaths.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -34,8 +43,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
 
   // Redirect unauthenticated users away from protected routes
   if (!user && protectedPaths.some((p) => pathname.startsWith(p))) {
