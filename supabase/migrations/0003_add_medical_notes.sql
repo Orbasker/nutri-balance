@@ -1,1 +1,1 @@
-ALTER TABLE "profiles" ADD COLUMN "clinical_notes" text;
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "clinical_notes" text;
