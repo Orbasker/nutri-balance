@@ -88,6 +88,18 @@ export const addConsumptionLogSchema = z.object({
 
 export type AddConsumptionLogInput = z.infer<typeof addConsumptionLogSchema>;
 
+export const deleteConsumptionLogSchema = z.object({
+  logId: z.string().uuid(),
+});
+
+export type DeleteConsumptionLogInput = z.infer<typeof deleteConsumptionLogSchema>;
+
+export const updateConsumptionLogSchema = z.object({
+  logId: z.string().uuid(),
+  quantity: z.number().positive("Quantity must be positive"),
+  nutrientSnapshot: z.record(z.string(), z.number()),
+});
+
 /**
  * Turns validated input into DB-ready numeric strings.
  * For stability mode, `daily_limit` is set to `range_max` so existing strict-style consumers stay consistent until the app reads ranges.
