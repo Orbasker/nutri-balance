@@ -14,7 +14,7 @@ echo "[nutri-balance] Setting up husky hooks..."
 bun run prepare
 
 # Copy env files from main worktree if missing
-MAIN_PATH=$(git worktree list | awk '/\[main\]$/ { print $1; exit }')
+MAIN_PATH=$(git worktree list | awk 'NR==1 { print $1; exit }')
 
 for envfile in .env .env.local; do
   if [ ! -f "$envfile" ]; then
