@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { AdminFoodDetail, AdminFoodListItem, AdminFoodVariant, NutrientOption } from "@/types";
-import { sql } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
@@ -58,7 +58,7 @@ export async function getAdminFoods(): Promise<AdminFoodListItem[]> {
   const variantCounts = await db
     .select({
       foodId: foodVariants.foodId,
-      count: sql<number>`count(*)::int`,
+      count: count(),
     })
     .from(foodVariants)
     .groupBy(foodVariants.foodId);
@@ -98,13 +98,10 @@ export async function getAdminFoodDetail(foodId: string): Promise<AdminFoodDetai
       confidenceScore: resolvedNutrientValues.confidenceScore,
     })
     .from(foods)
-    .leftJoin(foodVariants, sql`${foodVariants.foodId} = ${foods.id}`)
-    .leftJoin(
-      resolvedNutrientValues,
-      sql`${resolvedNutrientValues.foodVariantId} = ${foodVariants.id}`,
-    )
-    .leftJoin(nutrients, sql`${nutrients.id} = ${resolvedNutrientValues.nutrientId}`)
-    .where(sql`${foods.id} = ${foodId}`)
+    .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
+    .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
+    .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .where(eq(foods.id, foodId))
     .orderBy(foodVariants.preparationMethod, nutrients.sortOrder);
 
   if (rows.length === 0) return null;

@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, notInArray, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, inArray, notInArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
@@ -247,7 +247,7 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
 export async function findAndCreateGapTasks(): Promise<number> {
   // Get all nutrients
   const allNutrients = await db.select().from(nutrients);
-  const totalVariants = await db.select({ count: sql<number>`count(*)` }).from(foodVariants);
+  const totalVariants = await db.select({ count: count() }).from(foodVariants);
   const variantCount = totalVariants[0]?.count ?? 0;
 
   let tasksCreated = 0;
@@ -255,7 +255,7 @@ export async function findAndCreateGapTasks(): Promise<number> {
   for (const nutrient of allNutrients) {
     // Count how many variants already have data for this nutrient
     const [{ count: observedCount }] = await db
-      .select({ count: sql<number>`count(distinct ${nutrientObservations.foodVariantId})` })
+      .select({ count: countDistinct(nutrientObservations.foodVariantId) })
       .from(nutrientObservations)
       .where(eq(nutrientObservations.nutrientId, nutrient.id));
 
@@ -268,7 +268,10 @@ export async function findAndCreateGapTasks(): Promise<number> {
       .select({ id: aiTasks.id })
       .from(aiTasks)
       .where(
-        sql`${aiTasks.targetNutrientId} = ${nutrient.id} AND ${aiTasks.status} IN ('pending', 'running')`,
+        and(
+          eq(aiTasks.targetNutrientId, nutrient.id),
+          inArray(aiTasks.status, ["pending", "running"]),
+        ),
       )
       .limit(1);
 
