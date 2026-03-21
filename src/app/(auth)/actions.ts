@@ -42,7 +42,7 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     return { error: "Password must be at least 6 characters." };
   }
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -52,6 +52,11 @@ export async function register(prevState: AuthState, formData: FormData): Promis
 
   if (error) {
     return { error: error.message };
+  }
+
+  // If email confirmation is required, the user won't have a session yet
+  if (!data.session) {
+    return { error: "Check your email for a confirmation link." };
   }
 
   redirect("/dashboard");
