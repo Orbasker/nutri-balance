@@ -194,6 +194,15 @@ export function SearchInput() {
 
   const isNutrientSearch = searchResult?.searchType === "nutrient";
   const hasQuery = query.trim().length >= 2;
+
+  // Smart AI action: route to the right handler based on search context
+  const handleAiAction = useCallback(async () => {
+    if (isNutrientSearch && searchResult?.nutrientId) {
+      await handleAiNutrientSearch();
+    } else {
+      await handleAiFoodSearch();
+    }
+  }, [isNutrientSearch, searchResult?.nutrientId, handleAiNutrientSearch, handleAiFoodSearch]);
   const showResults =
     !isPending && !isAiSearching && hasSearched && searchResult && searchResult.totalCount > 0;
   const showFilteredEmpty =
@@ -232,10 +241,14 @@ export function SearchInput() {
           {/* AI Research button — always visible when there's a query */}
           {hasQuery && (
             <button
-              onClick={handleAiFoodSearch}
+              onClick={handleAiAction}
               disabled={isAiSearching}
               className="flex items-center justify-center w-10 h-10 rounded-xl text-md-primary hover:bg-md-primary/10 transition-colors disabled:opacity-50"
-              title={`AI research "${query}"`}
+              title={
+                isNutrientSearch
+                  ? `Discover more ${searchResult?.nutrientName} foods (USDA + AI)`
+                  : `AI research "${query}"`
+              }
             >
               <span className="material-symbols-outlined text-[22px]">neurology</span>
             </button>
@@ -353,37 +366,17 @@ export function SearchInput() {
             onPageChange={handlePageChange}
           />
 
-          {/* AI discover more for nutrient searches */}
-          {isNutrientSearch && searchResult?.nutrientId && (
-            <div className="flex flex-col items-center gap-3">
-              {aiError && (
-                <p className="text-md-error text-sm" role="alert">
-                  {aiError}
-                </p>
-              )}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleAiNutrientSearch}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-md-primary/10 to-md-tertiary/10 border border-md-primary/20 text-md-primary font-bold py-3 px-6 rounded-xl hover:from-md-primary/15 hover:to-md-tertiary/15 active:scale-95 transition-all duration-200"
-                >
-                  <span className="material-symbols-outlined text-[20px]">neurology</span>
-                  Discover more {searchResult.nutrientName} foods (USDA + AI)
-                </button>
-                <label
-                  htmlFor="pdf-upload"
-                  className="inline-flex items-center gap-2 bg-md-secondary/10 border border-md-secondary/20 text-md-secondary font-bold py-3 px-5 rounded-xl hover:bg-md-secondary/15 active:scale-95 transition-all duration-200 cursor-pointer"
-                  title="Upload a USDA PDF for bulk import"
-                >
-                  <span className="material-symbols-outlined text-[20px]">upload_file</span>
-                  Import PDF
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* AI research prompt — always visible below results for food searches */}
+          {/* AI research prompt — always visible below results */}
           {!isNutrientSearch && (
             <AiResearchPrompt query={query} onResearch={handleAiFoodSearch} aiError={aiError} />
+          )}
+          {isNutrientSearch && searchResult?.nutrientId && (
+            <AiResearchPrompt
+              query={searchResult.nutrientName ?? query}
+              onResearch={handleAiNutrientSearch}
+              aiError={aiError}
+              isNutrient
+            />
           )}
         </>
       )}
@@ -475,16 +468,20 @@ function AiResearchPrompt({
   query,
   onResearch,
   aiError,
+  isNutrient,
 }: {
   query: string;
   onResearch: () => void;
   aiError: string | null;
+  isNutrient?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between bg-gradient-to-r from-md-primary/5 to-md-tertiary/5 border border-md-primary/10 rounded-2xl px-5 py-4">
       <div className="flex items-center gap-3">
         <span className="material-symbols-outlined text-md-primary text-[20px]">neurology</span>
-        <p className="text-sm text-md-on-surface-variant">Can&apos;t find what you need?</p>
+        <p className="text-sm text-md-on-surface-variant">
+          {isNutrient ? "Want more foods?" : "Can\u0027t find what you need?"}
+        </p>
       </div>
       <div className="flex items-center gap-3">
         {aiError && <p className="text-xs text-md-error">{aiError}</p>}
@@ -492,7 +489,9 @@ function AiResearchPrompt({
           onClick={onResearch}
           className="inline-flex items-center gap-2 bg-md-primary text-white font-bold py-2 px-5 rounded-xl active:scale-95 transition-all duration-200 hover:bg-md-primary/90 text-sm"
         >
-          AI Research &ldquo;{query}&rdquo;
+          {isNutrient
+            ? `Discover more ${query} foods (USDA + AI)`
+            : `AI Research \u201c${query}\u201d`}
         </button>
       </div>
     </div>
