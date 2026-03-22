@@ -61,15 +61,7 @@ export async function searchFoodsByNutrient(
     params.set("sortOrder", "desc");
   }
 
-  const response = await fetch(`${USDA_BASE}/foods/search?${params}`, {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    throw new Error(`USDA API error: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
+  return fetchWithRetry(`${USDA_BASE}/foods/search?${params}`);
 }
 
 /**
@@ -89,15 +81,7 @@ export async function searchFoodByName(
     pageSize: String(pageSize),
   });
 
-  const response = await fetch(`${USDA_BASE}/foods/search?${params}`, {
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    throw new Error(`USDA API error: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
+  return fetchWithRetry(`${USDA_BASE}/foods/search?${params}`);
 }
 
 /**
@@ -105,16 +89,37 @@ export async function searchFoodByName(
  */
 export async function getFoodDetails(fdcId: number): Promise<USDAFood> {
   const apiKey = getApiKey();
+  return fetchWithRetry(`${USDA_BASE}/food/${fdcId}?api_key=${apiKey}`);
+}
 
-  const response = await fetch(`${USDA_BASE}/food/${fdcId}?api_key=${apiKey}`, {
-    headers: { "Content-Type": "application/json" },
-  });
+/**
+ * Fetch with retry and exponential backoff for rate-limited APIs.
+ * DEMO_KEY allows 30 req/hour, so 429s are common.
+ */
+async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      return response.json();
+    }
+
+    if (response.status === 429 && attempt < maxRetries) {
+      // Exponential backoff: 2s, 4s, 8s
+      const delay = 2000 * Math.pow(2, attempt);
+      console.warn(
+        `USDA API rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
     throw new Error(`USDA API error: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  throw new Error("USDA API: max retries exceeded");
 }
 
 /**

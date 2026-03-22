@@ -74,11 +74,15 @@ export async function exploreNutrientSources(
   try {
     const usdaSpan = trace.span({ name: "usda-api-explore" });
 
-    // Fetch multiple pages to get more data
-    const [page1, page2] = await Promise.all([
-      searchFoodsByNutrient(nutrient.displayName, { pageSize: 50, pageNumber: 1 }),
-      searchFoodsByNutrient(nutrient.displayName, { pageSize: 50, pageNumber: 2 }),
-    ]);
+    // Fetch pages sequentially to avoid rate limiting (DEMO_KEY: 30 req/hour)
+    const page1 = await searchFoodsByNutrient(nutrient.displayName, {
+      pageSize: 50,
+      pageNumber: 1,
+    });
+    const page2 = await searchFoodsByNutrient(nutrient.displayName, {
+      pageSize: 50,
+      pageNumber: 2,
+    });
 
     const totalFoods = page1.foods.length + page2.foods.length;
 
