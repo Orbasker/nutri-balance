@@ -15,6 +15,21 @@ Medical and dietary tracking often feels punitive or cluttered. This design syst
 
 ## Screens
 
+### v2 Screens (Current)
+
+| Screen            | ID                                 | Dimensions |
+| ----------------- | ---------------------------------- | ---------- |
+| Splash Screen     | `b3b2b6c704a545fbb5e22cd03dfd13e5` | 390 x 884  |
+| Dashboard         | `895c66c561c040a9ab15e25a2074f828` | 390 x 1337 |
+| Food Search       | `ce9815fa82c44e80854a30aae4657525` | 390 x 1207 |
+| Settings          | `cb4ad6e60e4f4799969173bd3b535abe` | 390 x 1695 |
+| History           | `b33b978d88c84c878b4e815055e4f1a3` | 390 x 1772 |
+| Log Intake        | `e0181575157d426498ca41e5e5041e38` | 390 x 1218 |
+| Food Details      | `3d463dfdbd4b45378e7a49e2669b9357` | 390 x 1460 |
+| Missing Food Flow | `9c2dbcbcac6046b09bce7b8ac179a3f9` | 390 x 1720 |
+
+### v1 Screens (Legacy)
+
 | Screen            | ID                                 | Dimensions |
 | ----------------- | ---------------------------------- | ---------- |
 | Home Dashboard    | `3739171132f84ab080bb266bb8ccd238` | 390 x 1336 |
