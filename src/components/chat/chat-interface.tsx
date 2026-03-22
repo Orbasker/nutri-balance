@@ -13,6 +13,7 @@ import { DefaultChatTransport, isToolUIPart } from "ai";
 
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { QuickActionsMenu } from "@/components/chat/quick-actions-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { cn } from "@/lib/utils";
 
@@ -262,7 +263,8 @@ function UserBubble({ message }: { message: UIMessage }) {
   const text = message.parts.find((p) => p.type === "text");
   if (!text || text.type !== "text") return null;
   return (
-    <div className="flex justify-end">
+    <div className="group/msg flex items-start justify-end gap-1">
+      <CopyButton text={text.text} />
       <div className="max-w-[85%] rounded-2xl rounded-br-md bg-blue-600 text-white px-4 py-3 text-sm leading-relaxed">
         {text.text}
       </div>
@@ -273,26 +275,33 @@ function UserBubble({ message }: { message: UIMessage }) {
 function AssistantMessage({ message, isActive }: { message: UIMessage; isActive: boolean }) {
   const hasText = message.parts.some((p) => p.type === "text" && p.text.trim());
   const toolParts = message.parts.filter(isToolUIPart);
+  const fullText = message.parts
+    .filter((p) => p.type === "text" && p.text.trim())
+    .map((p) => (p as { type: "text"; text: string }).text)
+    .join("\n");
 
   return (
-    <div className="flex justify-start gap-2">
+    <div className="group/msg flex justify-start gap-2">
       <div className="max-w-[90%] space-y-2">
         {toolParts.map((part, i) => (
           <ToolCard key={i} part={part} />
         ))}
 
         {hasText && (
-          <div className="rounded-2xl rounded-bl-md bg-slate-100 text-md-on-surface px-4 py-3 text-sm leading-relaxed">
-            {message.parts.map((part, i) => {
-              if (part.type === "text" && part.text.trim()) {
-                return (
-                  <div key={i} className="whitespace-pre-wrap">
-                    {formatMessage(part.text)}
-                  </div>
-                );
-              }
-              return null;
-            })}
+          <div className="flex items-start gap-1">
+            <div className="rounded-2xl rounded-bl-md bg-slate-100 text-md-on-surface px-4 py-3 text-sm leading-relaxed">
+              {message.parts.map((part, i) => {
+                if (part.type === "text" && part.text.trim()) {
+                  return (
+                    <div key={i} className="whitespace-pre-wrap">
+                      {formatMessage(part.text)}
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+            <CopyButton text={fullText} />
           </div>
         )}
 
@@ -516,6 +525,33 @@ function VerdictDot({ verdict }: { verdict: string }) {
         verdict === "exceed" && "bg-red-500",
       )}
     />
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [text]);
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          onClick={handleCopy}
+          className="mt-1 flex-shrink-0 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-90"
+        >
+          <span className="material-symbols-outlined text-[16px]">
+            {copied ? "check" : "content_copy"}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">{copied ? "Copied!" : "Copy"}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
