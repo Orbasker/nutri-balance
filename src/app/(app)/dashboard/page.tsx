@@ -16,6 +16,54 @@ function getTimeGreeting(): string {
   return "Good evening";
 }
 
+function getInsightMessage(nutrients: NutrientProgress[], todayLogCount: number): string {
+  if (nutrients.length === 0) return "Set up your nutrient limits to start tracking.";
+  if (todayLogCount === 0) return "Log your first meal to see how your day shapes up.";
+
+  const exceeded = nutrients.filter((n) => n.status === "exceed");
+  const caution = nutrients.filter((n) => n.status === "caution");
+
+  if (exceeded.length > 0) {
+    const names = exceeded.map((n) => n.displayName).join(", ");
+    return `${names} ${exceeded.length === 1 ? "has" : "have"} exceeded your daily limit. Consider adjusting your next meal.`;
+  }
+  if (caution.length > 0) {
+    const names = caution.map((n) => n.displayName).join(", ");
+    return `${names} approaching your limit — choose carefully for the rest of the day.`;
+  }
+
+  const avgPct = nutrients.reduce((s, n) => s + n.percentage, 0) / nutrients.length;
+  if (avgPct < 20) return "Just getting started — plenty of room for your meals today.";
+  if (avgPct < 50) return "Looking good so far. You have room for a full meal.";
+  return "All nutrients within safe range. Great balance today!";
+}
+
+function getOverallStatus(nutrients: NutrientProgress[]): {
+  label: string;
+  icon: string;
+  color: string;
+} {
+  if (nutrients.length === 0)
+    return { label: "No limits set", icon: "tune", color: "text-blue-100/60" };
+
+  const exceeded = nutrients.filter((n) => n.status === "exceed").length;
+  const cautionCount = nutrients.filter((n) => n.status === "caution").length;
+
+  if (exceeded > 0)
+    return {
+      label: `${exceeded} exceeded`,
+      icon: "warning",
+      color: "text-red-300",
+    };
+  if (cautionCount > 0)
+    return {
+      label: `${cautionCount} near limit`,
+      icon: "info",
+      color: "text-amber-300",
+    };
+  return { label: "All safe", icon: "check_circle", color: "text-emerald-300" };
+}
+
 const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
   safe: {
     bg: "bg-md-tertiary-fixed",
@@ -102,14 +150,21 @@ function MealRow({ log }: { log: RecentLogEntry }) {
 }
 
 export default async function DashboardPage() {
-  const { nutrientProgress, recentLogs, displayName, healthGoal, error } =
-    await fetchDashboardData();
+  const {
+    nutrientProgress,
+    recentLogs,
+    displayName,
+    healthGoal,
+    streakDays,
+    todayLogCount,
+    error,
+  } = await fetchDashboardData();
 
-  // Calculate rough total from nutrient data for the hero
-  const totalConsumed = nutrientProgress.reduce((s, n) => s + n.consumed, 0);
   const firstName = displayName?.split(/\s+/)[0] ?? null;
   const greeting = getTimeGreeting();
   const hasData = nutrientProgress.length > 0;
+  const insight = getInsightMessage(nutrientProgress, todayLogCount);
+  const overall = getOverallStatus(nutrientProgress);
 
   return (
     <div className="px-6 max-w-screen-xl mx-auto space-y-8">
@@ -123,38 +178,61 @@ export default async function DashboardPage() {
       <section className="nutrient-glass rounded-[2.5rem] p-8 text-white shadow-[0_20px_40px_rgba(0,68,147,0.15)] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10">
-          <p className="text-blue-100/80 text-sm font-medium mb-0.5">
+          <p className="text-lg font-semibold mb-0.5">
             {greeting}
             {firstName ? `, ${firstName}` : ""}
           </p>
-          {healthGoal && <p className="text-blue-100/50 text-xs font-medium mb-1">{healthGoal}</p>}
-          <p className="text-blue-100/60 uppercase tracking-[0.2em] text-[10px] font-bold mb-2">
-            {hasData ? "Today\u2019s Balance" : "Let\u2019s get started"}
-          </p>
-          <div className="flex items-baseline gap-2 mb-6">
-            <h2 className="text-5xl font-extrabold tracking-tighter">
-              {Math.round(totalConsumed).toLocaleString()}
-            </h2>
-            <span className="text-xl font-medium text-blue-100/70">
-              {nutrientProgress[0]?.unit ?? "units"}
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            {nutrientProgress.slice(0, 3).map((n) => (
-              <div key={n.nutrientId} className="space-y-1">
-                <p className="text-[10px] text-blue-100/60 font-semibold uppercase">
-                  {n.displayName}
-                </p>
-                <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full liquid-track"
-                    style={{ width: `${Math.min(n.percentage, 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs font-bold">{formatAmount(n.consumed, n.unit)}</p>
+          {healthGoal && <p className="text-blue-100/70 text-sm font-medium mb-4">{healthGoal}</p>}
+
+          {/* Overall status + streak row */}
+          <div className="flex items-center gap-6 mb-5">
+            <div className="flex items-center gap-2">
+              <span className={`material-symbols-outlined text-xl ${overall.color}`}>
+                {overall.icon}
+              </span>
+              <span className={`text-sm font-bold ${overall.color}`}>{overall.label}</span>
+            </div>
+            {streakDays > 1 && (
+              <div className="flex items-center gap-1.5 text-blue-100/70">
+                <span className="material-symbols-outlined text-base">local_fire_department</span>
+                <span className="text-sm font-semibold">{streakDays}-day streak</span>
               </div>
-            ))}
+            )}
+            {todayLogCount > 0 && (
+              <span className="text-sm text-blue-100/60 font-medium">
+                {todayLogCount} {todayLogCount === 1 ? "meal" : "meals"} logged
+              </span>
+            )}
           </div>
+
+          {/* Personalized insight */}
+          <p className="text-sm text-blue-100/80 mb-6 leading-relaxed max-w-md">{insight}</p>
+
+          {/* Mini nutrient bars */}
+          {hasData && (
+            <div className="grid grid-cols-3 gap-4">
+              {nutrientProgress.slice(0, 3).map((n) => (
+                <div key={n.nutrientId} className="space-y-1">
+                  <p className="text-[10px] text-blue-100/60 font-semibold uppercase">
+                    {n.displayName}
+                  </p>
+                  <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white rounded-full liquid-track"
+                      style={{ width: `${Math.min(n.percentage, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold">
+                    {formatAmount(n.consumed, n.unit)}
+                    <span className="text-blue-100/40 font-medium">
+                      {" "}
+                      / {formatAmount(n.dailyLimit, n.unit)}
+                    </span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

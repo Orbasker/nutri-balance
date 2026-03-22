@@ -29,7 +29,7 @@ export default async function SettingsPage() {
         "first_name, last_name, display_name, date_of_birth, gender, clinical_notes, health_goal, avatar_color",
       )
       .eq("id", user!.id)
-      .single(),
+      .maybeSingle(),
   ]);
 
   if (nutrientsError || limitsError) {

@@ -116,9 +116,9 @@ export async function saveProfile(data: {
 
   const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({
+  const { error } = await supabase.from("profiles").upsert(
+    {
+      id: user.id,
       first_name: data.firstName || null,
       last_name: data.lastName || null,
       display_name: displayName,
@@ -126,8 +126,9 @@ export async function saveProfile(data: {
       gender: data.gender,
       health_goal: data.healthGoal,
       avatar_color: data.avatarColor,
-    })
-    .eq("id", user.id);
+    },
+    { onConflict: "id" },
+  );
 
   if (error) {
     return { error: error.message };
