@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/foods", label: "Foods" },
   { href: "/review", label: "Review Queue" },
+  { href: "/foods-review", label: "Food Review" },
 ];
 
 export function AdminNav() {

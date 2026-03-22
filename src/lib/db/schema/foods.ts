@@ -1,6 +1,8 @@
 import { relations } from "drizzle-orm";
 import { boolean, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+import { foodFeedback } from "./feedback";
+
 export const preparationMethodEnum = pgEnum("preparation_method", [
   "raw",
   "boiled",
@@ -22,6 +24,7 @@ export const foods = pgTable("foods", {
   description: text(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by"),
 });
 
 export const foodAliases = pgTable("food_aliases", {
@@ -58,6 +61,7 @@ export const servingMeasures = pgTable("serving_measures", {
 export const foodsRelations = relations(foods, ({ many }) => ({
   aliases: many(foodAliases),
   variants: many(foodVariants),
+  feedback: many(foodFeedback),
 }));
 
 export const foodAliasesRelations = relations(foodAliases, ({ one }) => ({

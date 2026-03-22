@@ -157,6 +157,36 @@ export const reviewObservationSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+// Food Feedback validators
+
+export const submitFeedbackSchema = z.object({
+  foodId: uuidSchema,
+  nutrientId: uuidSchema.optional(),
+  foodVariantId: uuidSchema.optional(),
+  type: z.enum(["flag", "correction"]),
+  message: z.string().min(10, "Message must be at least 10 characters").max(1000),
+  suggestedValue: z.number().nonnegative().optional(),
+  suggestedUnit: z.string().max(20).optional(),
+  sourceUrl: z.string().url().max(500).optional(),
+});
+
+export type SubmitFeedbackInput = z.infer<typeof submitFeedbackSchema>;
+
+// Admin food review validators
+// Note: deleteFoodSchema already exists above -- reuse it
+
+export const approveFoodSchema = z.object({
+  foodId: uuidSchema,
+});
+
+export type ApproveFoodInput = z.infer<typeof approveFoodSchema>;
+
+export const dismissFeedbackSchema = z.object({
+  feedbackId: uuidSchema,
+});
+
+export type DismissFeedbackInput = z.infer<typeof dismissFeedbackSchema>;
+
 /**
  * Turns validated input into DB-ready numeric strings.
  * For stability mode, `daily_limit` is set to `range_max` so existing strict-style consumers stay consistent until the app reads ranges.
