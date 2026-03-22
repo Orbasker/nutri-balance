@@ -12,6 +12,7 @@ import type { UIMessage, UIMessagePart } from "ai";
 import { DefaultChatTransport, isToolUIPart } from "ai";
 
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { QuickActionsMenu } from "@/components/chat/quick-actions-menu";
 
 import { cn } from "@/lib/utils";
 
@@ -179,6 +180,16 @@ export function ChatInterface({
         className="px-4 pb-2 pt-3 border-t border-md-outline-variant/20"
       >
         <div className="flex items-end gap-2 max-w-2xl mx-auto">
+          <QuickActionsMenu
+            onAction={(label) => {
+              // For "Search food" and "Explore nutrients", pre-fill input
+              if (label === "Search food") {
+                setInput("Search for ");
+              } else if (label === "Explore nutrients") {
+                setInput("What nutrients are in ");
+              }
+            }}
+          />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
