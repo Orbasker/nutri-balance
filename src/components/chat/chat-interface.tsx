@@ -12,6 +12,7 @@ import type { UIMessage, UIMessagePart } from "ai";
 import { DefaultChatTransport, isToolUIPart } from "ai";
 
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { cn } from "@/lib/utils";
 
@@ -251,12 +252,10 @@ function UserBubble({ message }: { message: UIMessage }) {
   const text = message.parts.find((p) => p.type === "text");
   if (!text || text.type !== "text") return null;
   return (
-    <div className="group/msg flex justify-end">
-      <div className="relative max-w-[85%]">
-        <div className="rounded-2xl rounded-br-md bg-blue-600 text-white px-4 py-3 text-sm leading-relaxed">
-          {text.text}
-        </div>
-        <CopyButton text={text.text} variant="user" />
+    <div className="group/msg flex items-start justify-end gap-1">
+      <CopyButton text={text.text} />
+      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-blue-600 text-white px-4 py-3 text-sm leading-relaxed">
+        {text.text}
       </div>
     </div>
   );
@@ -278,7 +277,7 @@ function AssistantMessage({ message, isActive }: { message: UIMessage; isActive:
         ))}
 
         {hasText && (
-          <div className="relative">
+          <div className="flex items-start gap-1">
             <div className="rounded-2xl rounded-bl-md bg-slate-100 text-md-on-surface px-4 py-3 text-sm leading-relaxed">
               {message.parts.map((part, i) => {
                 if (part.type === "text" && part.text.trim()) {
@@ -291,7 +290,7 @@ function AssistantMessage({ message, isActive }: { message: UIMessage; isActive:
                 return null;
               })}
             </div>
-            <CopyButton text={fullText} variant="assistant" />
+            <CopyButton text={fullText} />
           </div>
         )}
 
@@ -518,7 +517,7 @@ function VerdictDot({ verdict }: { verdict: string }) {
   );
 }
 
-function CopyButton({ text, variant }: { text: string; variant: "user" | "assistant" }) {
+function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -529,20 +528,19 @@ function CopyButton({ text, variant }: { text: string; variant: "user" | "assist
   }, [text]);
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className={cn(
-        "absolute -bottom-1 opacity-0 group-hover/msg:opacity-100 transition-opacity",
-        "p-1 rounded-md hover:bg-black/5 active:scale-90",
-        variant === "user" ? "right-1 text-slate-400" : "left-1 text-slate-400",
-      )}
-      title={copied ? "Copied!" : "Copy message"}
-    >
-      <span className="material-symbols-outlined text-[16px]">
-        {copied ? "check" : "content_copy"}
-      </span>
-    </button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          onClick={handleCopy}
+          className="mt-1 flex-shrink-0 opacity-0 group-hover/msg:opacity-100 transition-opacity p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-90"
+        >
+          <span className="material-symbols-outlined text-[16px]">
+            {copied ? "check" : "content_copy"}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">{copied ? "Copied!" : "Copy"}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
