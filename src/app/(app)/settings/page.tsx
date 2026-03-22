@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
+import { LogoutButton } from "./logout-button";
 import { NutrientLimitsSettings } from "./nutrient-limits-settings";
 
 export default async function SettingsPage() {
@@ -49,6 +50,12 @@ export default async function SettingsPage() {
         limits={limits ?? []}
         medicalNotes={profile?.clinical_notes ?? ""}
       />
+
+      <div className="mt-12 pt-8 border-t border-md-outline-variant/30">
+        <h3 className="font-bold text-lg text-md-on-surface mb-1">Account</h3>
+        <p className="text-sm text-md-on-surface-variant mb-4">Signed in as {user!.email}</p>
+        <LogoutButton />
+      </div>
     </div>
   );
 }
