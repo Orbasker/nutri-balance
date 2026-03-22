@@ -34,6 +34,8 @@ export async function fetchDashboardData(): Promise<{
   recentLogs: RecentLogEntry[];
   displayName: string | null;
   healthGoal: string | null;
+  streakDays: number;
+  todayLogCount: number;
   error?: string;
 }> {
   const supabase = await createClient();
@@ -47,6 +49,8 @@ export async function fetchDashboardData(): Promise<{
       recentLogs: [],
       displayName: null,
       healthGoal: null,
+      streakDays: 0,
+      todayLogCount: 0,
       error: "Not authenticated",
     };
   }
@@ -54,11 +58,17 @@ export async function fetchDashboardData(): Promise<{
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  // Streak: check last 7 days for distinct log dates
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
   const [
     { data: limits, error: limitsError },
     { data: logs, error: logsError },
     { data: recentLogs, error: recentError },
-    { data: profile },
+    { data: profile, error: profileError },
+    { data: streakLogs },
   ] = await Promise.all([
     supabase
       .from("user_nutrient_limits")
@@ -82,7 +92,13 @@ export async function fetchDashboardData(): Promise<{
       .from("profiles")
       .select("first_name, last_name, display_name, health_goal")
       .eq("id", user.id)
-      .single(),
+      .maybeSingle(),
+    supabase
+      .from("consumption_logs")
+      .select("logged_at")
+      .eq("user_id", user.id)
+      .gte("logged_at", sevenDaysAgo.toISOString())
+      .order("logged_at", { ascending: false }),
   ]);
 
   if (limitsError || logsError || recentError) {
@@ -91,8 +107,23 @@ export async function fetchDashboardData(): Promise<{
       recentLogs: [],
       displayName: null,
       healthGoal: null,
+      streakDays: 0,
+      todayLogCount: 0,
       error: limitsError?.message ?? logsError?.message ?? recentError?.message,
     };
+  }
+
+  // Calculate consecutive day streak (including today)
+  const logDates = new Set((streakLogs ?? []).map((l) => new Date(l.logged_at).toDateString()));
+  let streakDays = 0;
+  const cursor = new Date();
+  for (let i = 0; i < 7; i++) {
+    if (logDates.has(cursor.toDateString())) {
+      streakDays++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
   }
 
   // Aggregate consumed amounts per nutrient from snapshots
@@ -147,7 +178,14 @@ export async function fetchDashboardData(): Promise<{
   return {
     nutrientProgress,
     recentLogs: mappedRecent,
-    displayName: profile?.first_name ?? profile?.display_name ?? null,
+    displayName:
+      profile?.first_name ??
+      profile?.display_name ??
+      (user.user_metadata?.full_name as string | undefined) ??
+      (user.user_metadata?.name as string | undefined) ??
+      null,
     healthGoal: profile?.health_goal ?? null,
+    streakDays,
+    todayLogCount: (logs ?? []).length,
   };
 }
