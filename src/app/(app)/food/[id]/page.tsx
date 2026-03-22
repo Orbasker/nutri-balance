@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { FeedbackForm } from "@/components/food/feedback-form";
+
 import { getFoodDetail, getTodaysConsumption, getUserNutrientLimits } from "./actions";
 import { FoodDetailClient } from "./food-detail-client";
 
@@ -49,6 +51,19 @@ export default async function FoodDetailPage({ params }: { params: Promise<{ id:
       </section>
 
       <FoodDetailClient food={food} todaysConsumption={todaysConsumption} userLimits={userLimits} />
+
+      <FeedbackForm
+        foodId={food.id}
+        variants={food.variants.map((v) => ({
+          id: v.id,
+          preparationMethod: v.preparationMethod,
+          nutrients: v.nutrients.map((n) => ({
+            nutrientId: n.nutrientId,
+            displayName: n.displayName,
+            unit: n.unit,
+          })),
+        }))}
+      />
     </div>
   );
 }

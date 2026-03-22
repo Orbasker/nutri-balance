@@ -17,6 +17,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: "mcg",
         valuePer100g: "482.9",
         confidenceScore: 95,
+        sourceSummary: null,
       },
       {
         foodId: "f1",
@@ -30,6 +31,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: "mcg",
         valuePer100g: "360.0",
         confidenceScore: 85,
+        sourceSummary: null,
       },
     ];
 
@@ -55,6 +57,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: "mcg",
         valuePer100g: "482.9",
         confidenceScore: 95,
+        sourceSummary: null,
       },
       {
         foodId: "f1",
@@ -68,6 +71,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: "mg",
         valuePer100g: "2.7",
         confidenceScore: 90,
+        sourceSummary: null,
       },
     ];
 
@@ -90,6 +94,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: null,
         valuePer100g: null,
         confidenceScore: null,
+        sourceSummary: null,
       },
     ];
 
@@ -117,6 +122,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: "mcg",
         valuePer100g: "482.9",
         confidenceScore: 95,
+        sourceSummary: null,
       },
       {
         foodId: "f2",
@@ -130,6 +136,7 @@ describe("mapSearchRows", () => {
         nutrientUnit: "mg",
         valuePer100g: "64.9",
         confidenceScore: 88,
+        sourceSummary: null,
       },
     ];
 

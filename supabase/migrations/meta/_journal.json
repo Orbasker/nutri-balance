@@ -15,6 +15,13 @@
       "when": 1774133085810,
       "tag": "0004_add_ai_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774192049036,
+      "tag": "0005_food_feedback",
+      "breakpoints": true
     }
   ]
 }

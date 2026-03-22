@@ -23,6 +23,7 @@ export interface FoodSearchResult {
   name: string;
   category: string | null;
   variants: FoodVariantSummary[];
+  isAiGenerated?: boolean;
 }
 
 export interface ServingMeasure {
@@ -188,4 +189,79 @@ export interface NutrientOption {
   name: string;
   displayName: string;
   unit: string;
+}
+
+// Food Feedback types
+
+export interface FoodFeedbackItem {
+  id: string;
+  foodId: string;
+  nutrientId: string | null;
+  foodVariantId: string | null;
+  userId: string;
+  type: "flag" | "correction";
+  message: string;
+  suggestedValue: number | null;
+  suggestedUnit: string | null;
+  sourceUrl: string | null;
+  status: "open" | "reviewed" | "dismissed";
+  createdAt: string;
+  reviewedAt: string | null;
+  // Joined fields
+  nutrientDisplayName?: string;
+  nutrientUnit?: string;
+}
+
+// Admin Food Review types
+
+export interface FoodReviewItem {
+  id: string;
+  name: string;
+  category: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  variantCount: number;
+  pendingObservationCount: number;
+  avgConfidence: number;
+  feedbackCount: number;
+  variants: FoodReviewVariant[];
+}
+
+export interface FoodReviewVariant {
+  id: string;
+  preparationMethod: string;
+  nutrients: FoodReviewNutrient[];
+}
+
+export interface FoodReviewNutrient {
+  nutrientDisplayName: string;
+  value: number;
+  unit: string;
+  confidenceScore: number;
+  reviewStatus: string;
+}
+
+// Search filters & pagination
+
+export interface SearchFilters {
+  category?: string;
+  confidenceLevel?: ConfidenceLabel;
+  aiGeneratedOnly?: boolean;
+}
+
+export interface PaginationParams {
+  page: number;
+  pageSize: number;
+}
+
+export interface PaginatedSearchResult {
+  results: FoodSearchResult[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  searchType: "food" | "nutrient";
+  nutrientName?: string;
+  nutrientId?: string;
+  availableCategories: string[];
 }
