@@ -8,6 +8,7 @@ export interface QuickAction {
   icon: string;
   label: string;
   color: string;
+  tooltipColor: string;
   onClick: () => void;
 }
 
@@ -16,36 +17,42 @@ const QUICK_ACTIONS: QuickAction[] = [
     icon: "upload_file",
     label: "Upload file",
     color: "bg-violet-500",
+    tooltipColor: "bg-violet-600",
     onClick: () => {},
   },
   {
     icon: "database_upload",
     label: "Import food data",
     color: "bg-teal-500",
+    tooltipColor: "bg-teal-600",
     onClick: () => {},
   },
   {
     icon: "nutrition",
     label: "Explore nutrients",
     color: "bg-amber-500",
+    tooltipColor: "bg-amber-600",
     onClick: () => {},
   },
   {
     icon: "search",
     label: "Search food",
     color: "bg-blue-500",
+    tooltipColor: "bg-blue-600",
     onClick: () => {},
   },
   {
     icon: "barcode_scanner",
     label: "Scan barcode",
     color: "bg-rose-500",
+    tooltipColor: "bg-rose-600",
     onClick: () => {},
   },
   {
     icon: "photo_camera",
     label: "Photo meal",
     color: "bg-emerald-500",
+    tooltipColor: "bg-emerald-600",
     onClick: () => {},
   },
 ];
@@ -129,14 +136,16 @@ export function QuickActionsMenu({ onAction }: { onAction?: (label: string) => v
               >
                 <span className="material-symbols-outlined text-2xl">{action.icon}</span>
               </button>
-              {/* Tooltip — only visible on hover */}
+              {/* Colored pill tooltip — slides in from left on hover */}
               <span
                 className={cn(
-                  "absolute -bottom-8 left-1/2 -translate-x-1/2",
-                  "text-xs font-medium text-slate-700 whitespace-nowrap",
-                  "bg-white px-2.5 py-1 rounded-lg shadow-md border border-slate-100",
-                  "opacity-0 group-hover:opacity-100 transition-opacity duration-150",
+                  "absolute top-1/2 left-full ml-2 -translate-y-1/2",
+                  "text-xs font-semibold text-white whitespace-nowrap",
+                  "px-3 py-1.5 rounded-full shadow-lg",
+                  "opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0",
+                  "transition-all duration-300 ease-out",
                   "pointer-events-none",
+                  action.tooltipColor,
                 )}
               >
                 {action.label}
