@@ -4,6 +4,8 @@ import { DailySummary } from "@/components/log/daily-summary";
 import { DaySelector } from "@/components/log/day-selector";
 import { LogEntryList } from "@/components/log/log-entry-list";
 
+import { createClient } from "@/lib/supabase/server";
+
 import { getDailySummary, getLogEntries, getNutrientInfo } from "./actions";
 
 function getTodayStr(): string {
@@ -19,12 +21,29 @@ export default async function LogPage({
   const todayStr = getTodayStr();
   const currentDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayStr;
 
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let firstName: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("first_name, display_name")
+      .eq("id", user.id)
+      .single();
+    firstName = profile?.first_name ?? profile?.display_name?.split(/\s+/)[0] ?? null;
+  }
+
   const entries = await getLogEntries(currentDate);
 
   const [summary, nutrientInfo] = await Promise.all([
     getDailySummary(entries),
     getNutrientInfo([...new Set(entries.flatMap((e) => Object.keys(e.nutrientSnapshot)))]),
   ]);
+
+  const isToday = currentDate === todayStr;
 
   return (
     <div className="px-6 max-w-screen-xl mx-auto">
@@ -33,9 +52,11 @@ export default async function LogPage({
         <div className="flex justify-between items-end">
           <div>
             <p className="text-md-outline uppercase tracking-widest text-[10px] font-bold mb-1">
-              Timeline
+              {firstName ? `${firstName}\u2019s Timeline` : "Timeline"}
             </p>
-            <h2 className="font-extrabold text-3xl text-md-primary">History</h2>
+            <h2 className="font-extrabold text-3xl text-md-primary">
+              {isToday ? "Today" : "History"}
+            </h2>
           </div>
           <DaySelector currentDate={currentDate} todayStr={todayStr} />
         </div>

@@ -97,6 +97,49 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
   return { ok: true };
 }
 
+export async function saveProfile(data: {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string | null;
+  gender: string | null;
+  healthGoal: string;
+  avatarColor: string;
+}): Promise<NutrientLimitActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in." };
+  }
+
+  const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      first_name: data.firstName || null,
+      last_name: data.lastName || null,
+      display_name: displayName,
+      date_of_birth: data.dateOfBirth,
+      gender: data.gender,
+      health_goal: data.healthGoal,
+      avatar_color: data.avatarColor,
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/search");
+  revalidatePath("/log");
+  return { ok: true };
+}
+
 export async function saveMedicalNotes(notes: string): Promise<NutrientLimitActionResult> {
   const supabase = await createClient();
   const {

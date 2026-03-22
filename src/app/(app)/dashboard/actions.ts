@@ -37,6 +37,8 @@ interface RecentLogRow {
 export async function fetchDashboardData(): Promise<{
   nutrientProgress: NutrientProgress[];
   recentLogs: RecentLogEntry[];
+  displayName: string | null;
+  healthGoal: string | null;
   error?: string;
 }> {
   const supabase = await createClient();
@@ -45,7 +47,13 @@ export async function fetchDashboardData(): Promise<{
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { nutrientProgress: [], recentLogs: [], error: "Not authenticated" };
+    return {
+      nutrientProgress: [],
+      recentLogs: [],
+      displayName: null,
+      healthGoal: null,
+      error: "Not authenticated",
+    };
   }
 
   const todayStart = new Date();
@@ -55,6 +63,7 @@ export async function fetchDashboardData(): Promise<{
     { data: limits, error: limitsError },
     { data: logs, error: logsError },
     { data: recentLogs, error: recentError },
+    { data: profile },
   ] = await Promise.all([
     supabase
       .from("user_nutrient_limits")
@@ -74,12 +83,19 @@ export async function fetchDashboardData(): Promise<{
       .gte("logged_at", todayStart.toISOString())
       .order("logged_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("profiles")
+      .select("first_name, last_name, display_name, health_goal")
+      .eq("id", user.id)
+      .single(),
   ]);
 
   if (limitsError || logsError || recentError) {
     return {
       nutrientProgress: [],
       recentLogs: [],
+      displayName: null,
+      healthGoal: null,
       error: limitsError?.message ?? logsError?.message ?? recentError?.message,
     };
   }
@@ -133,5 +149,10 @@ export async function fetchDashboardData(): Promise<{
     }),
   );
 
-  return { nutrientProgress, recentLogs: mappedRecent };
+  return {
+    nutrientProgress,
+    recentLogs: mappedRecent,
+    displayName: profile?.first_name ?? profile?.display_name ?? null,
+    healthGoal: profile?.health_goal ?? null,
+  };
 }

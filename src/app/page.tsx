@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { buttonVariants } from "@/components/ui/button";
-
 import { createClient } from "@/lib/supabase/server";
-import { cn } from "@/lib/utils";
 
 export default async function LandingPage() {
   const supabase = await createClient();
@@ -23,10 +20,16 @@ export default async function LandingPage() {
         <div className="flex justify-between items-center px-6 h-16 max-w-screen-xl mx-auto">
           <h1 className="font-extrabold text-md-primary tracking-tight text-xl">NutriBalance</h1>
           <div className="flex items-center gap-3">
-            <Link href="/login" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-lg px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted hover:text-foreground transition-all"
+            >
               Log in
             </Link>
-            <Link href="/register" className={cn(buttonVariants({ size: "sm" }))}>
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-lg px-2.5 h-7 text-[0.8rem] font-medium bg-primary text-primary-foreground hover:bg-primary/80 transition-all"
+            >
               Get started
             </Link>
           </div>
@@ -50,12 +53,15 @@ export default async function LandingPage() {
               adjustments, and clear answers — not guesswork.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <Link href="/register" className={cn(buttonVariants({ size: "lg" }))}>
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center rounded-lg px-2.5 h-9 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/80 transition-all"
+              >
                 Start tracking free
               </Link>
               <Link
                 href="/login"
-                className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+                className="inline-flex items-center justify-center rounded-lg px-2.5 h-9 text-sm font-medium border border-border bg-background hover:bg-muted hover:text-foreground transition-all"
               >
                 Log in
               </Link>
@@ -113,7 +119,10 @@ export default async function LandingPage() {
             <p className="text-md-on-surface-variant mb-8">
               Free to use. Set up your limits in minutes.
             </p>
-            <Link href="/register" className={cn(buttonVariants({ size: "lg" }))}>
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-lg px-2.5 h-9 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/80 transition-all"
+            >
               Create your account
             </Link>
           </div>
