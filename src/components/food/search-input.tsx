@@ -2,8 +2,6 @@
 
 import { useCallback, useRef, useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import {
   type PdfUploadResult,
   aiDiscoverFoodsByNutrient,
@@ -18,7 +16,6 @@ import { SearchResults } from "./search-results";
 const PAGE_SIZE = 20;
 
 export function SearchInput() {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState<PaginatedSearchResult | null>(null);
   const [filters, setFilters] = useState<SearchFilters>({});
@@ -89,7 +86,7 @@ export function SearchInput() {
     [query, filters, executeSearch],
   );
 
-  // AI agent: research a single food not in DB
+  // AI agent: research a food not in DB — stays on search page and refreshes results
   const handleAiFoodSearch = useCallback(async () => {
     if (!query.trim()) return;
     setIsAiSearching(true);
@@ -98,7 +95,9 @@ export function SearchInput() {
     try {
       const result = await aiSearchFood(query);
       if (result.status === "found") {
-        router.push(`/food/${result.foodId}`);
+        setAiSuccess(`Added "${query}" with nutrient data — pending admin review`);
+        // Refresh search to show the newly created food in results
+        executeSearch(query, filters, 1);
       } else {
         setAiError(result.message);
       }
@@ -107,7 +106,7 @@ export function SearchInput() {
     } finally {
       setIsAiSearching(false);
     }
-  }, [query, router]);
+  }, [query, filters, executeSearch]);
 
   // AI agent: discover more foods for a nutrient (now uses USDA API + AI)
   const handleAiNutrientSearch = useCallback(async () => {
