@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+/**
+ * Permissive UUID format check — accepts any 8-4-4-4-12 hex string.
+ * PostgreSQL stores UUIDs without enforcing RFC 4122 version/variant bits,
+ * so we must not reject valid DB values that Zod 4's strict `.uuid()` would.
+ */
+const uuidSchema = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "Invalid UUID");
+
 export const searchInputSchema = z.object({
   query: z
     .string()
@@ -25,8 +34,8 @@ function parsePositiveNumber(val: unknown): number | null {
 /** Payload for creating or updating a row in `user_nutrient_limits` (validated server-side). */
 export const saveUserNutrientLimitSchema = z
   .object({
-    nutrientId: z.string().uuid(),
-    limitId: z.string().uuid().optional(),
+    nutrientId: uuidSchema,
+    limitId: uuidSchema.optional(),
     mode: limitModeSchema,
     dailyLimit: z.union([z.string(), z.number()]).optional(),
     rangeMin: z.union([z.string(), z.number()]).optional(),
@@ -72,14 +81,14 @@ export const saveUserNutrientLimitSchema = z
 export type SaveUserNutrientLimitInput = z.infer<typeof saveUserNutrientLimitSchema>;
 
 export const deleteUserNutrientLimitSchema = z.object({
-  limitId: z.string().uuid(),
+  limitId: uuidSchema,
 });
 
 export type DeleteUserNutrientLimitInput = z.infer<typeof deleteUserNutrientLimitSchema>;
 
 export const addConsumptionLogSchema = z.object({
-  foodVariantId: z.string().uuid(),
-  servingMeasureId: z.string().uuid().nullable(),
+  foodVariantId: uuidSchema,
+  servingMeasureId: uuidSchema.nullable(),
   quantity: z.number().positive("Quantity must be positive"),
   gramsAmount: z.number().positive("Grams must be positive"),
   nutrientSnapshot: z.record(z.string(), z.number()),
@@ -89,13 +98,13 @@ export const addConsumptionLogSchema = z.object({
 export type AddConsumptionLogInput = z.infer<typeof addConsumptionLogSchema>;
 
 export const deleteConsumptionLogSchema = z.object({
-  logId: z.string().uuid(),
+  logId: uuidSchema,
 });
 
 export type DeleteConsumptionLogInput = z.infer<typeof deleteConsumptionLogSchema>;
 
 export const updateConsumptionLogSchema = z.object({
-  logId: z.string().uuid(),
+  logId: uuidSchema,
   quantity: z.number().positive("Quantity must be positive"),
   nutrientSnapshot: z.record(z.string(), z.number()),
 });
@@ -109,41 +118,41 @@ export const createFoodSchema = z.object({
 });
 
 export const updateFoodSchema = z.object({
-  foodId: z.string().uuid(),
+  foodId: uuidSchema,
   name: z.string().min(1, "Name is required").max(200),
   category: z.string().max(100).optional(),
   description: z.string().max(1000).optional(),
 });
 
 export const deleteFoodSchema = z.object({
-  foodId: z.string().uuid(),
+  foodId: uuidSchema,
 });
 
 export const addVariantSchema = z.object({
-  foodId: z.string().uuid(),
+  foodId: uuidSchema,
   preparationMethod: z.string().min(1),
   description: z.string().max(500).optional(),
   isDefault: z.boolean().default(false),
 });
 
 export const deleteVariantSchema = z.object({
-  variantId: z.string().uuid(),
+  variantId: uuidSchema,
 });
 
 export const saveNutrientValueSchema = z.object({
-  foodVariantId: z.string().uuid(),
-  nutrientId: z.string().uuid(),
+  foodVariantId: uuidSchema,
+  nutrientId: uuidSchema,
   valuePer100g: z.number().nonnegative("Value must be non-negative"),
   confidenceScore: z.number().int().min(0).max(100).default(50),
-  resolvedId: z.string().uuid().optional(),
+  resolvedId: uuidSchema.optional(),
 });
 
 export const deleteNutrientValueSchema = z.object({
-  resolvedId: z.string().uuid(),
+  resolvedId: uuidSchema,
 });
 
 export const reviewObservationSchema = z.object({
-  observationId: z.string().uuid(),
+  observationId: uuidSchema,
   status: z.enum(["approved", "rejected", "needs_revision"]),
   notes: z.string().max(1000).optional(),
 });

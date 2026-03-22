@@ -14,6 +14,7 @@ export interface SearchRow {
   nutrientUnit: string | null;
   valuePer100g: string | null;
   confidenceScore: number | null;
+  sourceSummary: string | null;
 }
 
 /**
@@ -30,6 +31,7 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
       id: string;
       name: string;
       category: string | null;
+      isAiGenerated: boolean;
       variants: Map<
         string,
         {
@@ -49,6 +51,7 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
         id: row.foodId,
         name: row.foodName,
         category: row.category,
+        isAiGenerated: false,
         variants: new Map(),
       };
       foodMap.set(row.foodId, food);
@@ -64,6 +67,10 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
           nutrients: [],
         };
         food.variants.set(row.variantId, variant);
+      }
+
+      if (row.sourceSummary?.startsWith("AI-generated")) {
+        food.isAiGenerated = true;
       }
 
       if (row.nutrientName && row.valuePer100g !== null) {
@@ -104,6 +111,7 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
       name: food.name,
       category: food.category,
       variants,
+      isAiGenerated: food.isAiGenerated,
     });
   }
 

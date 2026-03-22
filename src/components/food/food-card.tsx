@@ -49,6 +49,17 @@ export function FoodCard({ food }: FoodCardProps) {
           )}
         </div>
 
+        {food.isAiGenerated && (
+          <div className="flex items-center gap-1.5 bg-md-tertiary-fixed/30 border border-md-tertiary/20 rounded-lg px-3 py-1.5 mb-3">
+            <span className="material-symbols-outlined text-md-tertiary text-[16px]">
+              neurology
+            </span>
+            <span className="text-[11px] font-bold text-md-on-surface-variant uppercase tracking-wide">
+              AI Generated &middot; Pending Review
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center gap-4 mb-6">
           {defaultVariant && (
             <>

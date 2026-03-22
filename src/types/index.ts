@@ -23,6 +23,7 @@ export interface FoodSearchResult {
   name: string;
   category: string | null;
   variants: FoodVariantSummary[];
+  isAiGenerated?: boolean;
 }
 
 export interface ServingMeasure {
@@ -188,4 +189,29 @@ export interface NutrientOption {
   name: string;
   displayName: string;
   unit: string;
+}
+
+// Search filters & pagination
+
+export interface SearchFilters {
+  category?: string;
+  confidenceLevel?: ConfidenceLabel;
+  aiGeneratedOnly?: boolean;
+}
+
+export interface PaginationParams {
+  page: number;
+  pageSize: number;
+}
+
+export interface PaginatedSearchResult {
+  results: FoodSearchResult[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  searchType: "food" | "nutrient";
+  nutrientName?: string;
+  nutrientId?: string;
+  availableCategories: string[];
 }

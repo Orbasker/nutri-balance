@@ -1,7 +1,10 @@
 "use server";
 
+import { generateObject } from "ai";
 import { and, count, countDistinct, eq, inArray, notInArray } from "drizzle-orm";
+import { z } from "zod";
 
+import { getModel } from "@/lib/ai-provider";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
@@ -13,9 +16,22 @@ import {
   sources,
 } from "@/lib/db/schema/observations";
 import { flushLangfuse } from "@/lib/langfuse";
-import { tracedChatCompletion } from "@/lib/openai";
+import { getLangfuse } from "@/lib/langfuse";
 
 const AI_SOURCE_NAME = "NutriBalance AI Researcher";
+
+const nutrientDataPointSchema = z.object({
+  foodName: z.string(),
+  preparationMethod: z.string(),
+  valuePer100g: z.number().nonnegative(),
+  unit: z.string(),
+  confidence: z.number().min(0).max(100),
+  reasoning: z.string(),
+});
+
+const batchResultSchema = z.object({
+  results: z.array(nutrientDataPointSchema),
+});
 
 /**
  * Get or create the AI-generated source record.
@@ -61,74 +77,69 @@ async function findMissingVariants(nutrientId: string) {
     .where(notInArray(foodVariants.id, variantsWithData));
 }
 
-interface NutrientDataPoint {
-  foodName: string;
-  preparationMethod: string;
-  valuePer100g: number;
-  unit: string;
-  confidence: number;
-  reasoning: string;
-}
-
 /**
- * Call OpenAI to research nutrient content for a batch of food variants.
+ * Call AI to research nutrient content for a batch of food variants.
  */
 async function researchBatch(
   nutrientName: string,
   nutrientUnit: string,
   batch: { variantId: string; foodName: string; preparationMethod: string }[],
-): Promise<NutrientDataPoint[]> {
+) {
   const foodList = batch.map((b) => `- ${b.foodName} (${b.preparationMethod})`).join("\n");
+  const model = getModel();
 
-  const { completion } = await tracedChatCompletion({
-    traceName: "nutrient-research",
-    model: "gpt-4o-mini",
+  const langfuse = getLangfuse();
+  const trace = langfuse.trace({
+    name: "nutrient-research-batch",
     metadata: { nutrient: nutrientName, batchSize: batch.length },
-    messages: [
-      {
-        role: "system",
-        content: `You are a nutrition data researcher. You provide estimated nutrient values per 100g of food based on established nutrition databases (USDA, NCCDB, etc.).
-
-Return a JSON array with one object per food item. Each object must have:
-- "foodName": string (exact name from the input)
-- "preparationMethod": string (exact method from the input)
-- "valuePer100g": number (amount of ${nutrientName} in ${nutrientUnit} per 100g)
-- "unit": "${nutrientUnit}"
-- "confidence": number 0-100 (how confident you are in this value)
-- "reasoning": string (brief source or explanation)
-
-If you cannot estimate a value, use valuePer100g: 0 and confidence: 10.
-Return ONLY the JSON array, no other text.`,
-      },
-      {
-        role: "user",
-        content: `Research the ${nutrientName} (${nutrientUnit}) content per 100g for these foods:\n${foodList}`,
-      },
-    ],
-    temperature: 0.2,
   });
 
-  const content = completion.choices[0]?.message?.content ?? "[]";
-  const cleaned = content.replace(/```json\n?|```\n?/g, "").trim();
-  return JSON.parse(cleaned) as NutrientDataPoint[];
+  const modelName = typeof model === "string" ? model : model.modelId;
+
+  const generation = trace.generation({
+    name: "research-batch",
+    model: modelName,
+    input: { nutrientName, foodList },
+  });
+
+  const { object, usage } = await generateObject({
+    model,
+    schema: batchResultSchema,
+    prompt: `You are a nutrition data researcher. Estimate ${nutrientName} (${nutrientUnit}) content per 100g for these foods:
+${foodList}
+
+Rules:
+- Use exact food names and preparation methods from the input
+- Confidence: 85-95 for well-known USDA data, 60-80 for estimates, <60 for uncertain
+- If you cannot estimate a value, use valuePer100g: 0 and confidence: 10
+- Base values on USDA FoodData Central, NCCDB, or established nutrition literature`,
+  });
+
+  generation.end({
+    output: object,
+    usage: {
+      input: usage.inputTokens,
+      output: usage.outputTokens,
+      total: usage.totalTokens,
+    },
+  });
+
+  return object.results;
 }
 
 /**
  * Process a single AI task: research a nutrient across all foods missing data.
  */
 export async function processNutrientResearchTask(taskId: string): Promise<void> {
-  // Load the task
   const [task] = await db.select().from(aiTasks).where(eq(aiTasks.id, taskId)).limit(1);
   if (!task || task.status !== "pending") return;
 
-  // Mark as running
   await db
     .update(aiTasks)
     .set({ status: "running", startedAt: new Date() })
     .where(eq(aiTasks.id, taskId));
 
   try {
-    // Get the target nutrient
     const [nutrient] = await db
       .select()
       .from(nutrients)
@@ -137,7 +148,6 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
 
     if (!nutrient) throw new Error("Nutrient not found");
 
-    // Find food variants missing this nutrient
     const missing = await findMissingVariants(nutrient.id);
 
     if (missing.length === 0) {
@@ -158,7 +168,6 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
     let errors = 0;
     const BATCH_SIZE = 10;
 
-    // Process in batches
     for (let i = 0; i < missing.length; i += BATCH_SIZE) {
       const batch = missing.slice(i, i + BATCH_SIZE);
 
@@ -172,16 +181,11 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
           );
           if (!variant) continue;
 
-          // Create source record
           const [record] = await db
             .insert(sourceRecords)
-            .values({
-              sourceId,
-              rawData: result,
-            })
+            .values({ sourceId, rawData: result })
             .returning({ id: sourceRecords.id });
 
-          // Create nutrient observation
           const [observation] = await db
             .insert(nutrientObservations)
             .values({
@@ -198,7 +202,6 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
             })
             .returning({ id: nutrientObservations.id });
 
-          // Create evidence item with reasoning
           await db.insert(evidenceItems).values({
             observationId: observation.id,
             snippet: result.reasoning,
@@ -210,7 +213,6 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
         errors += batch.length;
       }
 
-      // Update progress
       await db
         .update(aiTasks)
         .set({ progress: { processed, total: missing.length, errors } })
@@ -245,7 +247,6 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
  * Called by the daily scheduler.
  */
 export async function findAndCreateGapTasks(): Promise<number> {
-  // Get all nutrients
   const allNutrients = await db.select().from(nutrients);
   const totalVariants = await db.select({ count: count() }).from(foodVariants);
   const variantCount = totalVariants[0]?.count ?? 0;
@@ -253,17 +254,14 @@ export async function findAndCreateGapTasks(): Promise<number> {
   let tasksCreated = 0;
 
   for (const nutrient of allNutrients) {
-    // Count how many variants already have data for this nutrient
     const [{ count: observedCount }] = await db
       .select({ count: countDistinct(nutrientObservations.foodVariantId) })
       .from(nutrientObservations)
       .where(eq(nutrientObservations.nutrientId, nutrient.id));
 
-    // If more than 20% of variants are missing data, create a task
     const missingRatio = 1 - Number(observedCount) / Number(variantCount);
     if (missingRatio <= 0.2) continue;
 
-    // Check if there's already a pending/running task for this nutrient
     const [existingTask] = await db
       .select({ id: aiTasks.id })
       .from(aiTasks)
