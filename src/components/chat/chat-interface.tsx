@@ -251,9 +251,12 @@ function UserBubble({ message }: { message: UIMessage }) {
   const text = message.parts.find((p) => p.type === "text");
   if (!text || text.type !== "text") return null;
   return (
-    <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-blue-600 text-white px-4 py-3 text-sm leading-relaxed">
-        {text.text}
+    <div className="group/msg flex justify-end">
+      <div className="relative max-w-[85%]">
+        <div className="rounded-2xl rounded-br-md bg-blue-600 text-white px-4 py-3 text-sm leading-relaxed">
+          {text.text}
+        </div>
+        <CopyButton text={text.text} variant="user" />
       </div>
     </div>
   );
@@ -262,26 +265,33 @@ function UserBubble({ message }: { message: UIMessage }) {
 function AssistantMessage({ message, isActive }: { message: UIMessage; isActive: boolean }) {
   const hasText = message.parts.some((p) => p.type === "text" && p.text.trim());
   const toolParts = message.parts.filter(isToolUIPart);
+  const fullText = message.parts
+    .filter((p) => p.type === "text" && p.text.trim())
+    .map((p) => (p as { type: "text"; text: string }).text)
+    .join("\n");
 
   return (
-    <div className="flex justify-start gap-2">
+    <div className="group/msg flex justify-start gap-2">
       <div className="max-w-[90%] space-y-2">
         {toolParts.map((part, i) => (
           <ToolCard key={i} part={part} />
         ))}
 
         {hasText && (
-          <div className="rounded-2xl rounded-bl-md bg-slate-100 text-md-on-surface px-4 py-3 text-sm leading-relaxed">
-            {message.parts.map((part, i) => {
-              if (part.type === "text" && part.text.trim()) {
-                return (
-                  <div key={i} className="whitespace-pre-wrap">
-                    {formatMessage(part.text)}
-                  </div>
-                );
-              }
-              return null;
-            })}
+          <div className="relative">
+            <div className="rounded-2xl rounded-bl-md bg-slate-100 text-md-on-surface px-4 py-3 text-sm leading-relaxed">
+              {message.parts.map((part, i) => {
+                if (part.type === "text" && part.text.trim()) {
+                  return (
+                    <div key={i} className="whitespace-pre-wrap">
+                      {formatMessage(part.text)}
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+            <CopyButton text={fullText} variant="assistant" />
           </div>
         )}
 
@@ -505,6 +515,34 @@ function VerdictDot({ verdict }: { verdict: string }) {
         verdict === "exceed" && "bg-red-500",
       )}
     />
+  );
+}
+
+function CopyButton({ text, variant }: { text: string; variant: "user" | "assistant" }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [text]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        "absolute -bottom-1 opacity-0 group-hover/msg:opacity-100 transition-opacity",
+        "p-1 rounded-md hover:bg-black/5 active:scale-90",
+        variant === "user" ? "right-1 text-slate-400" : "left-1 text-slate-400",
+      )}
+      title={copied ? "Copied!" : "Copy message"}
+    >
+      <span className="material-symbols-outlined text-[16px]">
+        {copied ? "check" : "content_copy"}
+      </span>
+    </button>
   );
 }
 
