@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { AppShell } from "@/components/app-shell";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 
@@ -27,10 +28,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     null;
 
   return (
-    <div className="min-h-screen pb-24">
-      <TopAppBar displayName={displayName} avatarColor={profile?.avatar_color ?? "blue"} />
-      <main className="pt-20">{children}</main>
-      <BottomNav />
-    </div>
+    <AppShell>
+      <div className="min-h-screen pb-24">
+        <TopAppBar displayName={displayName} avatarColor={profile?.avatar_color ?? "blue"} />
+        <main className="pt-20">{children}</main>
+        <BottomNav />
+      </div>
+    </AppShell>
   );
 }

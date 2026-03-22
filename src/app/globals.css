@@ -228,3 +228,17 @@
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
 }
+
+/* Splash screen shimmer animation */
+@keyframes splash-shimmer {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.splash-shimmer {
+  animation: splash-shimmer 2s infinite linear;
+}
