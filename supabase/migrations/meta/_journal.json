@@ -22,6 +22,13 @@
       "when": 1774192049036,
       "tag": "0005_food_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774199657578,
+      "tag": "0007_chat_tables",
+      "breakpoints": true
     }
   ]
 }

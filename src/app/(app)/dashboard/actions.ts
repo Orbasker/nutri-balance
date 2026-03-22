@@ -5,11 +5,6 @@ import type { NutrientProgress, RecentLogEntry } from "@/types";
 import { getNutrientStatus } from "@/lib/calculations";
 import { createClient } from "@/lib/supabase/server";
 
-interface NutrientSnapshotEntry {
-  nutrient_id: string;
-  amount: number;
-}
-
 interface LimitRow {
   nutrient_id: string;
   daily_limit: string;
@@ -101,13 +96,13 @@ export async function fetchDashboardData(): Promise<{
   }
 
   // Aggregate consumed amounts per nutrient from snapshots
+  // Snapshots are stored as Record<string, number> (nutrientId → amount)
   const consumedByNutrient: Record<string, number> = {};
   for (const log of logs ?? []) {
-    const snapshot = log.nutrient_snapshot as NutrientSnapshotEntry[] | null;
-    if (!snapshot) continue;
-    for (const entry of snapshot) {
-      consumedByNutrient[entry.nutrient_id] =
-        (consumedByNutrient[entry.nutrient_id] ?? 0) + entry.amount;
+    const snapshot = log.nutrient_snapshot as Record<string, number> | null;
+    if (!snapshot || typeof snapshot !== "object") continue;
+    for (const [nutrientId, amount] of Object.entries(snapshot)) {
+      consumedByNutrient[nutrientId] = (consumedByNutrient[nutrientId] ?? 0) + amount;
     }
   }
 
