@@ -6,17 +6,25 @@ import {
   type PdfUploadResult,
   aiDiscoverFoodsByNutrient,
   aiSearchFood,
+  listNutrients,
+  searchByNutrientId,
   searchFoods,
   uploadNutrientPdf,
 } from "@/app/(app)/search/actions";
-import type { PaginatedSearchResult, SearchFilters } from "@/types";
+import type { NutrientOption, PaginatedSearchResult, SearchFilters } from "@/types";
 
+import { cn } from "@/lib/utils";
+
+import { NutrientPicker } from "./nutrient-picker";
 import { SearchResults } from "./search-results";
 
 const PAGE_SIZE = 20;
 
+type SearchMode = "food" | "nutrient";
+
 export function SearchInput() {
-  const [query, setQuery] = useState("");
+  // -- Shared state --
+  const [mode, setMode] = useState<SearchMode>("food");
   const [searchResult, setSearchResult] = useState<PaginatedSearchResult | null>(null);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [hasSearched, setHasSearched] = useState(false);
@@ -28,9 +36,51 @@ export function SearchInput() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // -- Food search state --
+  const [query, setQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const executeSearch = useCallback((q: string, f: SearchFilters, page: number) => {
+  // -- Nutrient search state --
+  const [nutrientsList, setNutrientsList] = useState<NutrientOption[]>([]);
+  const [nutrientsLoading, setNutrientsLoading] = useState(false);
+  const [nutrientsLoaded, setNutrientsLoaded] = useState(false);
+  const [selectedNutrient, setSelectedNutrient] = useState<NutrientOption | null>(null);
+
+  // -- Mode switching --
+  const handleModeSwitch = useCallback(
+    (newMode: SearchMode) => {
+      if (newMode === mode) return;
+      setMode(newMode);
+      // Clear all search state
+      setQuery("");
+      setSearchResult(null);
+      setHasSearched(false);
+      setFilters({});
+      setAiError(null);
+      setAiSuccess(null);
+      setSelectedNutrient(null);
+      setShowUpload(false);
+
+      // Load nutrients on first switch to nutrient mode
+      if (newMode === "nutrient" && !nutrientsLoaded) {
+        setNutrientsLoading(true);
+        listNutrients()
+          .then((data) => {
+            setNutrientsList(data);
+            setNutrientsLoaded(true);
+          })
+          .catch(() => {
+            setAiError("Failed to load nutrients.");
+          })
+          .finally(() => setNutrientsLoading(false));
+      }
+    },
+    [mode, nutrientsLoaded],
+  );
+
+  // -- Food search handlers (existing behavior preserved) --
+  const executeFoodSearch = useCallback((q: string, f: SearchFilters, page: number) => {
     startTransition(async () => {
       const data = await searchFoods(q, f, { page, pageSize: PAGE_SIZE });
       setSearchResult(data);
@@ -55,38 +105,73 @@ export function SearchInput() {
         return;
       }
 
-      // Reset filters and page on new query
       setFilters({});
 
       debounceRef.current = setTimeout(() => {
-        executeSearch(value, {}, 1);
+        executeFoodSearch(value, {}, 1);
       }, 300);
     },
-    [executeSearch],
+    [executeFoodSearch],
   );
 
+  // -- Nutrient search handlers --
+  const executeNutrientSearch = useCallback(
+    (nutrientId: string, f: SearchFilters, page: number) => {
+      startTransition(async () => {
+        const data = await searchByNutrientId(nutrientId, f, { page, pageSize: PAGE_SIZE });
+        setSearchResult(data);
+        setHasSearched(true);
+      });
+    },
+    [],
+  );
+
+  const handleNutrientSelect = useCallback(
+    (nutrient: NutrientOption) => {
+      setSelectedNutrient(nutrient);
+      setAiError(null);
+      setAiSuccess(null);
+      setFilters({});
+      executeNutrientSearch(nutrient.id, {}, 1);
+    },
+    [executeNutrientSearch],
+  );
+
+  const handleNutrientClear = useCallback(() => {
+    setSelectedNutrient(null);
+    setSearchResult(null);
+    setHasSearched(false);
+    setFilters({});
+    setAiError(null);
+    setAiSuccess(null);
+  }, []);
+
+  // -- Shared handlers --
   const handleFiltersChange = useCallback(
     (newFilters: SearchFilters) => {
       setFilters(newFilters);
-      if (query.trim().length >= 2) {
-        executeSearch(query, newFilters, 1);
+      if (mode === "food" && query.trim().length >= 2) {
+        executeFoodSearch(query, newFilters, 1);
+      } else if (mode === "nutrient" && selectedNutrient) {
+        executeNutrientSearch(selectedNutrient.id, newFilters, 1);
       }
     },
-    [query, executeSearch],
+    [mode, query, selectedNutrient, executeFoodSearch, executeNutrientSearch],
   );
 
   const handlePageChange = useCallback(
     (page: number) => {
-      if (query.trim().length >= 2) {
-        executeSearch(query, filters, page);
+      if (mode === "food" && query.trim().length >= 2) {
+        executeFoodSearch(query, filters, page);
+      } else if (mode === "nutrient" && selectedNutrient) {
+        executeNutrientSearch(selectedNutrient.id, filters, page);
       }
-      // Scroll to top of results
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [query, filters, executeSearch],
+    [mode, query, selectedNutrient, filters, executeFoodSearch, executeNutrientSearch],
   );
 
-  // AI agent: research a food not in DB — stays on search page and refreshes results
+  // AI agent: research a food not in DB
   const handleAiFoodSearch = useCallback(async () => {
     if (!query.trim()) return;
     setIsAiSearching(true);
@@ -95,9 +180,8 @@ export function SearchInput() {
     try {
       const result = await aiSearchFood(query);
       if (result.status === "found") {
-        setAiSuccess(`Added "${query}" with nutrient data — pending admin review`);
-        // Refresh search to show the newly created food in results
-        executeSearch(query, filters, 1);
+        setAiSuccess(`Added "${query}" with nutrient data - pending admin review`);
+        executeFoodSearch(query, filters, 1);
       } else {
         setAiError(result.message);
       }
@@ -106,30 +190,40 @@ export function SearchInput() {
     } finally {
       setIsAiSearching(false);
     }
-  }, [query, filters, executeSearch]);
+  }, [query, filters, executeFoodSearch]);
 
-  // AI agent: discover more foods for a nutrient (now uses USDA API + AI)
+  // AI agent: discover more foods for a nutrient
   const handleAiNutrientSearch = useCallback(async () => {
-    if (!searchResult?.nutrientId) return;
+    const nutrientId = selectedNutrient?.id ?? searchResult?.nutrientId;
+    if (!nutrientId) return;
     setIsAiSearching(true);
     setAiError(null);
 
     try {
-      const result = await aiDiscoverFoodsByNutrient(searchResult.nutrientId);
+      const result = await aiDiscoverFoodsByNutrient(nutrientId);
       if (result.status === "found") {
         setAiSuccess(result.summary);
-        // Re-run the search to show the new foods
-        executeSearch(query, filters, 1);
-        setIsAiSearching(false);
+        if (selectedNutrient) {
+          executeNutrientSearch(selectedNutrient.id, filters, 1);
+        } else if (query.trim().length >= 2) {
+          executeFoodSearch(query, filters, 1);
+        }
       } else {
         setAiError(result.message);
-        setIsAiSearching(false);
       }
     } catch {
       setAiError("Something went wrong. Please try again.");
+    } finally {
       setIsAiSearching(false);
     }
-  }, [searchResult?.nutrientId, query, filters, executeSearch]);
+  }, [
+    selectedNutrient,
+    searchResult?.nutrientId,
+    query,
+    filters,
+    executeFoodSearch,
+    executeNutrientSearch,
+  ]);
 
   // PDF upload handler
   const handleFileUpload = useCallback(
@@ -143,14 +237,13 @@ export function SearchInput() {
       setAiError(null);
       setAiSuccess(null);
 
-      // Progress simulation — updates status based on elapsed time
       const steps = [
         { delay: 2000, msg: "Analyzing document structure..." },
         { delay: 6000, msg: "Extracting food entries (page 1)..." },
         { delay: 15000, msg: "Extracting food entries (processing pages)..." },
-        { delay: 30000, msg: "Still extracting — large document..." },
+        { delay: 30000, msg: "Still extracting - large document..." },
         { delay: 50000, msg: "Inserting foods into database..." },
-        { delay: 80000, msg: "Almost done — finalizing..." },
+        { delay: 80000, msg: "Almost done - finalizing..." },
       ];
       const timers = steps.map((s) => setTimeout(() => setUploadStatus(s.msg), s.delay));
 
@@ -164,14 +257,15 @@ export function SearchInput() {
         if (result.status === "success") {
           const msg = [
             `Imported ${result.count} food${result.count !== 1 ? "s" : ""} from PDF`,
-            result.skipped > 0 ? ` (${result.skipped} skipped — already in DB)` : "",
-            " — pending admin review",
+            result.skipped > 0 ? ` (${result.skipped} skipped - already in DB)` : "",
+            " - pending admin review",
           ].join("");
           setAiSuccess(msg);
 
-          // Re-run current search to show new results
-          if (query.trim().length >= 2) {
-            executeSearch(query, filters, 1);
+          if (mode === "food" && query.trim().length >= 2) {
+            executeFoodSearch(query, filters, 1);
+          } else if (mode === "nutrient" && selectedNutrient) {
+            executeNutrientSearch(selectedNutrient.id, filters, 1);
           }
         } else {
           setAiError(result.message);
@@ -182,26 +276,26 @@ export function SearchInput() {
       } finally {
         setIsUploading(false);
         setShowUpload(false);
-        // Reset file input
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
       }
     },
-    [query, filters, executeSearch],
+    [mode, query, selectedNutrient, filters, executeFoodSearch, executeNutrientSearch],
   );
 
-  const isNutrientSearch = searchResult?.searchType === "nutrient";
-  const hasQuery = query.trim().length >= 2;
+  const isNutrientSearch = mode === "nutrient" || searchResult?.searchType === "nutrient";
+  const hasQuery = mode === "food" ? query.trim().length >= 2 : !!selectedNutrient;
 
-  // Smart AI action: route to the right handler based on search context
+  // Smart AI action
   const handleAiAction = useCallback(async () => {
-    if (isNutrientSearch && searchResult?.nutrientId) {
+    if (isNutrientSearch) {
       await handleAiNutrientSearch();
     } else {
       await handleAiFoodSearch();
     }
-  }, [isNutrientSearch, searchResult?.nutrientId, handleAiNutrientSearch, handleAiFoodSearch]);
+  }, [isNutrientSearch, handleAiNutrientSearch, handleAiFoodSearch]);
+
   const showResults =
     !isPending && !isAiSearching && hasSearched && searchResult && searchResult.totalCount > 0;
   const showFilteredEmpty =
@@ -214,7 +308,7 @@ export function SearchInput() {
 
   return (
     <div className="space-y-8">
-      {/* Hidden file input — always in DOM so labels can trigger it */}
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -224,44 +318,95 @@ export function SearchInput() {
         id="pdf-upload"
       />
 
-      {/* Search Bar */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-          <span className="material-symbols-outlined text-md-outline">search</span>
-        </div>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleChange(e.target.value)}
-          className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-28 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
-          placeholder="Search foods, ingredients, or nutrients..."
-        />
-        <div className="absolute inset-y-0 right-4 flex items-center gap-1">
-          {/* AI Research button — always visible when there's a query */}
-          {hasQuery && (
+      {/* Mode Toggle */}
+      <div className="flex gap-2 bg-md-surface-container rounded-2xl p-1.5">
+        <button
+          onClick={() => handleModeSwitch("food")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-200",
+            mode === "food"
+              ? "bg-md-primary text-white shadow-md"
+              : "text-md-on-surface-variant hover:bg-md-surface-container-high",
+          )}
+        >
+          <span className="material-symbols-outlined text-[20px]">search</span>
+          Search Food
+        </button>
+        <button
+          onClick={() => handleModeSwitch("nutrient")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all duration-200",
+            mode === "nutrient"
+              ? "bg-md-primary text-white shadow-md"
+              : "text-md-on-surface-variant hover:bg-md-surface-container-high",
+          )}
+        >
+          <span className="material-symbols-outlined text-[20px]">science</span>
+          Search Nutrient
+        </button>
+      </div>
+
+      {/* Food Search Input */}
+      {mode === "food" && (
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+            <span className="material-symbols-outlined text-md-outline">search</span>
+          </div>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => handleChange(e.target.value)}
+            className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-28 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
+            placeholder="Search foods, ingredients, or nutrients..."
+          />
+          <div className="absolute inset-y-0 right-4 flex items-center gap-1">
+            {hasQuery && (
+              <button
+                onClick={handleAiAction}
+                disabled={isAiSearching}
+                className="flex items-center justify-center w-10 h-10 rounded-xl text-md-primary hover:bg-md-primary/10 transition-colors disabled:opacity-50"
+                title={
+                  isNutrientSearch
+                    ? `Discover more ${searchResult?.nutrientName} foods (USDA + AI)`
+                    : `AI research "${query}"`
+                }
+              >
+                <span className="material-symbols-outlined text-[22px]">neurology</span>
+              </button>
+            )}
             <button
-              onClick={handleAiAction}
-              disabled={isAiSearching}
-              className="flex items-center justify-center w-10 h-10 rounded-xl text-md-primary hover:bg-md-primary/10 transition-colors disabled:opacity-50"
-              title={
-                isNutrientSearch
-                  ? `Discover more ${searchResult?.nutrientName} foods (USDA + AI)`
-                  : `AI research "${query}"`
-              }
+              onClick={() => setShowUpload(!showUpload)}
+              className="flex items-center justify-center w-10 h-10 rounded-xl text-md-outline hover:text-md-primary hover:bg-md-primary/10 transition-colors"
+              title="Import foods from PDF"
+            >
+              <span className="material-symbols-outlined text-[22px]">upload_file</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Nutrient Search Picker */}
+      {mode === "nutrient" && (
+        <div className="space-y-4">
+          <NutrientPicker
+            nutrients={nutrientsList}
+            isLoading={nutrientsLoading}
+            selectedNutrient={selectedNutrient}
+            onSelect={handleNutrientSelect}
+            onClear={handleNutrientClear}
+          />
+          {/* AI Discover button for nutrient mode */}
+          {selectedNutrient && !isAiSearching && (
+            <button
+              onClick={handleAiNutrientSearch}
+              className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-md-primary/5 to-md-tertiary/5 border border-md-primary/15 rounded-2xl py-4 px-6 text-md-primary font-bold hover:from-md-primary/10 hover:to-md-tertiary/10 active:scale-[0.99] transition-all duration-200"
             >
               <span className="material-symbols-outlined text-[22px]">neurology</span>
+              Discover more foods with AI (USDA + research)
             </button>
           )}
-          {/* Upload PDF button */}
-          <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="flex items-center justify-center w-10 h-10 rounded-xl text-md-outline hover:text-md-primary hover:bg-md-primary/10 transition-colors"
-            title="Import foods from PDF"
-          >
-            <span className="material-symbols-outlined text-[22px]">upload_file</span>
-          </button>
         </div>
-      </div>
+      )}
 
       {/* PDF Upload Panel */}
       {showUpload && (
@@ -274,7 +419,7 @@ export function SearchInput() {
               <h4 className="font-bold text-md-on-surface mb-1">Import from PDF</h4>
               <p className="text-sm text-md-on-surface-variant mb-4">
                 Upload a USDA nutrient report or any PDF with food nutrient data. The AI will
-                extract all food entries and add them to the database — often hundreds of foods from
+                extract all food entries and add them to the database - often hundreds of foods from
                 a single document.
               </p>
 
@@ -332,12 +477,12 @@ export function SearchInput() {
               <p className="text-md-on-surface font-bold">AI Agent Researching</p>
               <p className="text-md-on-surface-variant text-sm mt-1">
                 {isNutrientSearch
-                  ? `Searching USDA database + AI for ${searchResult?.nutrientName} foods...`
+                  ? `Searching USDA database + AI for ${selectedNutrient?.displayName ?? searchResult?.nutrientName} foods...`
                   : `Looking up nutrient data for \u201c${query}\u201d...`}
               </p>
               {isNutrientSearch && (
                 <p className="text-md-outline text-xs mt-2">
-                  Fetching from USDA FoodData Central API — this may add 30-50+ foods
+                  Fetching from USDA FoodData Central API - this may add 30-50+ foods
                 </p>
               )}
             </div>
@@ -365,13 +510,13 @@ export function SearchInput() {
             onPageChange={handlePageChange}
           />
 
-          {/* AI research prompt — always visible below results */}
+          {/* AI research prompt - always visible below results */}
           {!isNutrientSearch && (
             <AiResearchPrompt query={query} onResearch={handleAiFoodSearch} aiError={aiError} />
           )}
-          {isNutrientSearch && searchResult?.nutrientId && (
+          {isNutrientSearch && (searchResult?.nutrientId || selectedNutrient) && (
             <AiResearchPrompt
-              query={searchResult.nutrientName ?? query}
+              query={selectedNutrient?.displayName ?? searchResult?.nutrientName ?? query}
               onResearch={handleAiNutrientSearch}
               aiError={aiError}
               isNutrient
@@ -380,7 +525,7 @@ export function SearchInput() {
         </>
       )}
 
-      {/* Show filters with no-match message when filters produce 0 results but query has matches */}
+      {/* Show filters with no-match message when filters produce 0 results */}
       {showFilteredEmpty && (
         <SearchResults
           searchResult={searchResult}
@@ -398,12 +543,13 @@ export function SearchInput() {
         </div>
       )}
 
-      {/* No Results — full AI option panel */}
+      {/* No Results - full AI option panel (food mode only) */}
       {!isAiSearching &&
         !isPending &&
         hasSearched &&
         searchResult?.totalCount === 0 &&
         hasQuery &&
+        mode === "food" &&
         !isNutrientSearch &&
         Object.values(filters).every((v) => !v) && (
           <div className="py-8 text-center space-y-6">
@@ -435,8 +581,45 @@ export function SearchInput() {
           </div>
         )}
 
-      {/* Nutrient Wisdom (show when no search) */}
-      {!hasSearched && !isPending && !isAiSearching && !showUpload && (
+      {/* No Results - nutrient mode empty state */}
+      {!isAiSearching &&
+        !isPending &&
+        hasSearched &&
+        searchResult?.totalCount === 0 &&
+        mode === "nutrient" &&
+        selectedNutrient &&
+        Object.values(filters).every((v) => !v) && (
+          <div className="py-8 text-center space-y-6">
+            <div className="w-16 h-16 rounded-full bg-md-surface-container-high flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-3xl text-md-outline">science</span>
+            </div>
+            <div>
+              <p className="text-md-on-surface-variant">
+                No foods with {selectedNutrient.displayName} data in our database yet.
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-br from-md-primary/5 to-md-tertiary/5 border border-md-primary/15 rounded-2xl p-6 max-w-md mx-auto">
+              <div className="flex items-center gap-3 justify-center mb-3">
+                <span className="material-symbols-outlined text-md-primary">neurology</span>
+                <h4 className="font-bold text-md-on-surface">Discover with AI</h4>
+              </div>
+              <p className="text-sm text-md-on-surface-variant mb-4">
+                Our AI agent will search USDA FoodData Central and nutrition research to find foods
+                rich in {selectedNutrient.displayName}.
+              </p>
+              <button
+                onClick={handleAiNutrientSearch}
+                className="bg-md-primary text-white font-bold py-3 px-8 rounded-xl active:scale-95 transition-all duration-200 hover:bg-md-primary/90"
+              >
+                Discover {selectedNutrient.displayName} foods
+              </button>
+            </div>
+          </div>
+        )}
+
+      {/* Nutrient Wisdom (show when no search in food mode) */}
+      {mode === "food" && !hasSearched && !isPending && !isAiSearching && !showUpload && (
         <div className="bg-gradient-to-br from-md-primary to-md-primary-container p-6 rounded-3xl text-white relative overflow-hidden group">
           <div className="relative z-10">
             <h4 className="text-2xl font-bold mb-2">Nutrient Wisdom</h4>
@@ -455,13 +638,33 @@ export function SearchInput() {
           </div>
         </div>
       )}
+
+      {/* Nutrient mode welcome (show when no nutrient selected) */}
+      {mode === "nutrient" && !selectedNutrient && !isPending && !isAiSearching && (
+        <div className="bg-gradient-to-br from-md-tertiary to-md-tertiary-container p-6 rounded-3xl text-white relative overflow-hidden group">
+          <div className="relative z-10">
+            <h4 className="text-2xl font-bold mb-2">Nutrient Explorer</h4>
+            <p className="text-md-tertiary-fixed-dim text-sm max-w-[70%] leading-relaxed">
+              Select a nutrient above to discover which foods contain the highest amounts. Great for
+              targeted dietary planning.
+            </p>
+          </div>
+          <div className="absolute -right-8 -bottom-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <span
+              className="material-symbols-outlined !text-9xl"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              science
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /**
  * Compact AI research prompt shown below search results.
- * Lets users trigger AI food research even when DB results exist.
  */
 function AiResearchPrompt({
   query,

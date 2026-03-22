@@ -2,12 +2,14 @@
 
 import type {
   FoodSearchResult,
+  NutrientOption,
   PaginatedSearchResult,
   PaginationParams,
   SearchFilters,
 } from "@/types";
 import {
   and,
+  asc,
   count,
   countDistinct,
   desc,
@@ -302,6 +304,82 @@ async function searchByName(
     results: mapSearchRows(rows as SearchRow[]),
     totalCount,
     categories,
+  };
+}
+
+/**
+ * List all nutrients sorted by sortOrder.
+ * Used by the nutrient search mode to populate the autocomplete picker.
+ */
+export async function listNutrients(): Promise<NutrientOption[]> {
+  const rows = await db
+    .select({
+      id: nutrients.id,
+      name: nutrients.name,
+      displayName: nutrients.displayName,
+      unit: nutrients.unit,
+    })
+    .from(nutrients)
+    .orderBy(asc(nutrients.sortOrder));
+
+  return rows;
+}
+
+/**
+ * Search foods by nutrient ID — public server action wrapping the internal searchByNutrient.
+ * Accepts a nutrientId directly (no query matching needed).
+ */
+export async function searchByNutrientId(
+  nutrientId: string,
+  filters: SearchFilters = {},
+  pagination: PaginationParams = { page: 1, pageSize: DEFAULT_PAGE_SIZE },
+): Promise<PaginatedSearchResult> {
+  if (!nutrientId?.trim()) {
+    return {
+      results: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: pagination.pageSize,
+      totalPages: 0,
+      searchType: "nutrient",
+      availableCategories: [],
+    };
+  }
+
+  // Look up the nutrient to get its display name
+  const [nutrient] = await db
+    .select({ id: nutrients.id, displayName: nutrients.displayName })
+    .from(nutrients)
+    .where(eq(nutrients.id, nutrientId));
+
+  if (!nutrient) {
+    return {
+      results: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: pagination.pageSize,
+      totalPages: 0,
+      searchType: "nutrient",
+      availableCategories: [],
+    };
+  }
+
+  const { results, totalCount, categories } = await searchByNutrient(
+    nutrientId,
+    filters,
+    pagination,
+  );
+
+  return {
+    results,
+    totalCount,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    totalPages: Math.ceil(totalCount / pagination.pageSize),
+    searchType: "nutrient",
+    nutrientName: nutrient.displayName,
+    nutrientId,
+    availableCategories: categories,
   };
 }
 
