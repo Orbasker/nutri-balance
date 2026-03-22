@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { LogoutButton } from "./logout-button";
 import { NutrientLimitsSettings } from "./nutrient-limits-settings";
+import { ProfileSettings } from "./profile-settings";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -22,7 +23,13 @@ export default async function SettingsPage() {
         ascending: true,
       }),
     supabase.from("user_nutrient_limits").select("*"),
-    supabase.from("profiles").select("clinical_notes").eq("id", user!.id).single(),
+    supabase
+      .from("profiles")
+      .select(
+        "first_name, last_name, display_name, date_of_birth, gender, clinical_notes, health_goal, avatar_color",
+      )
+      .eq("id", user!.id)
+      .single(),
   ]);
 
   if (nutrientsError || limitsError) {
@@ -44,6 +51,17 @@ export default async function SettingsPage() {
           Customize your clinical goals and tracker behavior.
         </p>
       </div>
+
+      <ProfileSettings
+        firstName={profile?.first_name ?? ""}
+        lastName={profile?.last_name ?? ""}
+        dateOfBirth={profile?.date_of_birth ?? ""}
+        gender={profile?.gender ?? ""}
+        healthGoal={profile?.health_goal ?? ""}
+        avatarColor={profile?.avatar_color ?? "blue"}
+      />
+
+      <div className="mt-8" />
 
       <NutrientLimitsSettings
         nutrients={nutrients ?? []}

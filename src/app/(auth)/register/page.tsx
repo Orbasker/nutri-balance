@@ -29,11 +29,19 @@ export default function RegisterPage() {
                 {state.error}
               </p>
             )}
-            <div className="flex flex-col gap-2">
-              <label htmlFor="displayName" className="text-sm font-medium">
-                Display name
-              </label>
-              <Input id="displayName" name="displayName" autoComplete="name" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="firstName" className="text-sm font-medium">
+                  First name
+                </label>
+                <Input id="firstName" name="firstName" autoComplete="given-name" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="lastName" className="text-sm font-medium">
+                  Last name
+                </label>
+                <Input id="lastName" name="lastName" autoComplete="family-name" />
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <label htmlFor="email" className="text-sm font-medium">

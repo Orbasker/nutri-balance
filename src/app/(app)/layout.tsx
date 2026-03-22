@@ -15,9 +15,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name, display_name, avatar_color")
+    .eq("id", user.id)
+    .single();
+
+  const displayName =
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    profile?.display_name ||
+    null;
+
   return (
     <div className="min-h-screen pb-24">
-      <TopAppBar />
+      <TopAppBar displayName={displayName} avatarColor={profile?.avatar_color ?? "blue"} />
       <main className="pt-20">{children}</main>
       <BottomNav />
     </div>

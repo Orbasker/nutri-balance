@@ -32,7 +32,9 @@ export async function register(prevState: AuthState, formData: FormData): Promis
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const displayName = (formData.get("displayName") as string) || undefined;
+  const firstName = (formData.get("firstName") as string) || undefined;
+  const lastName = (formData.get("lastName") as string) || undefined;
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || undefined;
 
   if (!email || !password) {
     return { error: "Email and password are required." };
@@ -46,7 +48,7 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     email,
     password,
     options: {
-      data: { display_name: displayName },
+      data: { display_name: displayName, first_name: firstName, last_name: lastName },
     },
   });
 

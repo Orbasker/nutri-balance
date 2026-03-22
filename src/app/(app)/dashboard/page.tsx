@@ -9,6 +9,13 @@ function formatAmount(value: number, unit: string): string {
   return `${value.toFixed(1)}${unit}`;
 }
 
+function getTimeGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
   safe: {
     bg: "bg-md-tertiary-fixed",
@@ -95,10 +102,14 @@ function MealRow({ log }: { log: RecentLogEntry }) {
 }
 
 export default async function DashboardPage() {
-  const { nutrientProgress, recentLogs, error } = await fetchDashboardData();
+  const { nutrientProgress, recentLogs, displayName, healthGoal, error } =
+    await fetchDashboardData();
 
   // Calculate rough total from nutrient data for the hero
   const totalConsumed = nutrientProgress.reduce((s, n) => s + n.consumed, 0);
+  const firstName = displayName?.split(/\s+/)[0] ?? null;
+  const greeting = getTimeGreeting();
+  const hasData = nutrientProgress.length > 0;
 
   return (
     <div className="px-6 max-w-screen-xl mx-auto space-y-8">
@@ -112,8 +123,13 @@ export default async function DashboardPage() {
       <section className="nutrient-glass rounded-[2.5rem] p-8 text-white shadow-[0_20px_40px_rgba(0,68,147,0.15)] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10">
-          <p className="text-blue-100/80 uppercase tracking-[0.2em] text-[10px] font-bold mb-2">
-            Today&apos;s Balance
+          <p className="text-blue-100/80 text-sm font-medium mb-0.5">
+            {greeting}
+            {firstName ? `, ${firstName}` : ""}
+          </p>
+          {healthGoal && <p className="text-blue-100/50 text-xs font-medium mb-1">{healthGoal}</p>}
+          <p className="text-blue-100/60 uppercase tracking-[0.2em] text-[10px] font-bold mb-2">
+            {hasData ? "Today\u2019s Balance" : "Let\u2019s get started"}
           </p>
           <div className="flex items-baseline gap-2 mb-6">
             <h2 className="text-5xl font-extrabold tracking-tighter">
