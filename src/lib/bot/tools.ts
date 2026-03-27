@@ -1,0 +1,370 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { eq, ilike, inArray, or } from "drizzle-orm";
+
+import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
+import { db } from "@/lib/db";
+import { foodAliases, foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
+import { nutrients } from "@/lib/db/schema/nutrients";
+import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+
+export interface ToolContext {
+  userId: string;
+  supabase: SupabaseClient;
+}
+
+/**
+ * Fetch user nutrient limits from Supabase.
+ * Used internally by tools that need limit context.
+ */
+async function fetchUserLimits(ctx: ToolContext) {
+  const { data: userLimits } = await ctx.supabase
+    .from("user_nutrient_limits")
+    .select("nutrient_id, daily_limit, mode, range_min, range_max")
+    .eq("user_id", ctx.userId);
+
+  return userLimits ?? [];
+}
+
+/**
+ * Build a Map of nutrient ID -> { dailyLimit, mode } from raw limit rows.
+ */
+function buildLimitsMap(
+  userLimits: Array<{ nutrient_id: string; daily_limit: string; mode: string }>,
+) {
+  return new Map(
+    userLimits.map((l) => [l.nutrient_id, { dailyLimit: Number(l.daily_limit), mode: l.mode }]),
+  );
+}
+
+export async function searchFood(params: { query: string }, _ctx: ToolContext) {
+  const searchTerm = `%${params.query}%`;
+  const matchingFoods = await db
+    .select({
+      foodId: foods.id,
+      foodName: foods.name,
+      category: foods.category,
+      variantId: foodVariants.id,
+      preparationMethod: foodVariants.preparationMethod,
+      isDefault: foodVariants.isDefault,
+      servingId: servingMeasures.id,
+      servingLabel: servingMeasures.label,
+      gramsEquivalent: servingMeasures.gramsEquivalent,
+    })
+    .from(foods)
+    .leftJoin(foodAliases, eq(foodAliases.foodId, foods.id))
+    .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
+    .leftJoin(servingMeasures, eq(servingMeasures.foodVariantId, foodVariants.id))
+    .where(or(ilike(foods.name, searchTerm), ilike(foodAliases.alias, searchTerm)))
+    .limit(30);
+
+  if (matchingFoods.length === 0) {
+    return { found: false, message: `No foods found matching "${params.query}".` };
+  }
+
+  const foodMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      category: string | null;
+      variants: Map<
+        string,
+        {
+          id: string;
+          method: string;
+          isDefault: boolean;
+          servings: Array<{ id: string; label: string; grams: number }>;
+        }
+      >;
+    }
+  >();
+
+  for (const row of matchingFoods) {
+    if (!foodMap.has(row.foodId)) {
+      foodMap.set(row.foodId, {
+        id: row.foodId,
+        name: row.foodName,
+        category: row.category,
+        variants: new Map(),
+      });
+    }
+    const food = foodMap.get(row.foodId)!;
+
+    if (row.variantId && !food.variants.has(row.variantId)) {
+      food.variants.set(row.variantId, {
+        id: row.variantId,
+        method: row.preparationMethod ?? "raw",
+        isDefault: row.isDefault ?? false,
+        servings: [],
+      });
+    }
+    if (row.variantId && row.servingId) {
+      const variant = food.variants.get(row.variantId)!;
+      if (!variant.servings.some((s) => s.id === row.servingId)) {
+        variant.servings.push({
+          id: row.servingId!,
+          label: row.servingLabel!,
+          grams: Number(row.gramsEquivalent),
+        });
+      }
+    }
+  }
+
+  return {
+    found: true,
+    foods: Array.from(foodMap.values()).map((f) => ({
+      id: f.id,
+      name: f.name,
+      category: f.category,
+      variants: Array.from(f.variants.values()).map((v) => ({
+        id: v.id,
+        preparationMethod: v.method,
+        isDefault: v.isDefault,
+        servings: v.servings,
+      })),
+    })),
+  };
+}
+
+export async function getFoodNutrients(params: { foodVariantId: string }, _ctx: ToolContext) {
+  const rows = await db
+    .select({
+      nutrientId: resolvedNutrientValues.nutrientId,
+      valuePer100g: resolvedNutrientValues.valuePer100g,
+      confidenceScore: resolvedNutrientValues.confidenceScore,
+      displayName: nutrients.displayName,
+      unit: nutrients.unit,
+    })
+    .from(resolvedNutrientValues)
+    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId))
+    .orderBy(nutrients.sortOrder);
+
+  return {
+    nutrients: rows.map((r) => ({
+      nutrientId: r.nutrientId,
+      displayName: r.displayName,
+      unit: r.unit,
+      valuePer100g: Number(r.valuePer100g),
+      confidenceScore: r.confidenceScore,
+      confidenceLabel: getConfidenceLabel(r.confidenceScore ?? 50),
+    })),
+  };
+}
+
+export async function checkCanIEat(
+  params: { foodVariantId: string; portionGrams: number },
+  ctx: ToolContext,
+) {
+  const userLimits = await fetchUserLimits(ctx);
+
+  // Get today's consumption
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString();
+
+  const { data: logs } = await ctx.supabase
+    .from("consumption_logs")
+    .select("nutrient_snapshot")
+    .eq("user_id", ctx.userId)
+    .gte("logged_at", todayStr);
+
+  const todayTotals: Record<string, number> = {};
+  for (const log of logs ?? []) {
+    const snap = log.nutrient_snapshot as Record<string, number> | null;
+    if (!snap) continue;
+    for (const [nId, amt] of Object.entries(snap)) {
+      todayTotals[nId] = (todayTotals[nId] ?? 0) + amt;
+    }
+  }
+
+  // Get nutrient values for this variant
+  const nutrientRows = await db
+    .select({
+      nutrientId: resolvedNutrientValues.nutrientId,
+      valuePer100g: resolvedNutrientValues.valuePer100g,
+      displayName: nutrients.displayName,
+      unit: nutrients.unit,
+    })
+    .from(resolvedNutrientValues)
+    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId))
+    .orderBy(nutrients.sortOrder);
+
+  // Get variant + food name
+  const [variantInfo] = await db
+    .select({ foodName: foods.name, method: foodVariants.preparationMethod })
+    .from(foodVariants)
+    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
+    .where(eq(foodVariants.id, params.foodVariantId));
+
+  const limitsMap = buildLimitsMap(userLimits);
+
+  const impact = nutrientRows.map((n) => {
+    const added = calculateNutrientAmount(Number(n.valuePer100g), params.portionGrams);
+    const consumed = todayTotals[n.nutrientId] ?? 0;
+    const newTotal = consumed + added;
+    const limit = limitsMap.get(n.nutrientId);
+    const status = getNutrientStatus(newTotal, limit?.dailyLimit ?? null);
+    const pct = limit ? Math.round((newTotal / limit.dailyLimit) * 100) : null;
+
+    return {
+      nutrient: n.displayName,
+      unit: n.unit,
+      consumedToday: Math.round(consumed * 10) / 10,
+      adding: Math.round(added * 10) / 10,
+      newTotal: Math.round(newTotal * 10) / 10,
+      dailyLimit: limit?.dailyLimit ?? null,
+      percentOfLimit: pct,
+      status,
+    };
+  });
+
+  const trackedImpact = impact.filter((i) => i.dailyLimit !== null);
+  const hasExceed = trackedImpact.some((i) => i.status === "exceed");
+  const hasCaution = trackedImpact.some((i) => i.status === "caution");
+
+  return {
+    food: variantInfo?.foodName ?? "Unknown",
+    preparationMethod: variantInfo?.method ?? "raw",
+    portionGrams: params.portionGrams,
+    overallVerdict: hasExceed ? "exceed" : hasCaution ? "caution" : "safe",
+    trackedNutrients: trackedImpact,
+    allNutrients: impact,
+  };
+}
+
+export async function recordMeal(
+  params: {
+    foodVariantId: string;
+    servingMeasureId?: string;
+    quantity: number;
+    portionGrams: number;
+    mealLabel?: string;
+  },
+  ctx: ToolContext,
+) {
+  // Calculate nutrient snapshot
+  const nutrientRows = await db
+    .select({
+      nutrientId: resolvedNutrientValues.nutrientId,
+      valuePer100g: resolvedNutrientValues.valuePer100g,
+    })
+    .from(resolvedNutrientValues)
+    .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId));
+
+  const snapshot: Record<string, number> = {};
+  for (const row of nutrientRows) {
+    snapshot[row.nutrientId] = calculateNutrientAmount(
+      Number(row.valuePer100g),
+      params.portionGrams,
+    );
+  }
+
+  const { error } = await ctx.supabase.from("consumption_logs").insert({
+    user_id: ctx.userId,
+    food_variant_id: params.foodVariantId,
+    serving_measure_id: params.servingMeasureId ?? null,
+    quantity: String(params.quantity),
+    nutrient_snapshot: snapshot,
+    meal_label: params.mealLabel ?? null,
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  // Get food name for confirmation
+  const [variantInfo] = await db
+    .select({ foodName: foods.name, method: foodVariants.preparationMethod })
+    .from(foodVariants)
+    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
+    .where(eq(foodVariants.id, params.foodVariantId));
+
+  return {
+    success: true,
+    logged: {
+      food: variantInfo?.foodName ?? "Unknown",
+      preparationMethod: variantInfo?.method,
+      quantity: params.quantity,
+      portionGrams: params.portionGrams,
+      mealLabel: params.mealLabel ?? null,
+      nutrientCount: Object.keys(snapshot).length,
+    },
+  };
+}
+
+export async function getDailySummary(_params: Record<string, never>, ctx: ToolContext) {
+  const userLimits = await fetchUserLimits(ctx);
+  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString();
+
+  const { data: logs } = await ctx.supabase
+    .from("consumption_logs")
+    .select("nutrient_snapshot, food_variant_id, quantity, meal_label, logged_at")
+    .eq("user_id", ctx.userId)
+    .gte("logged_at", todayStr)
+    .order("logged_at", { ascending: true });
+
+  const totals: Record<string, number> = {};
+  for (const log of logs ?? []) {
+    const snap = log.nutrient_snapshot as Record<string, number> | null;
+    if (!snap) continue;
+    for (const [nId, amt] of Object.entries(snap)) {
+      totals[nId] = (totals[nId] ?? 0) + amt;
+    }
+  }
+
+  if (limitNutrientIds.length === 0) {
+    return {
+      mealCount: (logs ?? []).length,
+      trackedNutrients: [],
+      message: "No nutrient limits configured.",
+    };
+  }
+
+  const nutrientRows = await db
+    .select({ id: nutrients.id, displayName: nutrients.displayName, unit: nutrients.unit })
+    .from(nutrients)
+    .where(inArray(nutrients.id, limitNutrientIds))
+    .orderBy(nutrients.sortOrder);
+
+  const limitsMap = buildLimitsMap(userLimits);
+
+  const summary = nutrientRows.map((n) => {
+    const total = totals[n.id] ?? 0;
+    const limit = limitsMap.get(n.id);
+    const pct = limit ? Math.round((total / limit.dailyLimit) * 100) : null;
+    return {
+      nutrient: n.displayName,
+      unit: n.unit,
+      consumed: Math.round(total * 10) / 10,
+      dailyLimit: limit?.dailyLimit ?? null,
+      percentOfLimit: pct,
+      status: getNutrientStatus(total, limit?.dailyLimit ?? null),
+    };
+  });
+
+  return {
+    mealCount: (logs ?? []).length,
+    trackedNutrients: summary,
+  };
+}
+
+export async function aiResearchFood(params: { foodName: string }, ctx: ToolContext) {
+  const { aiResearchFood: doResearch } = await import("@/lib/ai/food-search-agent");
+  const result = await doResearch(params.foodName, ctx.userId);
+
+  if ("error" in result) {
+    return { success: false, error: result.error };
+  }
+
+  return {
+    success: true,
+    foodId: result.foodId,
+    message: `Successfully researched and added "${params.foodName}" to the database. You can now search for it.`,
+  };
+}
