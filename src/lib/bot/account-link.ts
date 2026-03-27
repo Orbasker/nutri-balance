@@ -50,5 +50,11 @@ export async function generateLinkUrl(userId: string): Promise<string> {
     expiresAt,
   });
 
+  console.log("[LinkAccount] Token created:", {
+    tokenPrefix: token.slice(0, 8),
+    platformAccountId: account.id,
+    expiresAt: expiresAt.toISOString(),
+  });
+
   return `${getAppUrl()}/link-account?token=${token}`;
 }

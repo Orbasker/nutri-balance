@@ -15,19 +15,29 @@ export async function validateLinkToken(
   | { valid: false; error: string }
 > {
   // First, find the token itself (without join)
-  const [tokenRow] = await db
-    .select({
-      platformAccountId: accountLinkTokens.platformAccountId,
-      expiresAt: accountLinkTokens.expiresAt,
-    })
-    .from(accountLinkTokens)
-    .where(eq(accountLinkTokens.token, token));
+  let tokenRow = await findToken(token);
+
+  // Retry once after a short delay — handles DB replication lag
+  if (!tokenRow) {
+    await new Promise((r) => setTimeout(r, 1000));
+    tokenRow = await findToken(token);
+  }
 
   if (!tokenRow) {
+    console.error("[LinkAccount] Token not found in DB:", {
+      tokenPrefix: token.slice(0, 8),
+      tokenLength: token.length,
+    });
     return { valid: false, error: "Invalid or expired link token." };
   }
 
-  if (tokenRow.expiresAt < new Date()) {
+  const now = new Date();
+  if (new Date(tokenRow.expiresAt).getTime() < now.getTime()) {
+    console.error("[LinkAccount] Token expired:", {
+      tokenPrefix: token.slice(0, 8),
+      expiresAt: tokenRow.expiresAt,
+      now: now.toISOString(),
+    });
     return { valid: false, error: "This link has expired. Please request a new one from the bot." };
   }
 
@@ -41,6 +51,9 @@ export async function validateLinkToken(
     .where(eq(platformAccounts.id, tokenRow.platformAccountId));
 
   if (!account) {
+    console.error("[LinkAccount] Platform account not found for token:", {
+      platformAccountId: tokenRow.platformAccountId,
+    });
     return { valid: false, error: "Platform account not found. Please request a new link." };
   }
 
@@ -49,4 +62,15 @@ export async function validateLinkToken(
     platform: account.platform,
     platformUsername: account.platformUsername,
   };
+}
+
+async function findToken(token: string) {
+  const [row] = await db
+    .select({
+      platformAccountId: accountLinkTokens.platformAccountId,
+      expiresAt: accountLinkTokens.expiresAt,
+    })
+    .from(accountLinkTokens)
+    .where(eq(accountLinkTokens.token, token));
+  return row ?? null;
 }
