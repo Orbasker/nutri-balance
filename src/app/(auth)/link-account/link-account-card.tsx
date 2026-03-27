@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
+import { authClient } from "@/lib/auth-client";
+
 import { GoogleButton } from "../google-button";
 import { linkAccountToWeb } from "./actions";
 
@@ -26,6 +28,7 @@ export function LinkAccountCard({
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<"idle" | "linking" | "success" | "error">("idle");
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const platformLabel = platform.charAt(0).toUpperCase() + platform.slice(1);
@@ -49,6 +52,19 @@ export function LinkAccountCard({
     } catch {
       setError("Something went wrong. Please try again or request a new link from the bot.");
       setStatus("error");
+    }
+  }
+
+  async function handleUseDifferentAccount() {
+    setSigningOut(true);
+    setError(null);
+
+    try {
+      await authClient.signOut();
+      router.refresh();
+    } catch {
+      setError("Couldn't switch accounts right now. Please try again.");
+      setSigningOut(false);
     }
   }
 
@@ -95,8 +111,19 @@ export function LinkAccountCard({
               <p className="text-center text-sm text-muted-foreground">
                 Signed in as <span className="font-medium text-foreground">{userName}</span>
               </p>
+              <p className="text-center text-sm text-muted-foreground">
+                Continue with this account, or sign out to choose a different web account first.
+              </p>
               <Button className="w-full" onClick={handleLink} disabled={status === "linking"}>
                 {status === "linking" ? "Linking..." : `Link ${platformLabel} Account`}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleUseDifferentAccount}
+                disabled={signingOut || status === "linking"}
+              >
+                {signingOut ? "Signing out..." : "Use Different Account"}
               </Button>
             </div>
           ) : (

@@ -28,6 +28,33 @@ import { getWebLinksBlock } from "./web-links";
 
 let _bot: Chat | null = null;
 
+function getToolErrorDetails(result: unknown): unknown | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  if ("success" in result && result.success === false) {
+    return result;
+  }
+
+  if ("output" in result && result.output && typeof result.output === "object") {
+    const output = result.output as Record<string, unknown>;
+    if ("success" in output && output.success === false) {
+      return output;
+    }
+  }
+
+  return null;
+}
+
+async function getAccountLinkStatus(userId: string): Promise<{ isLinked: boolean }> {
+  const [authUser] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId));
+
+  return {
+    isLinked: authUser?.email ? !authUser.email.endsWith("@bot.nutribalance.local") : false,
+  };
+}
+
 /**
  * Lazily initialise the Chat bot so that importing this module during build
  * (when env vars like TELEGRAM_BOT_TOKEN are absent) does not throw.
@@ -65,12 +92,7 @@ export function getBot(): Chat {
  * Build the system prompt for the AI. Adapts dynamically based on what user
  * data is actually present in the database — no onboarding state to track.
  */
-async function buildSystemPrompt(userId: string): Promise<string> {
-  // Check if the user's account is linked to a web account
-  const [authUser] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId));
-
-  const isLinked = authUser?.email ? !authUser.email.endsWith("@bot.nutribalance.local") : false;
-
+async function buildSystemPrompt(userId: string, isLinked: boolean): Promise<string> {
   const [profile] = await db
     .select({
       displayName: profiles.displayName,
@@ -120,7 +142,11 @@ This user's bot account is NOT linked to a NutriBalance web account. After initi
 If the user asks whether their account is linked, tell them it is NOT linked yet and offer to generate a link.
 `
     : `\nACCOUNT LINKING:
-This user's bot account IS linked to a NutriBalance web account. Their data syncs between the bot and web dashboard. If the user asks about linking, confirm their account is already linked.
+This user's bot account IS linked to a NutriBalance web account. Their data syncs between the bot and web dashboard.
+If the user asks whether their account is linked, confirm it is already linked and syncing automatically.
+If they ask to reconnect, disconnect, or connect again, explain there is usually no need because sync is already active.
+If they want to connect this bot to a DIFFERENT web account, offer to generate a fresh link with the linkWebAccount tool.
+When helpful, include the Daily log and Dashboard links.
 `;
 
   const setupBlock =
@@ -176,7 +202,7 @@ TOOL USAGE:
  * Build all AI tool definitions — includes both nutrition tools and profile/onboarding tools.
  */
 function buildTools(toolCtx: ToolContext) {
-  return {
+  const tools = {
     searchFood: {
       description:
         "Search for a food in the database by name. Returns matching foods with their variants and nutrient data.",
@@ -327,7 +353,10 @@ function buildTools(toolCtx: ToolContext) {
         return { success: true, action: "created" };
       },
     },
+  };
 
+  return {
+    ...tools,
     linkWebAccount: {
       description:
         "Generate a link for the user to connect their bot account with their NutriBalance web account. This lets them access the same data on both the bot and the web dashboard. The link expires in 15 minutes.",
@@ -354,8 +383,8 @@ async function handleAiMessage(
   userId: string,
 ) {
   const toolCtx: ToolContext = { userId };
-
-  const systemPrompt = await buildSystemPrompt(userId);
+  const { isLinked } = await getAccountLinkStatus(userId);
+  const systemPrompt = await buildSystemPrompt(userId, isLinked);
 
   // Build conversation history from thread
   const messages = [];
@@ -375,18 +404,12 @@ async function handleAiMessage(
         for (let i = 0; i < toolCalls.length; i++) {
           const call = toolCalls[i];
           const res = toolResults?.[i];
-          const isError =
-            res && typeof res === "object" && "result" in res
-              ? typeof (res as Record<string, unknown>).result === "object" &&
-                (res as Record<string, unknown>).result !== null &&
-                "success" in ((res as Record<string, unknown>).result as Record<string, unknown>) &&
-                !((res as Record<string, unknown>).result as Record<string, unknown>).success
-              : false;
+          const errorDetails = getToolErrorDetails(res);
           console.log(
             `[NutriBalance Bot] Tool: ${call.toolName}`,
             JSON.stringify({
               toolName: call.toolName,
-              ...(isError ? { error: res } : { ok: true }),
+              ...(errorDetails ? { error: errorDetails } : { ok: true }),
             }),
           );
         }
