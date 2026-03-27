@@ -3,6 +3,7 @@
 import { and, eq, gt, ne } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
+import { getBot } from "@/lib/bot";
 import { db } from "@/lib/db";
 import { accountLinkTokens } from "@/lib/db/schema/account-link-tokens";
 import { user } from "@/lib/db/schema/auth";
@@ -180,9 +181,30 @@ export async function linkAccountToWeb(token: string): Promise<LinkResult> {
     .delete(accountLinkTokens)
     .where(eq(accountLinkTokens.platformAccountId, platformAccount.id));
 
+  // 8. Notify the user on their chat platform that linking succeeded
+  notifyPlatformUser(platformAccount.platform, platformAccount.platformUserId, true).catch(() => {
+    // Best-effort — don't fail the link if notification fails
+  });
+
   return {
     success: true,
     platform: platformAccount.platform,
     platformUsername: platformAccount.platformUsername,
   };
+}
+
+/**
+ * Send a notification to the user's chat platform about the link result.
+ * Best-effort — failures are silently ignored.
+ */
+async function notifyPlatformUser(platform: string, platformUserId: string, success: boolean) {
+  const bot = getBot();
+  const dm = await bot.openDM(`${platform}:${platformUserId}`);
+  if (success) {
+    await dm.post(
+      "Your account has been linked! Your nutrient limits, meal logs, and profile are now synced with your web account. You can continue using the bot as usual.",
+    );
+  } else {
+    await dm.post("Account linking failed. Please try again by asking me for a new link.");
+  }
 }

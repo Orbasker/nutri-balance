@@ -18,7 +18,7 @@ export const platformAccounts = pgTable(
   "platform_accounts",
   {
     id: uuid().defaultRandom().primaryKey(),
-    userId: uuid("user_id").notNull(),
+    userId: text("user_id").notNull(),
     platform: platformEnum().notNull(),
     platformUserId: text("platform_user_id").notNull(),
     platformUsername: text("platform_username"),
