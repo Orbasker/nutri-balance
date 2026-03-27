@@ -170,8 +170,9 @@ describe("Discord adapter registration", () => {
     expect(discordModule.createDiscordAdapter).toBeDefined();
   });
 
-  it("bot exports a valid instance with webhook handlers", async () => {
-    const { bot } = await import("../index");
+  it("getBot returns a valid instance with webhook handlers", async () => {
+    const { getBot } = await import("../index");
+    const bot = getBot();
     expect(bot).toBeDefined();
     expect(bot.webhooks).toBeDefined();
     expect(bot.webhooks.telegram).toBeDefined();
@@ -179,10 +180,11 @@ describe("Discord adapter registration", () => {
     expect(bot.webhooks.discord).toBeDefined();
   });
 
-  it("bot still works without Discord env vars (telegram always registered)", async () => {
+  it("getBot still works without Discord env vars (telegram always registered)", async () => {
     delete process.env.DISCORD_BOT_TOKEN;
 
-    const { bot } = await import("../index");
+    const { getBot } = await import("../index");
+    const bot = getBot();
     expect(bot).toBeDefined();
     expect(bot.webhooks.telegram).toBeDefined();
   });

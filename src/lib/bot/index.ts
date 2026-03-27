@@ -24,22 +24,35 @@ import { handleOnboarding } from "./onboarding";
 import { findOrCreatePlatformAccount } from "./user-linking";
 import { getWebLinksBlock } from "./web-links";
 
-const telegram = createTelegramAdapter();
+let _bot: Chat | null = null;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const adapters: Record<string, any> = {
-  telegram,
-};
+/**
+ * Lazily initialise the Chat bot so that importing this module during build
+ * (when env vars like TELEGRAM_BOT_TOKEN are absent) does not throw.
+ */
+export function getBot(): Chat {
+  if (_bot) return _bot;
 
-if (process.env.DISCORD_BOT_TOKEN) {
-  adapters.discord = createDiscordAdapter();
+  const telegram = createTelegramAdapter();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adapters: Record<string, any> = { telegram };
+
+  if (process.env.DISCORD_BOT_TOKEN) {
+    adapters.discord = createDiscordAdapter();
+  }
+
+  _bot = new Chat({
+    userName: "nutribalance",
+    adapters,
+    state: createMemoryState(),
+  });
+
+  // Register handlers on the freshly-created instance
+  registerHandlers(_bot);
+
+  return _bot;
 }
-
-export const bot = new Chat({
-  userName: "nutribalance",
-  adapters,
-  state: createMemoryState(),
-});
 
 /**
  * Build the system prompt for the AI, same as the web chat route.
@@ -229,50 +242,55 @@ async function resolveAccount(
   return findOrCreatePlatformAccount(platform, platformUserId, platformUsername);
 }
 
-// Handle new mentions (including DMs which auto-set isMention=true)
-bot.onNewMention(async (thread, message) => {
-  try {
-    const adapterName = thread.id.split(":")[0];
-    const account = await resolveAccount(adapterName, message);
+/**
+ * Register event handlers on the bot instance. Called once during lazy init.
+ */
+function registerHandlers(bot: Chat) {
+  // Handle new mentions (including DMs which auto-set isMention=true)
+  bot.onNewMention(async (thread, message) => {
+    try {
+      const adapterName = thread.id.split(":")[0];
+      const account = await resolveAccount(adapterName, message);
 
-    if (account.onboardingState !== "complete") {
-      await handleOnboarding(account, message.text, (text: string) => thread.post(text));
+      if (account.onboardingState !== "complete") {
+        await handleOnboarding(account, message.text, (text: string) => thread.post(text));
+        await thread.subscribe();
+        return;
+      }
+
       await thread.subscribe();
-      return;
+      await thread.startTyping();
+      await handleAiMessage(thread, message, account.userId);
+    } catch (error) {
+      console.error("[NutriBalance Bot] Error handling message:", error);
+      try {
+        await thread.post("Sorry, something went wrong. Please try again.");
+      } catch {
+        console.error("[NutriBalance Bot] Failed to send error message");
+      }
     }
+  });
 
-    await thread.subscribe();
-    await thread.startTyping();
-    await handleAiMessage(thread, message, account.userId);
-  } catch (error) {
-    console.error("[NutriBalance Bot] Error handling message:", error);
+  // Handle follow-up messages in subscribed threads
+  bot.onSubscribedMessage(async (thread, message) => {
     try {
-      await thread.post("Sorry, something went wrong. Please try again.");
-    } catch {
-      console.error("[NutriBalance Bot] Failed to send error message");
-    }
-  }
-});
+      const adapterName = thread.id.split(":")[0];
+      const account = await resolveAccount(adapterName, message);
 
-// Handle follow-up messages in subscribed threads
-bot.onSubscribedMessage(async (thread, message) => {
-  try {
-    const adapterName = thread.id.split(":")[0];
-    const account = await resolveAccount(adapterName, message);
+      if (account.onboardingState !== "complete") {
+        await handleOnboarding(account, message.text, (text: string) => thread.post(text));
+        return;
+      }
 
-    if (account.onboardingState !== "complete") {
-      await handleOnboarding(account, message.text, (text: string) => thread.post(text));
-      return;
+      await thread.startTyping();
+      await handleAiMessage(thread, message, account.userId);
+    } catch (error) {
+      console.error("[NutriBalance Bot] Error handling message:", error);
+      try {
+        await thread.post("Sorry, something went wrong. Please try again.");
+      } catch {
+        console.error("[NutriBalance Bot] Failed to send error message");
+      }
     }
-
-    await thread.startTyping();
-    await handleAiMessage(thread, message, account.userId);
-  } catch (error) {
-    console.error("[NutriBalance Bot] Error handling message:", error);
-    try {
-      await thread.post("Sorry, something went wrong. Please try again.");
-    } catch {
-      console.error("[NutriBalance Bot] Failed to send error message");
-    }
-  }
-});
+  });
+}

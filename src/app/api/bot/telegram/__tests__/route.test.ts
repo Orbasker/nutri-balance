@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { bot } from "@/lib/bot";
+import { getBot } from "@/lib/bot";
 
 import { POST } from "../route";
 
 vi.mock("@/lib/bot", () => ({
-  bot: {
+  getBot: vi.fn(() => ({
     webhooks: {
       telegram: vi.fn(),
     },
-  },
+  })),
 }));
 
 describe("Telegram webhook route", () => {
@@ -19,7 +19,8 @@ describe("Telegram webhook route", () => {
 
   it("returns bot webhook response on success", async () => {
     const mockResponse = new Response("OK", { status: 200 });
-    vi.mocked(bot.webhooks.telegram).mockResolvedValue(mockResponse);
+    const mockBot = { webhooks: { telegram: vi.fn().mockResolvedValue(mockResponse) } };
+    vi.mocked(getBot).mockReturnValue(mockBot as unknown as ReturnType<typeof getBot>);
 
     const request = new Request("http://localhost/api/bot/telegram", { method: "POST" });
     const result = await POST(request);
@@ -28,7 +29,10 @@ describe("Telegram webhook route", () => {
   });
 
   it("returns 200 OK when webhook handler throws (prevents Telegram retry)", async () => {
-    vi.mocked(bot.webhooks.telegram).mockRejectedValue(new Error("Internal error"));
+    const mockBot = {
+      webhooks: { telegram: vi.fn().mockRejectedValue(new Error("Internal error")) },
+    };
+    vi.mocked(getBot).mockReturnValue(mockBot as unknown as ReturnType<typeof getBot>);
 
     const request = new Request("http://localhost/api/bot/telegram", { method: "POST" });
     const result = await POST(request);

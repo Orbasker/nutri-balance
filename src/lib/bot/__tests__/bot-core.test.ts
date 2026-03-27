@@ -162,26 +162,32 @@ vi.mock("zod", () => ({
 }));
 
 describe("bot core module", () => {
-  it("exports a bot instance with webhooks", async () => {
-    const { bot } = await import("../index");
+  it("exports a getBot function that returns a bot instance with webhooks", async () => {
+    const { getBot } = await import("../index");
+    const bot = getBot();
     expect(bot).toBeDefined();
     expect(bot.webhooks).toBeDefined();
     expect(bot.webhooks.telegram).toBeDefined();
   });
 
   it("registers onNewMention handler", async () => {
-    const { bot } = await import("../index");
-    expect(bot.onNewMention).toHaveBeenCalled();
+    const { getBot } = await import("../index");
+    getBot();
+    expect(mockBot.onNewMention).toHaveBeenCalled();
   });
 
   it("registers onSubscribedMessage handler", async () => {
-    const { bot } = await import("../index");
-    expect(bot.onSubscribedMessage).toHaveBeenCalled();
+    const { getBot } = await import("../index");
+    getBot();
+    expect(mockBot.onSubscribedMessage).toHaveBeenCalled();
   });
 });
 
 describe("bot handler error recovery", () => {
   it("onNewMention handler catches errors and posts error message", async () => {
+    // Ensure bot is initialised so handlers are registered
+    const { getBot } = await import("../index");
+    getBot();
     // Get the handler that was registered
     const handler = mockBot.onNewMention.mock.calls[0][0];
 
@@ -210,6 +216,8 @@ describe("bot handler error recovery", () => {
   });
 
   it("onSubscribedMessage handler catches errors and posts error message", async () => {
+    const { getBot } = await import("../index");
+    getBot();
     const handler = mockBot.onSubscribedMessage.mock.calls[0][0];
 
     const mockPost = vi.fn().mockResolvedValue(undefined);
