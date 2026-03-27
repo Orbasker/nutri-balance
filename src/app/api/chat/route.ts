@@ -1,15 +1,21 @@
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
-import { and, eq, gte, ilike, inArray, or } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
 import { getSession } from "@/lib/auth-session";
-import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
+import type { ToolContext } from "@/lib/bot/tools";
+import {
+  aiResearchFood,
+  checkCanIEat,
+  getDailySummary,
+  getFoodNutrients,
+  recordMeal,
+  searchFood,
+} from "@/lib/bot/tools";
 import { db } from "@/lib/db";
-import { foodAliases, foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { consumptionLogs, profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 export const maxDuration = 60;
 
@@ -24,6 +30,8 @@ export async function POST(req: Request) {
 
   const { messages: uiMessages } = await req.json();
   const messages = await convertToModelMessages(uiMessages);
+
+  const toolCtx: ToolContext = { userId: user.id };
 
   // Fetch user profile for context
   const [profile] = await db
@@ -106,96 +114,7 @@ TOOL USAGE:
         inputSchema: z.object({
           query: z.string().describe("The food name to search for"),
         }),
-        execute: async ({ query }) => {
-          const searchTerm = `%${query}%`;
-          const matchingFoods = await db
-            .select({
-              foodId: foods.id,
-              foodName: foods.name,
-              category: foods.category,
-              variantId: foodVariants.id,
-              preparationMethod: foodVariants.preparationMethod,
-              isDefault: foodVariants.isDefault,
-              servingId: servingMeasures.id,
-              servingLabel: servingMeasures.label,
-              gramsEquivalent: servingMeasures.gramsEquivalent,
-            })
-            .from(foods)
-            .leftJoin(foodAliases, eq(foodAliases.foodId, foods.id))
-            .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-            .leftJoin(servingMeasures, eq(servingMeasures.foodVariantId, foodVariants.id))
-            .where(or(ilike(foods.name, searchTerm), ilike(foodAliases.alias, searchTerm)))
-            .limit(30);
-
-          if (matchingFoods.length === 0) {
-            return { found: false, message: `No foods found matching "${query}".` };
-          }
-
-          // Group by food
-          const foodMap = new Map<
-            string,
-            {
-              id: string;
-              name: string;
-              category: string | null;
-              variants: Map<
-                string,
-                {
-                  id: string;
-                  method: string;
-                  isDefault: boolean;
-                  servings: Array<{ id: string; label: string; grams: number }>;
-                }
-              >;
-            }
-          >();
-
-          for (const row of matchingFoods) {
-            if (!foodMap.has(row.foodId)) {
-              foodMap.set(row.foodId, {
-                id: row.foodId,
-                name: row.foodName,
-                category: row.category,
-                variants: new Map(),
-              });
-            }
-            const food = foodMap.get(row.foodId)!;
-
-            if (row.variantId && !food.variants.has(row.variantId)) {
-              food.variants.set(row.variantId, {
-                id: row.variantId,
-                method: row.preparationMethod ?? "raw",
-                isDefault: row.isDefault ?? false,
-                servings: [],
-              });
-            }
-            if (row.variantId && row.servingId) {
-              const variant = food.variants.get(row.variantId)!;
-              if (!variant.servings.some((s) => s.id === row.servingId)) {
-                variant.servings.push({
-                  id: row.servingId!,
-                  label: row.servingLabel!,
-                  grams: Number(row.gramsEquivalent),
-                });
-              }
-            }
-          }
-
-          return {
-            found: true,
-            foods: Array.from(foodMap.values()).map((f) => ({
-              id: f.id,
-              name: f.name,
-              category: f.category,
-              variants: Array.from(f.variants.values()).map((v) => ({
-                id: v.id,
-                preparationMethod: v.method,
-                isDefault: v.isDefault,
-                servings: v.servings,
-              })),
-            })),
-          };
-        },
+        execute: async (params) => searchFood(params, toolCtx),
       },
 
       getFoodNutrients: {
@@ -204,31 +123,7 @@ TOOL USAGE:
         inputSchema: z.object({
           foodVariantId: z.string().describe("The food variant ID to get nutrients for"),
         }),
-        execute: async ({ foodVariantId }) => {
-          const rows = await db
-            .select({
-              nutrientId: resolvedNutrientValues.nutrientId,
-              valuePer100g: resolvedNutrientValues.valuePer100g,
-              confidenceScore: resolvedNutrientValues.confidenceScore,
-              displayName: nutrients.displayName,
-              unit: nutrients.unit,
-            })
-            .from(resolvedNutrientValues)
-            .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
-            .where(eq(resolvedNutrientValues.foodVariantId, foodVariantId))
-            .orderBy(nutrients.sortOrder);
-
-          return {
-            nutrients: rows.map((r) => ({
-              nutrientId: r.nutrientId,
-              displayName: r.displayName,
-              unit: r.unit,
-              valuePer100g: Number(r.valuePer100g),
-              confidenceScore: r.confidenceScore,
-              confidenceLabel: getConfidenceLabel(r.confidenceScore ?? 50),
-            })),
-          };
-        },
+        execute: async (params) => getFoodNutrients(params, toolCtx),
       },
 
       checkCanIEat: {
@@ -238,88 +133,7 @@ TOOL USAGE:
           foodVariantId: z.string().describe("The food variant ID"),
           portionGrams: z.number().describe("How many grams the user wants to eat"),
         }),
-        execute: async ({ foodVariantId, portionGrams }) => {
-          // Get today's consumption
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-
-          const logs = await db
-            .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
-            .from(consumptionLogs)
-            .where(and(eq(consumptionLogs.userId, user.id), gte(consumptionLogs.loggedAt, today)));
-
-          const todayTotals: Record<string, number> = {};
-          for (const log of logs) {
-            const snap = log.nutrientSnapshot as Record<string, number> | null;
-            if (!snap) continue;
-            for (const [nId, amt] of Object.entries(snap)) {
-              todayTotals[nId] = (todayTotals[nId] ?? 0) + amt;
-            }
-          }
-
-          // Get nutrient values for this variant
-          const nutrientRows = await db
-            .select({
-              nutrientId: resolvedNutrientValues.nutrientId,
-              valuePer100g: resolvedNutrientValues.valuePer100g,
-              displayName: nutrients.displayName,
-              unit: nutrients.unit,
-            })
-            .from(resolvedNutrientValues)
-            .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
-            .where(eq(resolvedNutrientValues.foodVariantId, foodVariantId))
-            .orderBy(nutrients.sortOrder);
-
-          // Get variant + food name
-          const [variantInfo] = await db
-            .select({ foodName: foods.name, method: foodVariants.preparationMethod })
-            .from(foodVariants)
-            .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-            .where(eq(foodVariants.id, foodVariantId));
-
-          const limitsMap = new Map(
-            (userLimits ?? []).map(
-              (l: { nutrient_id: string; daily_limit: string; mode: string }) => [
-                l.nutrient_id,
-                { dailyLimit: Number(l.daily_limit), mode: l.mode },
-              ],
-            ),
-          );
-
-          const impact = nutrientRows.map((n) => {
-            const added = calculateNutrientAmount(Number(n.valuePer100g), portionGrams);
-            const consumed = todayTotals[n.nutrientId] ?? 0;
-            const newTotal = consumed + added;
-            const limit = limitsMap.get(n.nutrientId);
-            const status = getNutrientStatus(newTotal, limit?.dailyLimit ?? null);
-            const pct = limit ? Math.round((newTotal / limit.dailyLimit) * 100) : null;
-
-            return {
-              nutrient: n.displayName,
-              unit: n.unit,
-              consumedToday: Math.round(consumed * 10) / 10,
-              adding: Math.round(added * 10) / 10,
-              newTotal: Math.round(newTotal * 10) / 10,
-              dailyLimit: limit?.dailyLimit ?? null,
-              percentOfLimit: pct,
-              status,
-            };
-          });
-
-          // Filter to only tracked nutrients (ones with limits) for the summary
-          const trackedImpact = impact.filter((i) => i.dailyLimit !== null);
-          const hasExceed = trackedImpact.some((i) => i.status === "exceed");
-          const hasCaution = trackedImpact.some((i) => i.status === "caution");
-
-          return {
-            food: variantInfo?.foodName ?? "Unknown",
-            preparationMethod: variantInfo?.method ?? "raw",
-            portionGrams,
-            overallVerdict: hasExceed ? "exceed" : hasCaution ? "caution" : "safe",
-            trackedNutrients: trackedImpact,
-            allNutrients: impact,
-          };
-        },
+        execute: async (params) => checkCanIEat(params, toolCtx),
       },
 
       recordMeal: {
@@ -340,119 +154,14 @@ TOOL USAGE:
             .optional()
             .describe("Optional meal label: breakfast, lunch, dinner, snack"),
         }),
-        execute: async ({ foodVariantId, servingMeasureId, quantity, portionGrams, mealLabel }) => {
-          // Calculate nutrient snapshot
-          const nutrientRows = await db
-            .select({
-              nutrientId: resolvedNutrientValues.nutrientId,
-              valuePer100g: resolvedNutrientValues.valuePer100g,
-            })
-            .from(resolvedNutrientValues)
-            .where(eq(resolvedNutrientValues.foodVariantId, foodVariantId));
-
-          const snapshot: Record<string, number> = {};
-          for (const row of nutrientRows) {
-            snapshot[row.nutrientId] = calculateNutrientAmount(
-              Number(row.valuePer100g),
-              portionGrams,
-            );
-          }
-
-          await db.insert(consumptionLogs).values({
-            userId: user.id,
-            foodVariantId,
-            servingMeasureId: servingMeasureId ?? null,
-            quantity: String(quantity),
-            nutrientSnapshot: snapshot,
-            mealLabel: mealLabel ?? null,
-          });
-
-          // Get food name for confirmation
-          const [variantInfo] = await db
-            .select({ foodName: foods.name, method: foodVariants.preparationMethod })
-            .from(foodVariants)
-            .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-            .where(eq(foodVariants.id, foodVariantId));
-
-          return {
-            success: true,
-            logged: {
-              food: variantInfo?.foodName ?? "Unknown",
-              preparationMethod: variantInfo?.method,
-              quantity,
-              portionGrams,
-              mealLabel: mealLabel ?? null,
-              nutrientCount: Object.keys(snapshot).length,
-            },
-          };
-        },
+        execute: async (params) => recordMeal(params, toolCtx),
       },
 
       getDailySummary: {
         description:
           "Get the user's nutrient intake summary for today. Shows consumed amounts vs daily limits.",
         inputSchema: z.object({}),
-        execute: async () => {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-
-          const logs = await db
-            .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
-            .from(consumptionLogs)
-            .where(and(eq(consumptionLogs.userId, user.id), gte(consumptionLogs.loggedAt, today)))
-            .orderBy(consumptionLogs.loggedAt);
-
-          const totals: Record<string, number> = {};
-          for (const log of logs) {
-            const snap = log.nutrientSnapshot as Record<string, number> | null;
-            if (!snap) continue;
-            for (const [nId, amt] of Object.entries(snap)) {
-              totals[nId] = (totals[nId] ?? 0) + amt;
-            }
-          }
-
-          if (limitNutrientIds.length === 0) {
-            return {
-              mealCount: logs.length,
-              trackedNutrients: [],
-              message: "No nutrient limits configured.",
-            };
-          }
-
-          const nutrientRows = await db
-            .select({ id: nutrients.id, displayName: nutrients.displayName, unit: nutrients.unit })
-            .from(nutrients)
-            .where(inArray(nutrients.id, limitNutrientIds))
-            .orderBy(nutrients.sortOrder);
-
-          const limitsMap = new Map(
-            (userLimits ?? []).map(
-              (l: { nutrient_id: string; daily_limit: string; mode: string }) => [
-                l.nutrient_id,
-                { dailyLimit: Number(l.daily_limit), mode: l.mode },
-              ],
-            ),
-          );
-
-          const summary = nutrientRows.map((n) => {
-            const total = totals[n.id] ?? 0;
-            const limit = limitsMap.get(n.id);
-            const pct = limit ? Math.round((total / limit.dailyLimit) * 100) : null;
-            return {
-              nutrient: n.displayName,
-              unit: n.unit,
-              consumed: Math.round(total * 10) / 10,
-              dailyLimit: limit?.dailyLimit ?? null,
-              percentOfLimit: pct,
-              status: getNutrientStatus(total, limit?.dailyLimit ?? null),
-            };
-          });
-
-          return {
-            mealCount: logs.length,
-            trackedNutrients: summary,
-          };
-        },
+        execute: async () => getDailySummary({} as Record<string, never>, toolCtx),
       },
 
       aiResearchFood: {
@@ -461,20 +170,7 @@ TOOL USAGE:
         inputSchema: z.object({
           foodName: z.string().describe("The name of the food to research"),
         }),
-        execute: async ({ foodName }) => {
-          const { aiResearchFood } = await import("@/lib/ai/food-search-agent");
-          const result = await aiResearchFood(foodName, user.id);
-
-          if ("error" in result) {
-            return { success: false, error: result.error };
-          }
-
-          return {
-            success: true,
-            foodId: result.foodId,
-            message: `Successfully researched and added "${foodName}" to the database. You can now search for it.`,
-          };
-        },
+        execute: async (params) => aiResearchFood(params, toolCtx),
       },
     },
   });
