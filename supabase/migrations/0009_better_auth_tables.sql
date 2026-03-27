@@ -50,8 +50,6 @@ CREATE TABLE "verification" (
 --> statement-breakpoint
 ALTER TABLE "ai_tasks" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "chat_conversations" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "chat_messages" ALTER COLUMN "id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "chat_messages" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "food_feedback" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "foods" ALTER COLUMN "created_by" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "reviews" ALTER COLUMN "reviewer_id" SET DATA TYPE text;--> statement-breakpoint
@@ -65,12 +63,6 @@ ALTER TABLE "user_nutrient_limits" ALTER COLUMN "id" SET DATA TYPE text;--> stat
 ALTER TABLE "user_nutrient_limits" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "user_nutrient_limits" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "user_nutrient_limits" ALTER COLUMN "nutrient_id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "first_name" text;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "last_name" text;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "date_of_birth" date;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "gender" text;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "health_goal" text;--> statement-breakpoint
-ALTER TABLE "profiles" ADD COLUMN "avatar_color" text DEFAULT 'blue';--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
