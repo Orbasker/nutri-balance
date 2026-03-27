@@ -8,8 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-import { authClient } from "@/lib/auth-client";
-
 import { GoogleButton } from "../google-button";
 import { linkAccountToWeb } from "./actions";
 
@@ -37,12 +35,17 @@ export function LinkAccountCard({
     setStatus("linking");
     setError(null);
 
-    const result = await linkAccountToWeb(token);
-    if ("error" in result) {
-      setError(result.error);
+    try {
+      const result = await linkAccountToWeb(token);
+      if ("error" in result) {
+        setError(result.error);
+        setStatus("error");
+      } else {
+        setStatus("success");
+      }
+    } catch {
+      setError("Something went wrong. Please try again or request a new link from the bot.");
       setStatus("error");
-    } else {
-      setStatus("success");
     }
   }
 
