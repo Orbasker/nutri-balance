@@ -54,4 +54,12 @@ describe("web links in bot", () => {
     const block = getWebLinksBlock();
     expect(block).toContain("http://localhost:3000");
   });
+
+  it("can include the link tool instructions", async () => {
+    const { getWebLinksBlock } = await import("../web-links");
+    const block = getWebLinksBlock("https://nutri.example.com", true);
+    expect(block).toContain("linkWebAccount");
+    expect(block).toContain("https://nutri.example.com/log");
+    expect(block).toContain("https://nutri.example.com/dashboard");
+  });
 });

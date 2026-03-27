@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gt, ne } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { getBot } from "@/lib/bot";
@@ -14,6 +14,17 @@ export type LinkResult =
   | { success: true; platform: string; platformUsername: string | null }
   | { error: string };
 
+type LinkTokenContext = {
+  tokenId: string;
+  platformAccountId: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  linkedUserId: string;
+  platform: string;
+  platformUserId: string;
+  platformUsername: string | null;
+};
+
 /**
  * Link a bot platform account to the authenticated web user.
  *
@@ -23,151 +34,221 @@ export type LinkResult =
  * 3. Reassign platform_accounts.userId → web user
  * 4. Migrate user_nutrient_limits and consumption_logs (skip duplicates)
  * 5. Clean up the old bot-only user + profile if no other platform accounts reference it
- * 6. Delete the used token
+ * 6. Mark the token as used and notify the user back on chat
  */
 export async function linkAccountToWeb(token: string): Promise<LinkResult> {
-  // Get the authenticated web user from the session
   const session = await getSession();
   if (!session) {
     return { error: "You must be signed in to link your account." };
   }
-  const webUserId = session.user.id;
-  // 1. Validate token and get platform account
-  const [tokenRow] = await db
-    .select({
-      id: accountLinkTokens.id,
-      platformAccountId: accountLinkTokens.platformAccountId,
-      expiresAt: accountLinkTokens.expiresAt,
-    })
-    .from(accountLinkTokens)
-    .where(and(eq(accountLinkTokens.token, token), gt(accountLinkTokens.expiresAt, new Date())));
 
-  if (!tokenRow) {
+  const webUserId = session.user.id;
+
+  const tokenContext = await getLinkTokenContext(token);
+  if (!tokenContext) {
     return { error: "Invalid or expired link token." };
   }
 
-  const [platformAccount] = await db
-    .select()
-    .from(platformAccounts)
-    .where(eq(platformAccounts.id, tokenRow.platformAccountId));
+  const successResult = {
+    success: true as const,
+    platform: tokenContext.platform,
+    platformUsername: tokenContext.platformUsername,
+  };
 
-  if (!platformAccount) {
-    return { error: "Platform account not found." };
+  if (tokenContext.usedAt) {
+    if (tokenContext.linkedUserId === webUserId) {
+      return successResult;
+    }
+
+    await notifyPlatformUser(
+      tokenContext.platform,
+      tokenContext.platformUserId,
+      buildFailureMessage("This link has already been used."),
+    );
+
+    return { error: "This link has already been used." };
   }
 
-  // Already linked to this user?
-  if (platformAccount.userId === webUserId) {
-    // Clean up token and return success
-    await db.delete(accountLinkTokens).where(eq(accountLinkTokens.id, tokenRow.id));
+  if (tokenContext.expiresAt.getTime() <= Date.now()) {
+    await db
+      .update(accountLinkTokens)
+      .set({ status: "expired" })
+      .where(eq(accountLinkTokens.id, tokenContext.tokenId));
+
+    await notifyPlatformUser(
+      tokenContext.platform,
+      tokenContext.platformUserId,
+      buildFailureMessage("This link has expired. Please ask me for a new link and try again."),
+    );
+
+    return { error: "This link has expired. Please request a new one from the bot." };
+  }
+
+  if (tokenContext.linkedUserId === webUserId) {
+    await db
+      .update(accountLinkTokens)
+      .set({ status: "used", usedAt: new Date() })
+      .where(eq(accountLinkTokens.id, tokenContext.tokenId));
+
+    await notifyPlatformUser(
+      tokenContext.platform,
+      tokenContext.platformUserId,
+      buildSuccessMessage(true),
+    );
+
+    return successResult;
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      const oldBotUserId = tokenContext.linkedUserId;
+
+      await tx
+        .update(platformAccounts)
+        .set({ userId: webUserId })
+        .where(eq(platformAccounts.id, tokenContext.platformAccountId));
+
+      const webLimits = await tx
+        .select({ nutrientId: userNutrientLimits.nutrientId })
+        .from(userNutrientLimits)
+        .where(eq(userNutrientLimits.userId, webUserId));
+
+      const webNutrientIds = new Set(webLimits.map((limit) => limit.nutrientId));
+
+      const botLimits = await tx
+        .select()
+        .from(userNutrientLimits)
+        .where(eq(userNutrientLimits.userId, oldBotUserId));
+
+      for (const limit of botLimits) {
+        if (!webNutrientIds.has(limit.nutrientId)) {
+          await tx
+            .update(userNutrientLimits)
+            .set({ userId: webUserId })
+            .where(eq(userNutrientLimits.id, limit.id));
+        }
+      }
+
+      await tx
+        .update(consumptionLogs)
+        .set({ userId: webUserId })
+        .where(eq(consumptionLogs.userId, oldBotUserId));
+
+      const [webProfile] = await tx.select().from(profiles).where(eq(profiles.id, webUserId));
+      const [botProfile] = await tx.select().from(profiles).where(eq(profiles.id, oldBotUserId));
+
+      if (webProfile && botProfile) {
+        const updates: Record<string, string> = {};
+        if (!webProfile.healthGoal && botProfile.healthGoal)
+          updates.healthGoal = botProfile.healthGoal;
+        if (!webProfile.clinicalNotes && botProfile.clinicalNotes) {
+          updates.clinicalNotes = botProfile.clinicalNotes;
+        }
+        if (
+          (!webProfile.displayName || webProfile.displayName === "User") &&
+          botProfile.displayName &&
+          botProfile.displayName !== "Bot User"
+        ) {
+          updates.displayName = botProfile.displayName;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await tx.update(profiles).set(updates).where(eq(profiles.id, webUserId));
+        }
+      }
+
+      const [otherAccounts] = await tx
+        .select({ id: platformAccounts.id })
+        .from(platformAccounts)
+        .where(
+          and(
+            eq(platformAccounts.userId, oldBotUserId),
+            ne(platformAccounts.id, tokenContext.platformAccountId),
+          ),
+        );
+
+      if (!otherAccounts) {
+        await tx.delete(profiles).where(eq(profiles.id, oldBotUserId));
+        await tx.delete(user).where(eq(user.id, oldBotUserId));
+      }
+
+      await tx
+        .update(accountLinkTokens)
+        .set({ status: "used", usedAt: new Date() })
+        .where(eq(accountLinkTokens.platformAccountId, tokenContext.platformAccountId));
+    });
+  } catch (error) {
+    console.error("[LinkAccount] Failed to link account:", error);
+
+    await notifyPlatformUser(
+      tokenContext.platform,
+      tokenContext.platformUserId,
+      buildFailureMessage(
+        "Something went wrong while linking your account. Please ask me for a new link and try again.",
+      ),
+    );
+
     return {
-      success: true,
-      platform: platformAccount.platform,
-      platformUsername: platformAccount.platformUsername,
+      error:
+        "Something went wrong while linking your account. Please try again or request a new link from the bot.",
     };
   }
 
-  const oldBotUserId = platformAccount.userId;
+  await notifyPlatformUser(
+    tokenContext.platform,
+    tokenContext.platformUserId,
+    buildSuccessMessage(false),
+  );
 
-  // 2. Reassign platform account to web user
-  await db
-    .update(platformAccounts)
-    .set({ userId: webUserId })
-    .where(eq(platformAccounts.id, platformAccount.id));
+  return successResult;
+}
 
-  // 3. Migrate nutrient limits (skip if web user already has limits for the same nutrient)
-  const webLimits = await db
-    .select({ nutrientId: userNutrientLimits.nutrientId })
-    .from(userNutrientLimits)
-    .where(eq(userNutrientLimits.userId, webUserId));
+async function getLinkTokenContext(token: string): Promise<LinkTokenContext | null> {
+  const [row] = await db
+    .select({
+      tokenId: accountLinkTokens.id,
+      platformAccountId: accountLinkTokens.platformAccountId,
+      expiresAt: accountLinkTokens.expiresAt,
+      usedAt: accountLinkTokens.usedAt,
+      linkedUserId: platformAccounts.userId,
+      platform: platformAccounts.platform,
+      platformUserId: platformAccounts.platformUserId,
+      platformUsername: platformAccounts.platformUsername,
+    })
+    .from(accountLinkTokens)
+    .innerJoin(platformAccounts, eq(platformAccounts.id, accountLinkTokens.platformAccountId))
+    .where(eq(accountLinkTokens.token, token));
 
-  const webNutrientIds = new Set(webLimits.map((l) => l.nutrientId));
+  return row ?? null;
+}
 
-  const botLimits = await db
-    .select()
-    .from(userNutrientLimits)
-    .where(eq(userNutrientLimits.userId, oldBotUserId));
-
-  for (const limit of botLimits) {
-    if (!webNutrientIds.has(limit.nutrientId)) {
-      // Move limit to web user
-      await db
-        .update(userNutrientLimits)
-        .set({ userId: webUserId })
-        .where(eq(userNutrientLimits.id, limit.id));
-    }
+function buildSuccessMessage(alreadyLinked: boolean): string {
+  if (alreadyLinked) {
+    return "Your account is already linked to this web account. Your data is already synced between the bot and dashboard.";
   }
 
-  // 4. Migrate consumption logs — move all to web user
-  await db
-    .update(consumptionLogs)
-    .set({ userId: webUserId })
-    .where(eq(consumptionLogs.userId, oldBotUserId));
+  return "Your account has been linked. Your nutrient limits, meal logs, and profile are now synced with your web account. You can continue using the bot as usual.";
+}
 
-  // 5. Merge profile data (fill in missing fields from bot profile)
-  const [webProfile] = await db.select().from(profiles).where(eq(profiles.id, webUserId));
-  const [botProfile] = await db.select().from(profiles).where(eq(profiles.id, oldBotUserId));
-
-  if (webProfile && botProfile) {
-    const updates: Record<string, string> = {};
-    if (!webProfile.healthGoal && botProfile.healthGoal) updates.healthGoal = botProfile.healthGoal;
-    if (!webProfile.clinicalNotes && botProfile.clinicalNotes)
-      updates.clinicalNotes = botProfile.clinicalNotes;
-    if (
-      (!webProfile.displayName || webProfile.displayName === "User") &&
-      botProfile.displayName &&
-      botProfile.displayName !== "Bot User"
-    )
-      updates.displayName = botProfile.displayName;
-
-    if (Object.keys(updates).length > 0) {
-      await db.update(profiles).set(updates).where(eq(profiles.id, webUserId));
-    }
-  }
-
-  // 6. Clean up old bot user if no other platform accounts reference it
-  const [otherAccounts] = await db
-    .select({ id: platformAccounts.id })
-    .from(platformAccounts)
-    .where(
-      and(eq(platformAccounts.userId, oldBotUserId), ne(platformAccounts.id, platformAccount.id)),
-    );
-
-  if (!otherAccounts) {
-    // No other platform accounts — safe to delete the bot-only user
-    // Cascade will handle profile, remaining limits, sessions, etc.
-    await db.delete(profiles).where(eq(profiles.id, oldBotUserId));
-    await db.delete(user).where(eq(user.id, oldBotUserId));
-  }
-
-  // 7. Delete used token (and any other expired tokens for this account)
-  await db
-    .delete(accountLinkTokens)
-    .where(eq(accountLinkTokens.platformAccountId, platformAccount.id));
-
-  // 8. Notify the user on their chat platform that linking succeeded
-  notifyPlatformUser(platformAccount.platform, platformAccount.platformUserId, true).catch(() => {
-    // Best-effort — don't fail the link if notification fails
-  });
-
-  return {
-    success: true,
-    platform: platformAccount.platform,
-    platformUsername: platformAccount.platformUsername,
-  };
+function buildFailureMessage(reason: string): string {
+  return `Account linking failed: ${reason}`;
 }
 
 /**
  * Send a notification to the user's chat platform about the link result.
  * Best-effort — failures are silently ignored.
  */
-async function notifyPlatformUser(platform: string, platformUserId: string, success: boolean) {
-  const bot = getBot();
-  const dm = await bot.openDM(`${platform}:${platformUserId}`);
-  if (success) {
-    await dm.post(
-      "Your account has been linked! Your nutrient limits, meal logs, and profile are now synced with your web account. You can continue using the bot as usual.",
-    );
-  } else {
-    await dm.post("Account linking failed. Please try again by asking me for a new link.");
+async function notifyPlatformUser(platform: string, platformUserId: string, message: string) {
+  try {
+    const bot = getBot();
+    const adapter = bot.getAdapter(platform as "telegram" | "discord");
+    if (!adapter?.openDM) {
+      throw new Error(`Adapter "${platform}" does not support direct messages.`);
+    }
+
+    const dmThreadId = await adapter.openDM(platformUserId);
+    await adapter.postMessage(dmThreadId, message);
+  } catch (error) {
+    console.error("[LinkAccount] Failed to notify platform user:", error);
   }
 }

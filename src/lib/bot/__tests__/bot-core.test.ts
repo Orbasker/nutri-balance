@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { findOrCreatePlatformAccount } from "@/lib/bot/user-linking";
 
+const mockDbWhere = vi.fn().mockResolvedValue([]);
 const mockBot = {
   onNewMention: vi.fn(),
   onSubscribedMessage: vi.fn(),
@@ -55,7 +56,10 @@ vi.mock("@/lib/ai-provider", () => ({
 }));
 
 vi.mock("ai", () => ({
-  streamText: vi.fn().mockReturnValue({ fullStream: (async function* () {})() }),
+  streamText: vi.fn().mockReturnValue({
+    fullStream: (async function* () {})(),
+    text: Promise.resolve("Test reply"),
+  }),
   stepCountIs: vi.fn(),
 }));
 
@@ -63,7 +67,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([]),
+        where: mockDbWhere,
       }),
     }),
   },
@@ -150,6 +154,10 @@ vi.mock("@/lib/calculations", () => ({
 vi.mock("zod", () => ({
   z: {
     object: vi.fn().mockReturnValue({}),
+    enum: vi.fn().mockReturnValue({
+      optional: vi.fn().mockReturnValue({ describe: vi.fn().mockReturnValue({}) }),
+      describe: vi.fn().mockReturnValue({}),
+    }),
     string: vi.fn().mockReturnValue({
       describe: vi.fn().mockReturnValue({}),
       optional: vi.fn().mockReturnValue({ describe: vi.fn().mockReturnValue({}) }),
@@ -184,6 +192,40 @@ describe("bot core module", () => {
 });
 
 describe("bot handler error recovery", () => {
+  it("posts finalized plain text replies for Telegram threads", async () => {
+    const { getBot } = await import("../index");
+    getBot();
+    const handler = mockBot.onNewMention.mock.calls[0][0];
+
+    const mockPost = vi.fn().mockResolvedValue(undefined);
+    const mockThread = {
+      id: "telegram:chat-789",
+      post: mockPost,
+      subscribe: vi.fn().mockResolvedValue(undefined),
+      startTyping: vi.fn().mockResolvedValue(undefined),
+      allMessages: (async function* () {})(),
+    };
+    const mockMessage = {
+      text: "hello",
+      author: { userId: "tg-123", userName: "tester", fullName: "Tester" },
+    };
+
+    vi.mocked(findOrCreatePlatformAccount).mockResolvedValueOnce({
+      id: "platform-account-1",
+      createdAt: new Date(),
+      userId: "user-123",
+      platform: "telegram",
+      platformUserId: "tg-123",
+      platformUsername: "tester",
+      onboardingState: "complete",
+      onboardingData: null,
+    });
+
+    await handler(mockThread, mockMessage);
+
+    expect(mockPost).toHaveBeenCalledWith("Test reply");
+  });
+
   it("onNewMention handler catches errors and posts error message", async () => {
     // Ensure bot is initialised so handlers are registered
     const { getBot } = await import("../index");
@@ -237,5 +279,112 @@ describe("bot handler error recovery", () => {
     await handler(mockThread, mockMessage);
 
     expect(mockPost).toHaveBeenCalledWith(expect.stringContaining("Sorry"));
+  });
+
+  it("keeps relinking available for users who want to switch to a different web account", async () => {
+    const { getBot } = await import("../index");
+    const { streamText } = await import("ai");
+
+    getBot();
+    const handler = mockBot.onNewMention.mock.calls[0][0];
+
+    const mockPost = vi.fn().mockResolvedValue(undefined);
+    const mockThread = {
+      id: "telegram:chat-987",
+      post: mockPost,
+      subscribe: vi.fn().mockResolvedValue(undefined),
+      startTyping: vi.fn().mockResolvedValue(undefined),
+      allMessages: (async function* () {})(),
+    };
+    const mockMessage = {
+      text: "can you disconnect and connect me again to my account?",
+      author: { userId: "tg-456", userName: "or", fullName: "Or" },
+    };
+
+    vi.mocked(findOrCreatePlatformAccount).mockResolvedValueOnce({
+      id: "platform-account-2",
+      createdAt: new Date(),
+      userId: "user-linked-1",
+      platform: "telegram",
+      platformUserId: "tg-456",
+      platformUsername: "or",
+      onboardingState: "complete",
+      onboardingData: null,
+    });
+
+    mockDbWhere
+      .mockResolvedValueOnce([{ email: "or@example.com" }])
+      .mockResolvedValueOnce([
+        { displayName: "Or", clinicalNotes: null, healthGoal: "Keep my intake steady" },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await handler(mockThread, mockMessage);
+
+    const lastCall = vi.mocked(streamText).mock.calls.at(-1)?.[0];
+    expect(lastCall).toBeDefined();
+    expect(lastCall?.system).toContain("there is usually no need because sync is already active");
+    expect(lastCall?.system).toContain(
+      "If they want to connect this bot to a DIFFERENT web account",
+    );
+    expect(lastCall?.system).toContain("Daily log:");
+    expect(lastCall?.system).toContain("Dashboard:");
+    expect(Object.keys(lastCall?.tools ?? {})).toContain("linkWebAccount");
+    expect(mockPost).toHaveBeenCalledWith("Test reply");
+  });
+
+  it("logs tool business failures as errors in onStepFinish", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const { getBot } = await import("../index");
+    const { streamText } = await import("ai");
+
+    getBot();
+    const handler = mockBot.onNewMention.mock.calls[0][0];
+
+    const mockThread = {
+      id: "telegram:chat-654",
+      post: vi.fn().mockResolvedValue(undefined),
+      subscribe: vi.fn().mockResolvedValue(undefined),
+      startTyping: vi.fn().mockResolvedValue(undefined),
+      allMessages: (async function* () {})(),
+    };
+    const mockMessage = {
+      text: "log a banana",
+      author: { userId: "tg-654", userName: "or", fullName: "Or" },
+    };
+
+    vi.mocked(findOrCreatePlatformAccount).mockResolvedValueOnce({
+      id: "platform-account-3",
+      createdAt: new Date(),
+      userId: "user-654",
+      platform: "telegram",
+      platformUserId: "tg-654",
+      platformUsername: "or",
+      onboardingState: "complete",
+      onboardingData: null,
+    });
+
+    mockDbWhere
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ displayName: "Or", clinicalNotes: null, healthGoal: "steady" }])
+      .mockResolvedValueOnce([]);
+
+    await handler(mockThread, mockMessage);
+
+    const lastCall = vi.mocked(streamText).mock.calls.at(-1)?.[0];
+    await lastCall?.onStepFinish?.({
+      toolCalls: [{ toolName: "recordMeal" } as never],
+      toolResults: [{ success: true, output: { success: false, error: "db failed" } } as never],
+    } as never);
+
+    expect(logSpy).toHaveBeenCalledWith(
+      "[NutriBalance Bot] Tool: recordMeal",
+      JSON.stringify({
+        toolName: "recordMeal",
+        error: { success: false, error: "db failed" },
+      }),
+    );
+
+    logSpy.mockRestore();
   });
 });
