@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { aiRuns } from "@/lib/db/schema/ai-runs";
+import { sendResendEmailAlert } from "@/lib/ops-alerts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -63,7 +64,7 @@ export async function finishAiRun(
   const completedAt = new Date();
   const durationMs = Math.max(0, completedAt.getTime() - handle.startedAt.getTime());
 
-  await db
+  const [updatedRun] = await db
     .update(aiRuns)
     .set({
       status: input.status,
@@ -75,7 +76,46 @@ export async function finishAiRun(
       foodId: input.foodId ?? null,
       metadata: input.metadata ?? null,
     })
-    .where(eq(aiRuns.id, handle.id));
+    .where(eq(aiRuns.id, handle.id))
+    .returning({
+      itemCount: aiRuns.itemCount,
+      inputTokens: aiRuns.inputTokens,
+      outputTokens: aiRuns.outputTokens,
+      totalTokens: aiRuns.totalTokens,
+      estimatedCostUsd: aiRuns.estimatedCostUsd,
+      resultSummary: aiRuns.resultSummary,
+      errorMessage: aiRuns.errorMessage,
+      aiTaskId: aiRuns.aiTaskId,
+      foodId: aiRuns.foodId,
+    });
+
+  const title =
+    input.status === "failed" ? `[NutriBalance] AI run failed` : `[NutriBalance] AI run completed`;
+
+  await sendResendEmailAlert({
+    title,
+    headerLines: [
+      `run: ${handle.type}`,
+      `goal: ${handle.goal}`,
+      `source: ${handle.source}`,
+      `runId: ${handle.id}`,
+      ...(updatedRun?.aiTaskId ? [`aiTaskId: ${updatedRun.aiTaskId}`] : []),
+      ...(updatedRun?.foodId ? [`foodId: ${updatedRun.foodId}`] : []),
+    ],
+    details: {
+      status: input.status,
+      durationMs,
+      itemCount: updatedRun?.itemCount ?? null,
+      inputTokens: updatedRun?.inputTokens ?? null,
+      outputTokens: updatedRun?.outputTokens ?? null,
+      totalTokens: updatedRun?.totalTokens ?? null,
+      estimatedCostUsd:
+        updatedRun?.estimatedCostUsd == null ? null : Number(updatedRun.estimatedCostUsd),
+      resultSummary: updatedRun?.resultSummary ?? null,
+      errorMessage: updatedRun?.errorMessage ?? null,
+      ...(input.metadata ?? {}),
+    },
+  });
 }
 
 export async function incrementAiRunUsage(input: {

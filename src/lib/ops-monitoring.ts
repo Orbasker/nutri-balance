@@ -1,4 +1,5 @@
 import { incrementAiRunUsage } from "@/lib/ai-run-audit";
+import { sendResendEmailAlert } from "@/lib/ops-alerts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -113,66 +114,15 @@ async function sendOpsAlert(
   handle: JobRunHandle,
   details: JsonRecord,
 ): Promise<boolean> {
-  return sendResendEmailAlert(title, handle, details);
-}
-
-function parseCsvValues(raw: string | undefined): string[] {
-  if (!raw) return [];
-
-  return raw
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function formatAlertMessage(title: string, handle: JobRunHandle, details: JsonRecord): string {
-  const detailLines = Object.entries(details)
-    .filter(([, value]) => value != null && value !== "")
-    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`);
-
-  return [
+  return sendResendEmailAlert({
     title,
-    `job: ${handle.jobKey}`,
-    `source: ${handle.source}`,
-    ...(handle.aiTaskId ? [`aiTaskId: ${handle.aiTaskId}`] : []),
-    ...detailLines,
-  ].join("\n");
-}
-
-async function sendResendEmailAlert(
-  title: string,
-  handle: JobRunHandle,
-  details: JsonRecord,
-): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ALERT_EMAIL_FROM;
-  const recipients = parseCsvValues(process.env.ALERT_EMAIL_TO);
-
-  if (!apiKey || !from || recipients.length === 0) {
-    return false;
-  }
-
-  const text = formatAlertMessage(title, handle, details);
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: recipients,
-        subject: title,
-        text,
-      }),
-    });
-
-    return response.ok;
-  } catch {
-    return false;
-  }
+    headerLines: [
+      `job: ${handle.jobKey}`,
+      `source: ${handle.source}`,
+      ...(handle.aiTaskId ? [`aiTaskId: ${handle.aiTaskId}`] : []),
+    ],
+    details,
+  });
 }
 
 function parseBooleanFlag(raw: string | undefined): boolean {
