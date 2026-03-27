@@ -14,5 +14,5 @@ export default async function AdminEntryPage() {
     redirect("/dashboard");
   }
 
-  redirect("/ai-observations");
+  redirect("/ai-runs");
 }

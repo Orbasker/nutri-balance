@@ -1,3 +1,5 @@
+import { incrementAiRunUsage } from "@/lib/ai-run-audit";
+
 type JsonRecord = Record<string, unknown>;
 
 interface PricingEntry {
@@ -273,6 +275,7 @@ export async function recordAiUsageEvent(input: {
   usage: UsageMetrics;
   aiTaskId?: string | null;
   jobRunId?: string | null;
+  aiRunId?: string | null;
   userId?: string | null;
   metadata?: JsonRecord;
 }) {
@@ -297,6 +300,16 @@ export async function recordAiUsageEvent(input: {
     } else {
       runSummary.estimatedCostUsd = null;
     }
+  }
+
+  if (input.aiRunId) {
+    await incrementAiRunUsage({
+      aiRunId: input.aiRunId,
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      estimatedCostUsd,
+    });
   }
 
   const eventThreshold = parseNumberFlag(process.env.AI_USAGE_ALERT_THRESHOLD_USD);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runAiReview } from "@/lib/ai/review-agent";
+import { executeAiReviewRun } from "@/lib/ai/review-runner";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 
 /**
@@ -21,7 +21,10 @@ export async function POST(request: Request) {
   });
 
   try {
-    const result = await runAiReview({ jobRunId: run.id });
+    const result = await executeAiReviewRun({
+      source: "cron",
+      jobRunId: run.id,
+    });
 
     await finishJobRun(run, {
       status: "completed",

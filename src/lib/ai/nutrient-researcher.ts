@@ -5,6 +5,7 @@ import { and, count, countDistinct, eq, inArray, notInArray } from "drizzle-orm"
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
+import { type AiRunHandle, finishAiRun, startAiRun } from "@/lib/ai-run-audit";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
@@ -88,6 +89,7 @@ async function researchBatch(
   options?: {
     aiTaskId?: string;
     jobRunId?: string;
+    aiRunId?: string;
   },
 ) {
   const foodList = batch.map((b) => `- ${b.foodName} (${b.preparationMethod})`).join("\n");
@@ -135,6 +137,7 @@ Rules:
     model: modelName,
     aiTaskId: options?.aiTaskId,
     jobRunId: options?.jobRunId,
+    aiRunId: options?.aiRunId,
     usage: {
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
@@ -172,6 +175,7 @@ export async function processNutrientResearchTask(
   let errors = 0;
   let totalMissing = 0;
   let nutrientName = "Unknown nutrient";
+  let aiRun: AiRunHandle | null = null;
 
   try {
     await db
@@ -187,6 +191,16 @@ export async function processNutrientResearchTask(
 
     if (!nutrient) throw new Error("Nutrient not found");
     nutrientName = nutrient.displayName;
+    aiRun = await startAiRun({
+      type: "nutrient_research_task",
+      goal: `Research missing ${nutrient.displayName} values`,
+      source,
+      aiTaskId: taskId,
+      metadata: {
+        nutrientId: nutrient.id,
+        nutrientName: nutrient.displayName,
+      },
+    });
 
     const missing = await findMissingVariants(nutrient.id);
     totalMissing = missing.length;
@@ -210,6 +224,18 @@ export async function processNutrientResearchTask(
           nutrientName: nutrient.displayName,
         },
       });
+
+      if (aiRun) {
+        await finishAiRun(aiRun, {
+          status: "completed",
+          itemCount: 0,
+          resultSummary: `No missing data found for ${nutrient.displayName}.`,
+          metadata: {
+            nutrientId: nutrient.id,
+            nutrientName: nutrient.displayName,
+          },
+        });
+      }
       return;
     }
 
@@ -223,6 +249,7 @@ export async function processNutrientResearchTask(
         const results = await researchBatch(nutrient.name, nutrient.unit, batch, {
           aiTaskId: taskId,
           jobRunId: run.id,
+          aiRunId: aiRun?.id,
         });
 
         for (const result of results) {
@@ -291,6 +318,20 @@ export async function processNutrientResearchTask(
         totalMissing: missing.length,
       },
     });
+
+    if (aiRun) {
+      await finishAiRun(aiRun, {
+        status: "completed",
+        itemCount: processed,
+        resultSummary: `Researched ${processed} food variants for ${nutrient.displayName}.`,
+        metadata: {
+          nutrientId: nutrient.id,
+          nutrientName: nutrient.displayName,
+          totalMissing: missing.length,
+          errors,
+        },
+      });
+    }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -313,6 +354,19 @@ export async function processNutrientResearchTask(
         totalMissing,
       },
     });
+
+    if (aiRun) {
+      await finishAiRun(aiRun, {
+        status: "failed",
+        itemCount: processed,
+        errorMessage,
+        resultSummary: `Research failed for ${nutrientName}.`,
+        metadata: {
+          totalMissing,
+          errors,
+        },
+      });
+    }
   } finally {
     await flushLangfuse();
   }

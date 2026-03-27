@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
+import { finishAiRun, startAiRun } from "@/lib/ai-run-audit";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
@@ -119,6 +120,9 @@ async function getOrCreateAiSource(): Promise<string> {
 export async function aiResearchFood(
   query: string,
   userId: string,
+  options?: {
+    source?: string;
+  },
 ): Promise<{ foodId: string } | { error: string }> {
   const allNutrients = await db.select().from(nutrients).orderBy(nutrients.sortOrder);
 
@@ -133,7 +137,16 @@ export async function aiResearchFood(
   const trace = langfuse.trace({
     name: "food-search-agent",
     userId,
-    metadata: { query },
+    metadata: { query, source: options?.source ?? "app-search" },
+  });
+  const aiRun = await startAiRun({
+    type: "food_generation",
+    goal: `Research food "${query}"`,
+    source: options?.source ?? "app-search",
+    triggerUserId: userId,
+    metadata: {
+      query,
+    },
   });
 
   try {
@@ -177,6 +190,7 @@ Rules:
       operation: "generate-food-profile",
       model: modelName,
       userId,
+      aiRunId: aiRun.id,
       usage: {
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
@@ -189,11 +203,20 @@ Rules:
 
     // Validate that we got useful data
     if (!foodData.name || !foodData.variants?.length) {
+      await finishAiRun(aiRun, {
+        status: "failed",
+        resultSummary: "AI could not identify a valid food profile.",
+        errorMessage: "AI could not identify this food.",
+        metadata: {
+          query,
+        },
+      });
       return { error: "AI could not identify this food. Try a more specific name." };
     }
 
     // Persist the food, variants, nutrients, and observations
     const sourceId = await getOrCreateAiSource();
+    let observationCount = 0;
 
     const [food] = await db
       .insert(foods)
@@ -264,6 +287,7 @@ Rules:
           observationId: observation.id,
           snippet: nutrientData.reasoning,
         });
+        observationCount++;
 
         const confidenceLabel =
           nutrientData.confidence >= 80
@@ -283,13 +307,36 @@ Rules:
       }
     }
 
+    await finishAiRun(aiRun, {
+      status: "completed",
+      itemCount: observationCount,
+      foodId: food.id,
+      resultSummary: `Created ${foodData.name} with ${foodData.variants.length} variants and ${observationCount} AI observations.`,
+      metadata: {
+        query,
+        foodName: foodData.name,
+        variantCount: foodData.variants.length,
+      },
+    });
+
     trace.update({ output: { foodId: food.id, name: foodData.name } });
     await flushLangfuse();
 
     return { foodId: food.id };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    await finishAiRun(aiRun, {
+      status: "failed",
+      errorMessage,
+      resultSummary: "Food generation failed.",
+      metadata: {
+        query,
+      },
+    });
+
     trace.update({
-      output: { error: error instanceof Error ? error.message : String(error) },
+      output: { error: errorMessage },
     });
     await flushLangfuse();
     console.error("AI food search error:", error);

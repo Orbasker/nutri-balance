@@ -61,7 +61,7 @@ export function TopAppBar({
         <div className="flex items-center gap-2">
           {showAdminLink && (
             <Link
-              href="/ai-observations"
+              href="/admin"
               className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
             >
               Admin

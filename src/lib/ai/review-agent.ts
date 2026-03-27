@@ -110,6 +110,7 @@ async function reviewBatch(
   trace: ReturnType<ReturnType<typeof getLangfuse>["trace"]>,
   options?: {
     jobRunId?: string;
+    aiRunId?: string;
   },
 ) {
   const itemList = batch
@@ -171,6 +172,7 @@ Return a verdict for EVERY observation listed. Use the exact observation ID from
     operation: "review-batch",
     model: modelName,
     jobRunId: options?.jobRunId,
+    aiRunId: options?.aiRunId,
     usage: {
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
@@ -242,11 +244,15 @@ export interface ReviewResult {
  * Main entry point: fetch all pending AI-extracted observations,
  * send them to AI for verification, and apply verdicts.
  */
-export async function runAiReview(options?: { jobRunId?: string }): Promise<ReviewResult> {
+export async function runAiReview(options?: {
+  jobRunId?: string;
+  aiRunId?: string;
+  source?: string;
+}): Promise<ReviewResult> {
   const langfuse = getLangfuse();
   const trace = langfuse.trace({
     name: "ai-review-agent",
-    metadata: { trigger: "api" },
+    metadata: { trigger: options?.source ?? "api" },
   });
 
   try {
@@ -266,7 +272,10 @@ export async function runAiReview(options?: { jobRunId?: string }): Promise<Revi
       const batch = pending.slice(i, i + BATCH_SIZE);
 
       try {
-        const verdicts = await reviewBatch(batch, trace, { jobRunId: options?.jobRunId });
+        const verdicts = await reviewBatch(batch, trace, {
+          jobRunId: options?.jobRunId,
+          aiRunId: options?.aiRunId,
+        });
 
         for (const verdict of verdicts) {
           try {
