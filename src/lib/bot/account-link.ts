@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { accountLinkTokens } from "@/lib/db/schema/account-link-tokens";
@@ -25,7 +25,7 @@ export async function generateLinkUrl(userId: string): Promise<string> {
     throw new Error("No platform account found for user");
   }
 
-  // Check for existing valid token
+  // Check for existing valid (non-expired, non-used) token
   const [existing] = await db
     .select({ token: accountLinkTokens.token })
     .from(accountLinkTokens)
@@ -33,6 +33,7 @@ export async function generateLinkUrl(userId: string): Promise<string> {
       and(
         eq(accountLinkTokens.platformAccountId, account.id),
         gt(accountLinkTokens.expiresAt, new Date()),
+        isNull(accountLinkTokens.usedAt),
       ),
     );
 

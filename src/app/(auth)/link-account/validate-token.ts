@@ -11,7 +11,7 @@ import { platformAccounts } from "@/lib/db/schema/platform-accounts";
 export async function validateLinkToken(
   token: string,
 ): Promise<
-  | { valid: true; platform: string; platformUsername: string | null }
+  | { valid: true; platform: string; platformUsername: string | null; alreadyUsed?: boolean }
   | { valid: false; error: string }
 > {
   // First, find the token itself (without join)
@@ -29,6 +29,25 @@ export async function validateLinkToken(
       tokenLength: token.length,
     });
     return { valid: false, error: "Invalid or expired link token." };
+  }
+
+  // Token was already used — treat as valid so the page can show "already linked"
+  // instead of "expired" (the RSC re-renders after the server action)
+  if (tokenRow.usedAt) {
+    const [account] = await db
+      .select({
+        platform: platformAccounts.platform,
+        platformUsername: platformAccounts.platformUsername,
+      })
+      .from(platformAccounts)
+      .where(eq(platformAccounts.id, tokenRow.platformAccountId));
+
+    return {
+      valid: true,
+      platform: account?.platform ?? "unknown",
+      platformUsername: account?.platformUsername ?? null,
+      alreadyUsed: true,
+    };
   }
 
   const now = new Date();
@@ -69,6 +88,7 @@ async function findToken(token: string) {
     .select({
       platformAccountId: accountLinkTokens.platformAccountId,
       expiresAt: accountLinkTokens.expiresAt,
+      usedAt: accountLinkTokens.usedAt,
     })
     .from(accountLinkTokens)
     .where(eq(accountLinkTokens.token, token));

@@ -42,6 +42,9 @@ export function LinkAccountCard({
         setStatus("error");
       } else {
         setStatus("success");
+        // Navigate away immediately — the server action deleted the token,
+        // so if the RSC tree re-renders it will show "Link Expired"
+        router.replace("/dashboard");
       }
     } catch {
       setError("Something went wrong. Please try again or request a new link from the bot.");
