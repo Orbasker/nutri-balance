@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 
 import { authClient } from "@/lib/auth-client";
 
-export function GoogleButton() {
+export function GoogleButton({ callbackURL = "/dashboard" }: { callbackURL?: string } = {}) {
   const [loading, setLoading] = useState(false);
 
   async function handleGoogleSignIn() {
     setLoading(true);
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL,
     });
   }
 

@@ -18,9 +18,11 @@ import {
   searchFood,
 } from "@/lib/bot/tools";
 import { db } from "@/lib/db";
+import { user } from "@/lib/db/schema/auth";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
+import { generateLinkUrl } from "./account-link";
 import { findOrCreatePlatformAccount } from "./user-linking";
 import { getWebLinksBlock } from "./web-links";
 
@@ -63,6 +65,11 @@ export function getBot(): Chat {
  * data is actually present in the database — no onboarding state to track.
  */
 async function buildSystemPrompt(userId: string): Promise<string> {
+  // Check if the user's account is linked to a web account
+  const [authUser] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId));
+
+  const isLinked = authUser?.email ? !authUser.email.endsWith("@bot.nutribalance.local") : false;
+
   const [profile] = await db
     .select({
       displayName: profiles.displayName,
@@ -106,6 +113,12 @@ async function buildSystemPrompt(userId: string): Promise<string> {
   if (!profile?.healthGoal) missing.push("health goal or dietary concern");
   if (userLimits.length === 0) missing.push("nutrient limits");
 
+  const accountLinkBlock = !isLinked
+    ? `\nACCOUNT LINKING:
+This user's bot account is NOT linked to a NutriBalance web account. After initial setup is complete (name + at least one nutrient limit), mention once that they can link their account to access the web dashboard, view detailed charts, and sync their data across devices. Use the linkWebAccount tool to generate a personal link. Don't push it repeatedly — one friendly mention is enough.
+`
+    : "";
+
   const setupBlock =
     missing.length > 0
       ? `\nSETUP NEEDED:
@@ -124,7 +137,7 @@ IMPORTANT PRIVACY RULES:
 - You ONLY discuss this specific user's dietary data, limits, and food logs. Never reference other users.
 - All data you access is private to this user, protected by row-level security.
 - If asked about other people's diets, politely decline.
-${setupBlock}
+${setupBlock}${accountLinkBlock}
 YOUR CAPABILITIES:
 - Search for foods in the database and check their nutrient content
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
@@ -132,6 +145,7 @@ YOUR CAPABILITIES:
 - Provide the user's current daily nutrient summary
 - Research foods not in the database using AI (triggers background research)
 - Update the user's profile (name, health goal) and nutrient limits
+- Link this bot account to a NutriBalance web account (use linkWebAccount)
 
 USER'S NUTRIENT LIMITS:
 ${limitsContext || "No limits configured yet."}
@@ -307,6 +321,21 @@ function buildTools(toolCtx: ToolContext) {
           mode,
         });
         return { success: true, action: "created" };
+      },
+    },
+
+    linkWebAccount: {
+      description:
+        "Generate a link for the user to connect their bot account with their NutriBalance web account. This lets them access the same data on both the bot and the web dashboard. The link expires in 15 minutes.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const url = await generateLinkUrl(toolCtx.userId);
+        return {
+          success: true,
+          url,
+          message:
+            "Link generated. The user should click it to sign in and connect their accounts.",
+        };
       },
     },
   };
