@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
@@ -17,11 +18,11 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
     return { error: "Email and password are required." };
   }
 
-  const result = await auth.api.signInEmail({
-    body: { email, password },
-  });
-
-  if (!result) {
+  try {
+    await auth.api.signInEmail({
+      body: { email, password },
+    });
+  } catch {
     return { error: "Invalid email or password." };
   }
 
@@ -65,7 +66,7 @@ export async function logout() {
   const session = await getSession();
   if (session) {
     await auth.api.signOut({
-      headers: await import("next/headers").then((m) => m.headers()),
+      headers: await headers(),
     });
   }
   redirect("/login");
