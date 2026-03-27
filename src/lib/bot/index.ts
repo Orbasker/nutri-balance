@@ -1,5 +1,6 @@
 import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createMemoryState } from "@chat-adapter/state-memory";
+import { createPostgresState } from "@chat-adapter/state-pg";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { stepCountIs, streamText } from "ai";
 import { Chat, toAiMessages } from "chat";
@@ -42,10 +43,14 @@ export function getBot(): Chat {
     adapters.discord = createDiscordAdapter();
   }
 
+  const hasPostgresState = Boolean(process.env.POSTGRES_URL) || Boolean(process.env.DATABASE_URL);
+  const state = hasPostgresState ? createPostgresState() : createMemoryState();
+
   _bot = new Chat({
     userName: "nutribalance",
     adapters,
-    state: createMemoryState(),
+    state,
+    concurrency: { strategy: "queue" },
   });
 
   // Register handlers on the freshly-created instance
