@@ -96,6 +96,15 @@ END $$;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
+-- Clean up orphaned rows from old Supabase auth before adding FK constraints to Better Auth user table
+DELETE FROM "chat_messages" WHERE "conversation_id" IN (
+  SELECT "id" FROM "chat_conversations" WHERE "user_id" NOT IN (SELECT "id" FROM "user")
+);--> statement-breakpoint
+DELETE FROM "chat_conversations" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
+DELETE FROM "consumption_logs" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
+DELETE FROM "profiles" WHERE "id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
+DELETE FROM "user_nutrient_limits" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
+DELETE FROM "food_feedback" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chat_conversations_user_id_user_id_fk') THEN
     ALTER TABLE "chat_conversations" ADD CONSTRAINT "chat_conversations_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
