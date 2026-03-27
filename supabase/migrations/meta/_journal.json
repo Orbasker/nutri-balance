@@ -33,7 +33,7 @@
     {
       "idx": 4,
       "version": "7",
-      "when": 1774614604907,
+      "when": 1774616072112,
       "tag": "0009_better_auth_tables",
       "breakpoints": true
     }

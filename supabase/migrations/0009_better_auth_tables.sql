@@ -1,3 +1,4 @@
+-- Create Better Auth tables
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -72,22 +73,16 @@ DROP POLICY IF EXISTS "profiles_select" ON "profiles";--> statement-breakpoint
 DROP POLICY IF EXISTS "profiles_insert" ON "profiles";--> statement-breakpoint
 DROP POLICY IF EXISTS "profiles_update" ON "profiles";--> statement-breakpoint
 ALTER TABLE "profiles" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
--- Now alter column types from uuid to text for Better Auth compatibility
+-- Convert uuid columns to text for Better Auth compatibility (user_id references only)
 ALTER TABLE "ai_tasks" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "chat_conversations" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "food_feedback" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "foods" ALTER COLUMN "created_by" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "reviews" ALTER COLUMN "reviewer_id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "consumption_logs" ALTER COLUMN "id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "consumption_logs" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "consumption_logs" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "consumption_logs" ALTER COLUMN "food_variant_id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "consumption_logs" ALTER COLUMN "serving_measure_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "profiles" ALTER COLUMN "id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "user_nutrient_limits" ALTER COLUMN "id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "user_nutrient_limits" ALTER COLUMN "id" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "user_nutrient_limits" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "user_nutrient_limits" ALTER COLUMN "nutrient_id" SET DATA TYPE text;--> statement-breakpoint
+-- Add FK constraints to new user table
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint

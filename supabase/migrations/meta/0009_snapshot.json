@@ -1,5 +1,5 @@
 {
-  "id": "eb5831d8-8cd8-41e6-a4bc-13b06e8924f3",
+  "id": "956dee97-8088-415e-9a53-8826040e43c4",
   "prevId": "71b4e5ab-c00b-4a87-8b2b-03d45f0a43fa",
   "version": "7",
   "dialect": "postgresql",
@@ -1687,9 +1687,10 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
         "user_id": {
           "name": "user_id",
@@ -1699,13 +1700,13 @@
         },
         "food_variant_id": {
           "name": "food_variant_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
         "serving_measure_id": {
           "name": "serving_measure_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1886,9 +1887,10 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
         "user_id": {
           "name": "user_id",
@@ -1898,7 +1900,7 @@
         },
         "nutrient_id": {
           "name": "nutrient_id",
-          "type": "text",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
