@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth-session";
 
-import { validateLinkToken } from "./actions";
 import { LinkAccountCard } from "./link-account-card";
+import { validateLinkToken } from "./validate-token";
 
 export default async function LinkAccountPage({
   searchParams,

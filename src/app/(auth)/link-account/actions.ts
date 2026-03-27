@@ -15,43 +15,6 @@ export type LinkResult =
   | { error: string };
 
 /**
- * Validate a link token and return info about the platform account.
- * Does NOT perform the link — just checks if the token is valid.
- */
-export async function validateLinkToken(
-  token: string,
-): Promise<
-  | { valid: true; platform: string; platformUsername: string | null }
-  | { valid: false; error: string }
-> {
-  const [row] = await db
-    .select({
-      platformAccountId: accountLinkTokens.platformAccountId,
-      expiresAt: accountLinkTokens.expiresAt,
-      platform: platformAccounts.platform,
-      platformUsername: platformAccounts.platformUsername,
-      currentUserId: platformAccounts.userId,
-    })
-    .from(accountLinkTokens)
-    .innerJoin(platformAccounts, eq(accountLinkTokens.platformAccountId, platformAccounts.id))
-    .where(eq(accountLinkTokens.token, token));
-
-  if (!row) {
-    return { valid: false, error: "Invalid or expired link token." };
-  }
-
-  if (row.expiresAt < new Date()) {
-    return { valid: false, error: "This link has expired. Please request a new one from the bot." };
-  }
-
-  return {
-    valid: true,
-    platform: row.platform,
-    platformUsername: row.platformUsername,
-  };
-}
-
-/**
  * Link a bot platform account to the authenticated web user.
  *
  * Steps:
