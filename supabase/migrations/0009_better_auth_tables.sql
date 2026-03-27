@@ -48,6 +48,31 @@ CREATE TABLE "verification" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+-- Drop RLS policies that reference columns being altered (Better Auth uses app-layer auth, not RLS)
+DROP POLICY IF EXISTS "Users can manage own conversations" ON "chat_conversations";--> statement-breakpoint
+DROP POLICY IF EXISTS "Users can manage messages in own conversations" ON "chat_messages";--> statement-breakpoint
+ALTER TABLE "chat_conversations" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "chat_messages" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DROP POLICY IF EXISTS "Users can insert own feedback" ON "food_feedback";--> statement-breakpoint
+DROP POLICY IF EXISTS "Users read own feedback, admins read all" ON "food_feedback";--> statement-breakpoint
+DROP POLICY IF EXISTS "Admins can update feedback" ON "food_feedback";--> statement-breakpoint
+DROP POLICY IF EXISTS "Admins can delete feedback" ON "food_feedback";--> statement-breakpoint
+ALTER TABLE "food_feedback" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DROP POLICY IF EXISTS "consumption_logs_select" ON "consumption_logs";--> statement-breakpoint
+DROP POLICY IF EXISTS "consumption_logs_insert" ON "consumption_logs";--> statement-breakpoint
+DROP POLICY IF EXISTS "consumption_logs_update" ON "consumption_logs";--> statement-breakpoint
+DROP POLICY IF EXISTS "consumption_logs_delete" ON "consumption_logs";--> statement-breakpoint
+ALTER TABLE "consumption_logs" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DROP POLICY IF EXISTS "user_nutrient_limits_select" ON "user_nutrient_limits";--> statement-breakpoint
+DROP POLICY IF EXISTS "user_nutrient_limits_insert" ON "user_nutrient_limits";--> statement-breakpoint
+DROP POLICY IF EXISTS "user_nutrient_limits_update" ON "user_nutrient_limits";--> statement-breakpoint
+DROP POLICY IF EXISTS "user_nutrient_limits_delete" ON "user_nutrient_limits";--> statement-breakpoint
+ALTER TABLE "user_nutrient_limits" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DROP POLICY IF EXISTS "profiles_select" ON "profiles";--> statement-breakpoint
+DROP POLICY IF EXISTS "profiles_insert" ON "profiles";--> statement-breakpoint
+DROP POLICY IF EXISTS "profiles_update" ON "profiles";--> statement-breakpoint
+ALTER TABLE "profiles" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+-- Now alter column types from uuid to text for Better Auth compatibility
 ALTER TABLE "ai_tasks" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "chat_conversations" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "food_feedback" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
