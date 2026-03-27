@@ -24,7 +24,7 @@ export const foods = pgTable("foods", {
   description: text(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  createdBy: uuid("created_by"),
+  createdBy: text("created_by"),
 });
 
 export const foodAliases = pgTable("food_aliases", {

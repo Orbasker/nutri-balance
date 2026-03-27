@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "@/lib/db";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 import { findOrCreatePlatformAccount } from "../user-linking";
 
@@ -13,8 +12,13 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-vi.mock("@/lib/supabase/admin", () => ({
-  createAdminClient: vi.fn(),
+vi.mock("@/lib/db/schema/auth", () => ({
+  user: {
+    id: "id",
+    name: "name",
+    email: "email",
+    emailVerified: "email_verified",
+  },
 }));
 
 vi.mock("@/lib/db/schema/platform-accounts", () => ({
@@ -43,16 +47,8 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 describe("findOrCreatePlatformAccount", () => {
-  const mockSupabase = {
-    auth: {
-      admin: {
-        createUser: vi.fn(),
-      },
-    },
-  };
-
   beforeEach(() => {
-    vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -78,7 +74,6 @@ describe("findOrCreatePlatformAccount", () => {
     const result = await findOrCreatePlatformAccount("telegram", "tg-789", "testuser");
 
     expect(result).toEqual(existingAccount);
-    expect(mockSupabase.auth.admin.createUser).not.toHaveBeenCalled();
   });
 
   it("creates new auth user, profile, and platform account when not found", async () => {
@@ -86,12 +81,6 @@ describe("findOrCreatePlatformAccount", () => {
     const mockWhere = vi.fn().mockResolvedValue([]);
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
     vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
-
-    // Auth user creation
-    mockSupabase.auth.admin.createUser.mockResolvedValue({
-      data: { user: { id: "new-user-id" } },
-      error: null,
-    });
 
     // Platform account insert
     const newAccount = {
@@ -105,33 +94,27 @@ describe("findOrCreatePlatformAccount", () => {
       createdAt: new Date(),
     };
 
-    // db.insert called twice: once for profiles, once for platform_accounts
+    // db.insert called three times: auth user, profile, platform account
     vi.mocked(db.insert)
-      .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) } as never)
+      .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) } as never) // auth user
+      .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) } as never) // profile
       .mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
           returning: vi.fn().mockResolvedValue([newAccount]),
         }),
-      } as never);
+      } as never); // platform account
 
     const result = await findOrCreatePlatformAccount("telegram", "tg-999", "newuser");
 
     expect(result).toEqual(newAccount);
-    expect(mockSupabase.auth.admin.createUser).toHaveBeenCalledWith({
-      email: "telegram_tg-999@bot.nutribalance.local",
-      email_confirm: true,
-    });
+    // Should have inserted auth user, profile, then platform account
+    expect(db.insert).toHaveBeenCalledTimes(3);
   });
 
   it("uses 'Bot User' as display name when platformUsername is null", async () => {
     const mockWhere = vi.fn().mockResolvedValue([]);
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
     vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
-
-    mockSupabase.auth.admin.createUser.mockResolvedValue({
-      data: { user: { id: "new-user-id" } },
-      error: null,
-    });
 
     const newAccount = {
       id: "new-acc-id",
@@ -145,6 +128,7 @@ describe("findOrCreatePlatformAccount", () => {
     };
 
     vi.mocked(db.insert)
+      .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) } as never)
       .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) } as never)
       .mockReturnValueOnce({
         values: vi.fn().mockReturnValue({
@@ -163,13 +147,6 @@ describe("findOrCreatePlatformAccount", () => {
     const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
     vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
 
-    // Auth creation succeeds
-    mockSupabase.auth.admin.createUser.mockResolvedValue({
-      data: { user: { id: "new-user-race" } },
-      error: null,
-    });
-
-    // Profile insert succeeds, but platform account insert fails (unique constraint)
     const existingAccount = {
       id: "acc-concurrent",
       userId: "user-concurrent",
@@ -181,17 +158,14 @@ describe("findOrCreatePlatformAccount", () => {
       createdAt: new Date(),
     };
 
-    vi.mocked(db.insert)
-      .mockReturnValueOnce({ values: vi.fn().mockResolvedValue(undefined) } as never) // profile insert ok
-      .mockReturnValueOnce({
-        values: vi.fn().mockReturnValue({
-          returning: vi
-            .fn()
-            .mockRejectedValue(new Error("duplicate key value violates unique constraint")),
-        }),
-      } as never); // platform account insert fails
+    // Auth user insert fails with unique constraint
+    vi.mocked(db.insert).mockReturnValueOnce({
+      values: vi
+        .fn()
+        .mockRejectedValue(new Error("duplicate key value violates unique constraint")),
+    } as never);
 
-    // On retry select, account is found (created by concurrent request)
+    // On retry select, account is found
     mockWhere.mockResolvedValueOnce([existingAccount]);
 
     const result = await findOrCreatePlatformAccount("telegram", "tg-race", "racer");

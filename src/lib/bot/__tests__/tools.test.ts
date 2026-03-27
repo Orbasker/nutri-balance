@@ -35,13 +35,11 @@ describe("shared tool exports", () => {
     expect(typeof aiResearchFood).toBe("function");
   });
 
-  it("ToolContext interface accepts userId and supabase", () => {
+  it("ToolContext interface accepts userId", () => {
     // Type-level check that ToolContext has the expected shape
     const ctx: ToolContext = {
       userId: "test-user-id",
-      supabase: {} as ToolContext["supabase"],
     };
     expect(ctx.userId).toBe("test-user-id");
-    expect(ctx.supabase).toBeDefined();
   });
 });

@@ -1,47 +1,55 @@
-import { createClient } from "@/lib/supabase/server";
+import { eq } from "drizzle-orm";
+
+import { getSession } from "@/lib/auth-session";
+import { db } from "@/lib/db";
+import { nutrients } from "@/lib/db/schema/nutrients";
+import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 import { LogoutButton } from "./logout-button";
 import { NutrientLimitsSettings } from "./nutrient-limits-settings";
 import { ProfileSettings } from "./profile-settings";
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
+  const session = await getSession();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const [
-    { data: nutrients, error: nutrientsError },
-    { data: limits, error: limitsError },
-    { data: profile },
-  ] = await Promise.all([
-    supabase
-      .from("nutrients")
-      .select("id, name, unit, display_name, sort_order")
-      .order("sort_order", {
-        ascending: true,
-      }),
-    supabase.from("user_nutrient_limits").select("*"),
-    supabase
-      .from("profiles")
-      .select(
-        "first_name, last_name, display_name, date_of_birth, gender, clinical_notes, health_goal, avatar_color",
-      )
-      .eq("id", user!.id)
-      .maybeSingle(),
+  const [allNutrients, limits, profile] = await Promise.all([
+    db
+      .select({
+        id: nutrients.id,
+        name: nutrients.name,
+        unit: nutrients.unit,
+        display_name: nutrients.displayName,
+        sort_order: nutrients.sortOrder,
+      })
+      .from(nutrients)
+      .orderBy(nutrients.sortOrder),
+    db.select().from(userNutrientLimits).where(eq(userNutrientLimits.userId, session!.user.id)),
+    db
+      .select({
+        first_name: profiles.firstName,
+        last_name: profiles.lastName,
+        display_name: profiles.displayName,
+        date_of_birth: profiles.dateOfBirth,
+        gender: profiles.gender,
+        clinical_notes: profiles.clinicalNotes,
+        health_goal: profiles.healthGoal,
+        avatar_color: profiles.avatarColor,
+      })
+      .from(profiles)
+      .where(eq(profiles.id, session!.user.id))
+      .then((rows) => rows[0] ?? null),
   ]);
 
-  if (nutrientsError || limitsError) {
-    return (
-      <div className="px-6 max-w-screen-md mx-auto pt-4">
-        <h2 className="font-extrabold text-3xl text-md-primary tracking-tight mb-2">Settings</h2>
-        <p className="text-md-error mt-4 text-sm" role="alert">
-          {nutrientsError?.message ?? limitsError?.message ?? "Could not load settings."}
-        </p>
-      </div>
-    );
-  }
+  // Map limits to the format expected by the component
+  const mappedLimits = limits.map((l) => ({
+    id: l.id,
+    user_id: l.userId,
+    nutrient_id: l.nutrientId,
+    daily_limit: l.dailyLimit,
+    mode: l.mode,
+    range_min: l.rangeMin,
+    range_max: l.rangeMax,
+  }));
 
   return (
     <div className="max-w-screen-md mx-auto px-6 pt-4 pb-12">
@@ -64,14 +72,16 @@ export default async function SettingsPage() {
       <div className="mt-8" />
 
       <NutrientLimitsSettings
-        nutrients={nutrients ?? []}
-        limits={limits ?? []}
+        nutrients={allNutrients ?? []}
+        limits={mappedLimits ?? []}
         medicalNotes={profile?.clinical_notes ?? ""}
       />
 
       <div className="mt-12 pt-8 border-t border-md-outline-variant/30">
         <h3 className="font-bold text-lg text-md-on-surface mb-1">Account</h3>
-        <p className="text-sm text-md-on-surface-variant mb-4">Signed in as {user!.email}</p>
+        <p className="text-sm text-md-on-surface-variant mb-4">
+          Signed in as {session!.user.email}
+        </p>
         <LogoutButton />
       </div>
     </div>

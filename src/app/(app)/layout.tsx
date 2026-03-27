@@ -1,36 +1,42 @@
 import { redirect } from "next/navigation";
 
+import { eq } from "drizzle-orm";
+
 import { AppShell } from "@/components/app-shell";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth-session";
+import { db } from "@/lib/db";
+import { profiles } from "@/lib/db/schema/users";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("first_name, last_name, display_name, avatar_color")
-    .eq("id", user.id)
-    .single();
+  const [profile] = await db
+    .select({
+      firstName: profiles.firstName,
+      lastName: profiles.lastName,
+      displayName: profiles.displayName,
+      avatarColor: profiles.avatarColor,
+    })
+    .from(profiles)
+    .where(eq(profiles.id, session.user.id));
 
   const displayName =
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-    profile?.display_name ||
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
+    profile?.displayName ||
+    session.user.name ||
     null;
 
   return (
     <AppShell>
       <div className="min-h-screen pb-24">
-        <TopAppBar displayName={displayName} avatarColor={profile?.avatar_color ?? "blue"} />
+        <TopAppBar displayName={displayName} avatarColor={profile?.avatarColor ?? "blue"} />
         <main className="pt-20">{children}</main>
         <BottomNav />
       </div>

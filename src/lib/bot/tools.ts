@@ -1,28 +1,31 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { eq, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, gte, ilike, inArray, or } from "drizzle-orm";
 
 import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodAliases, foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+import { consumptionLogs, userNutrientLimits } from "@/lib/db/schema/users";
 
 export interface ToolContext {
   userId: string;
-  supabase: SupabaseClient;
 }
 
 /**
- * Fetch user nutrient limits from Supabase.
+ * Fetch user nutrient limits via Drizzle.
  * Used internally by tools that need limit context.
  */
 async function fetchUserLimits(ctx: ToolContext) {
-  const { data: userLimits } = await ctx.supabase
-    .from("user_nutrient_limits")
-    .select("nutrient_id, daily_limit, mode, range_min, range_max")
-    .eq("user_id", ctx.userId);
-
-  return userLimits ?? [];
+  return db
+    .select({
+      nutrient_id: userNutrientLimits.nutrientId,
+      daily_limit: userNutrientLimits.dailyLimit,
+      mode: userNutrientLimits.mode,
+      range_min: userNutrientLimits.rangeMin,
+      range_max: userNutrientLimits.rangeMax,
+    })
+    .from(userNutrientLimits)
+    .where(eq(userNutrientLimits.userId, ctx.userId));
 }
 
 /**
@@ -161,17 +164,15 @@ export async function checkCanIEat(
   // Get today's consumption
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString();
 
-  const { data: logs } = await ctx.supabase
-    .from("consumption_logs")
-    .select("nutrient_snapshot")
-    .eq("user_id", ctx.userId)
-    .gte("logged_at", todayStr);
+  const logs = await db
+    .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+    .from(consumptionLogs)
+    .where(and(eq(consumptionLogs.userId, ctx.userId), gte(consumptionLogs.loggedAt, today)));
 
   const todayTotals: Record<string, number> = {};
-  for (const log of logs ?? []) {
-    const snap = log.nutrient_snapshot as Record<string, number> | null;
+  for (const log of logs) {
+    const snap = log.nutrientSnapshot as Record<string, number> | null;
     if (!snap) continue;
     for (const [nId, amt] of Object.entries(snap)) {
       todayTotals[nId] = (todayTotals[nId] ?? 0) + amt;
@@ -261,18 +262,14 @@ export async function recordMeal(
     );
   }
 
-  const { error } = await ctx.supabase.from("consumption_logs").insert({
-    user_id: ctx.userId,
-    food_variant_id: params.foodVariantId,
-    serving_measure_id: params.servingMeasureId ?? null,
+  await db.insert(consumptionLogs).values({
+    userId: ctx.userId,
+    foodVariantId: params.foodVariantId,
+    servingMeasureId: params.servingMeasureId ?? null,
     quantity: String(params.quantity),
-    nutrient_snapshot: snapshot,
-    meal_label: params.mealLabel ?? null,
+    nutrientSnapshot: snapshot,
+    mealLabel: params.mealLabel ?? null,
   });
-
-  if (error) {
-    return { success: false, error: error.message };
-  }
 
   // Get food name for confirmation
   const [variantInfo] = await db
@@ -300,18 +297,16 @@ export async function getDailySummary(_params: Record<string, never>, ctx: ToolC
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString();
 
-  const { data: logs } = await ctx.supabase
-    .from("consumption_logs")
-    .select("nutrient_snapshot, food_variant_id, quantity, meal_label, logged_at")
-    .eq("user_id", ctx.userId)
-    .gte("logged_at", todayStr)
-    .order("logged_at", { ascending: true });
+  const logs = await db
+    .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+    .from(consumptionLogs)
+    .where(and(eq(consumptionLogs.userId, ctx.userId), gte(consumptionLogs.loggedAt, today)))
+    .orderBy(consumptionLogs.loggedAt);
 
   const totals: Record<string, number> = {};
-  for (const log of logs ?? []) {
-    const snap = log.nutrient_snapshot as Record<string, number> | null;
+  for (const log of logs) {
+    const snap = log.nutrientSnapshot as Record<string, number> | null;
     if (!snap) continue;
     for (const [nId, amt] of Object.entries(snap)) {
       totals[nId] = (totals[nId] ?? 0) + amt;
@@ -320,7 +315,7 @@ export async function getDailySummary(_params: Record<string, never>, ctx: ToolC
 
   if (limitNutrientIds.length === 0) {
     return {
-      mealCount: (logs ?? []).length,
+      mealCount: logs.length,
       trackedNutrients: [],
       message: "No nutrient limits configured.",
     };
@@ -349,7 +344,7 @@ export async function getDailySummary(_params: Record<string, never>, ctx: ToolC
   });
 
   return {
-    mealCount: (logs ?? []).length,
+    mealCount: logs.length,
     trackedNutrients: summary,
   };
 }

@@ -19,7 +19,7 @@ export const foodFeedback = pgTable("food_feedback", {
   foodVariantId: uuid("food_variant_id").references(() => foodVariants.id, {
     onDelete: "cascade",
   }),
-  userId: uuid("user_id").notNull(),
+  userId: text("user_id").notNull(),
   type: feedbackTypeEnum().notNull(),
   message: text().notNull(),
   suggestedValue: numeric("suggested_value"),

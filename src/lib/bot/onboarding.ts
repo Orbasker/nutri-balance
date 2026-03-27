@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { nutrients as nutrientsTable } from "@/lib/db/schema/nutrients";
 import { platformAccounts } from "@/lib/db/schema/platform-accounts";
 import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 type PlatformAccount = typeof platformAccounts.$inferSelect;
 
@@ -190,25 +190,23 @@ async function handleAwaitingNutrients(
 
   if (choice === "4") {
     // Custom selection - fetch available nutrients from DB
-    const supabase = createAdminClient();
-    const { data: availableNutrients } = await supabase
-      .from("nutrients")
-      .select("id, display_name, unit")
-      .order("sort_order");
+    const availableNutrients = await db
+      .select({
+        id: nutrientsTable.id,
+        displayName: nutrientsTable.displayName,
+        unit: nutrientsTable.unit,
+      })
+      .from(nutrientsTable)
+      .orderBy(nutrientsTable.sortOrder);
 
-    const nutrientList = (availableNutrients ?? [])
-      .map(
-        (n: { id: string; display_name: string; unit: string }, i: number) =>
-          `${i + 1}. ${n.display_name} (${n.unit})`,
-      )
+    const nutrientList = availableNutrients
+      .map((n, i: number) => `${i + 1}. ${n.displayName} (${n.unit})`)
       .join("\n");
 
-    const nutrientEntries = (availableNutrients ?? []).map(
-      (n: { id: string; display_name: string }) => ({
-        name: n.display_name,
-        key: n.id,
-      }),
-    );
+    const nutrientEntries = availableNutrients.map((n) => ({
+      name: n.displayName,
+      key: n.id,
+    }));
 
     await updateOnboardingState(account.id, "awaiting_nutrients", {
       nutrients: nutrientEntries,
@@ -264,15 +262,18 @@ async function handleAwaitingLimits(
 
   // Look up the nutrient in the database
   const currentNutrient = nutrients[currentIndex];
-  const supabase = createAdminClient();
-  const { data: nutrientRows } = await supabase
-    .from("nutrients")
-    .select("id, display_name, unit")
-    .order("sort_order");
+  const nutrientRows = await db
+    .select({
+      id: nutrientsTable.id,
+      displayName: nutrientsTable.displayName,
+      unit: nutrientsTable.unit,
+    })
+    .from(nutrientsTable)
+    .orderBy(nutrientsTable.sortOrder);
 
-  const matchedNutrient = (nutrientRows ?? []).find(
-    (n: { id: string; display_name: string }) =>
-      n.display_name.toLowerCase() === currentNutrient.name.toLowerCase() ||
+  const matchedNutrient = nutrientRows.find(
+    (n) =>
+      n.displayName.toLowerCase() === currentNutrient.name.toLowerCase() ||
       n.id === currentNutrient.key,
   );
 

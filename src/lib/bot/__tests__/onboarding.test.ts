@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "@/lib/db";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 import { handleOnboarding } from "../onboarding";
 
@@ -9,11 +8,17 @@ vi.mock("@/lib/db", () => ({
   db: {
     update: vi.fn(),
     insert: vi.fn(),
+    select: vi.fn(),
   },
 }));
 
-vi.mock("@/lib/supabase/admin", () => ({
-  createAdminClient: vi.fn(),
+vi.mock("@/lib/db/schema/nutrients", () => ({
+  nutrients: {
+    id: "id",
+    displayName: "display_name",
+    unit: "unit",
+    sortOrder: "sort_order",
+  },
 }));
 
 vi.mock("@/lib/db/schema/platform-accounts", () => ({
@@ -70,24 +75,17 @@ function setupDbUpdateMock() {
   vi.mocked(db.update).mockReturnValue({ set: mockSet } as never);
 }
 
+function setupDbSelectMock(results: unknown[] = []) {
+  const mockOrderBy = vi.fn().mockResolvedValue(results);
+  const mockFrom = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+  vi.mocked(db.select).mockReturnValue({ from: mockFrom } as never);
+}
+
 describe("handleOnboarding", () => {
   let mockRespond: ((text: string) => Promise<unknown>) & ReturnType<typeof vi.fn>;
-  let mockSupabase: {
-    from: ReturnType<typeof vi.fn>;
-    select: ReturnType<typeof vi.fn>;
-    eq: ReturnType<typeof vi.fn>;
-    order: ReturnType<typeof vi.fn>;
-  };
 
   beforeEach(() => {
     mockRespond = vi.fn().mockResolvedValue(undefined) as typeof mockRespond;
-    mockSupabase = {
-      from: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-    vi.mocked(createAdminClient).mockReturnValue(mockSupabase as never);
     setupDbUpdateMock();
   });
 
@@ -151,10 +149,7 @@ describe("handleOnboarding", () => {
       },
     });
 
-    mockSupabase.order.mockResolvedValue({
-      data: [{ id: "nutrient-k", display_name: "Potassium", unit: "mg" }],
-      error: null,
-    });
+    setupDbSelectMock([{ id: "nutrient-k", displayName: "Potassium", unit: "mg" }]);
 
     vi.mocked(db.insert).mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
@@ -168,8 +163,6 @@ describe("handleOnboarding", () => {
   });
 
   it("handles custom nutrient selection (option 4 then comma input)", async () => {
-    // User previously chose option "4" and got the numbered list.
-    // Now they reply with "1,3" to select nutrients from the stored list.
     const account = makeAccount({
       onboardingState: "awaiting_nutrients",
       onboardingData: {
@@ -178,7 +171,7 @@ describe("handleOnboarding", () => {
           { name: "Sodium", key: "sodium" },
           { name: "Vitamin K", key: "vitamin_k" },
         ],
-        currentIndex: -1, // indicates custom mode
+        currentIndex: -1,
       },
     });
 
@@ -186,10 +179,8 @@ describe("handleOnboarding", () => {
 
     expect(mockRespond).toHaveBeenCalledTimes(1);
     const message = mockRespond.mock.calls[0][0] as string;
-    // Should transition to awaiting_limits with the selected nutrients
     expect(message).toContain("Potassium");
     expect(message).toContain("Vitamin K");
-    // Should NOT contain Sodium (not selected)
     expect(message).not.toContain("Sodium");
   });
 
@@ -209,7 +200,6 @@ describe("handleOnboarding", () => {
 
     expect(mockRespond).toHaveBeenCalledTimes(1);
     const message = mockRespond.mock.calls[0][0] as string;
-    // Should ask user to try again with valid numbers
     expect(message).toMatch(/valid|invalid|between|range/i);
   });
 
@@ -220,7 +210,6 @@ describe("handleOnboarding", () => {
 
     expect(mockRespond).toHaveBeenCalledTimes(1);
     const message = mockRespond.mock.calls[0][0] as string;
-    // Must contain restart/reset language AND the welcome message
     expect(message).toMatch(/reset|restart|fresh/i);
     expect(message).toContain("start");
   });
@@ -243,7 +232,6 @@ describe("handleOnboarding", () => {
     expect(mockRespond).toHaveBeenCalledTimes(1);
     const message = mockRespond.mock.calls[0][0] as string;
     expect(message).toMatch(/wrong|restart|start/i);
-    // Should have called db.update to reset state
     expect(db.update).toHaveBeenCalled();
   });
 
@@ -256,10 +244,7 @@ describe("handleOnboarding", () => {
       },
     });
 
-    mockSupabase.order.mockResolvedValue({
-      data: [{ id: "nutrient-k", display_name: "Potassium", unit: "mg" }],
-      error: null,
-    });
+    setupDbSelectMock([{ id: "nutrient-k", displayName: "Potassium", unit: "mg" }]);
 
     vi.mocked(db.insert).mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),

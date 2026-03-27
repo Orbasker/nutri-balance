@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
+import { getSession } from "@/lib/auth-session";
 import type { ToolContext } from "@/lib/bot/tools";
 import {
   aiResearchFood,
@@ -14,25 +15,23 @@ import {
 } from "@/lib/bot/tools";
 import { db } from "@/lib/db";
 import { nutrients } from "@/lib/db/schema/nutrients";
-import { profiles } from "@/lib/db/schema/users";
-import { createClient } from "@/lib/supabase/server";
+import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const user = session.user;
 
   const { messages: uiMessages } = await req.json();
   const messages = await convertToModelMessages(uiMessages);
 
-  const toolCtx: ToolContext = { userId: user.id, supabase };
+  const toolCtx: ToolContext = { userId: user.id };
 
   // Fetch user profile for context
   const [profile] = await db
@@ -40,13 +39,19 @@ export async function POST(req: Request) {
     .from(profiles)
     .where(eq(profiles.id, user.id));
 
-  // Fetch user nutrient limits for system prompt context
-  const { data: userLimits } = await supabase
-    .from("user_nutrient_limits")
-    .select("nutrient_id, daily_limit, mode, range_min, range_max")
-    .eq("user_id", user.id);
+  // Fetch user nutrient limits for context
+  const userLimits = await db
+    .select({
+      nutrient_id: userNutrientLimits.nutrientId,
+      daily_limit: userNutrientLimits.dailyLimit,
+      mode: userNutrientLimits.mode,
+      range_min: userNutrientLimits.rangeMin,
+      range_max: userNutrientLimits.rangeMax,
+    })
+    .from(userNutrientLimits)
+    .where(eq(userNutrientLimits.userId, user.id));
 
-  const limitNutrientIds = (userLimits ?? []).map((l: { nutrient_id: string }) => l.nutrient_id);
+  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
   let limitsContext = "";
   if (limitNutrientIds.length > 0) {
     const nutrientRows = await db

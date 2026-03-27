@@ -1,9 +1,38 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
-import { updateSession } from "@/lib/supabase/middleware";
+import { getSessionCookie } from "better-auth/cookies";
 
-export async function proxy(request: NextRequest) {
-  return await updateSession(request);
+const protectedPaths = [
+  "/dashboard",
+  "/search",
+  "/food",
+  "/log",
+  "/settings",
+  "/review",
+  "/chat",
+  "/api/chat",
+];
+const authPaths = ["/login", "/register"];
+
+export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Auth pages are always accessible
+  if (authPaths.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next({ request });
+  }
+
+  // Check for session cookie (optimistic check — full validation happens in layouts/actions)
+  const sessionCookie = getSessionCookie(request);
+
+  // Redirect unauthenticated users away from protected routes
+  if (!sessionCookie && protectedPaths.some((p) => pathname.startsWith(p))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  return NextResponse.next({ request });
 }
 
 export const config = {

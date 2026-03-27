@@ -4,19 +4,16 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { createClient } from "@/lib/supabase/client";
+import { authClient } from "@/lib/auth-client";
 
 export function GoogleButton() {
   const [loading, setLoading] = useState(false);
 
   async function handleGoogleSignIn() {
     setLoading(true);
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    await authClient.signIn.social({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/callback`,
-      },
+      callbackURL: "/dashboard",
     });
   }
 

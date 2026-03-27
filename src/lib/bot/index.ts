@@ -18,8 +18,7 @@ import {
 } from "@/lib/bot/tools";
 import { db } from "@/lib/db";
 import { nutrients } from "@/lib/db/schema/nutrients";
-import { profiles } from "@/lib/db/schema/users";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 import { handleOnboarding } from "./onboarding";
 import { findOrCreatePlatformAccount } from "./user-linking";
@@ -46,19 +45,21 @@ export const bot = new Chat({
  * Build the system prompt for the AI, same as the web chat route.
  */
 async function buildSystemPrompt(userId: string): Promise<string> {
-  const adminSupabase = createAdminClient();
-
   const [profile] = await db
     .select({ displayName: profiles.displayName, clinicalNotes: profiles.clinicalNotes })
     .from(profiles)
     .where(eq(profiles.id, userId));
 
-  const { data: userLimits } = await adminSupabase
-    .from("user_nutrient_limits")
-    .select("nutrient_id, daily_limit, mode, range_min, range_max")
-    .eq("user_id", userId);
+  const userLimits = await db
+    .select({
+      nutrient_id: userNutrientLimits.nutrientId,
+      daily_limit: userNutrientLimits.dailyLimit,
+      mode: userNutrientLimits.mode,
+    })
+    .from(userNutrientLimits)
+    .where(eq(userNutrientLimits.userId, userId));
 
-  const limitNutrientIds = (userLimits ?? []).map((l: { nutrient_id: string }) => l.nutrient_id);
+  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
   let limitsContext = "";
   if (limitNutrientIds.length > 0) {
     const nutrientRows = await db
@@ -67,8 +68,8 @@ async function buildSystemPrompt(userId: string): Promise<string> {
       .where(inArray(nutrients.id, limitNutrientIds));
     const nutrientMap = new Map(nutrientRows.map((n) => [n.id, n]));
 
-    limitsContext = (userLimits ?? [])
-      .map((l: { nutrient_id: string; daily_limit: string; mode: string }) => {
+    limitsContext = userLimits
+      .map((l) => {
         const n = nutrientMap.get(l.nutrient_id);
         if (!n) return null;
         return `- ${n.displayName}: ${l.daily_limit} ${n.unit}/day (${l.mode} mode)`;
@@ -192,8 +193,7 @@ async function handleAiMessage(
   message: Parameters<Parameters<Chat["onNewMention"]>[0]>[1],
   userId: string,
 ) {
-  const adminSupabase = createAdminClient();
-  const toolCtx: ToolContext = { userId, supabase: adminSupabase };
+  const toolCtx: ToolContext = { userId };
 
   const systemPrompt = await buildSystemPrompt(userId);
 

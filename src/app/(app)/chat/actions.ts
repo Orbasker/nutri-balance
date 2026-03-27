@@ -2,16 +2,13 @@
 
 import { and, desc, eq } from "drizzle-orm";
 
+import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { chatConversations, chatMessages } from "@/lib/db/schema/chat";
-import { createClient } from "@/lib/supabase/server";
 
 export async function listConversations() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
+  const session = await getSession();
+  if (!session) return [];
 
   return db
     .select({
@@ -20,37 +17,33 @@ export async function listConversations() {
       updatedAt: chatConversations.updatedAt,
     })
     .from(chatConversations)
-    .where(eq(chatConversations.userId, user.id))
+    .where(eq(chatConversations.userId, session.user.id))
     .orderBy(desc(chatConversations.updatedAt));
 }
 
 export async function createConversation() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+  const session = await getSession();
+  if (!session) throw new Error("Not authenticated");
 
   const [row] = await db
     .insert(chatConversations)
-    .values({ userId: user.id })
+    .values({ userId: session.user.id })
     .returning({ id: chatConversations.id });
 
   return row.id;
 }
 
 export async function loadConversationMessages(conversationId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
+  const session = await getSession();
+  if (!session) return [];
 
   // Verify ownership
   const [convo] = await db
     .select({ id: chatConversations.id })
     .from(chatConversations)
-    .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, user.id)));
+    .where(
+      and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, session.user.id)),
+    );
 
   if (!convo) return [];
 
@@ -77,17 +70,16 @@ export async function saveMessages(
   conversationId: string,
   messages: Array<{ id: string; role: string; parts: unknown }>,
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const session = await getSession();
+  if (!session) return;
 
   // Verify ownership
   const [convo] = await db
     .select({ id: chatConversations.id, title: chatConversations.title })
     .from(chatConversations)
-    .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, user.id)));
+    .where(
+      and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, session.user.id)),
+    );
 
   if (!convo) return;
 
@@ -134,26 +126,24 @@ export async function saveMessages(
 }
 
 export async function updateConversationTitle(conversationId: string, title: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const session = await getSession();
+  if (!session) return;
 
   await db
     .update(chatConversations)
     .set({ title })
-    .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, user.id)));
+    .where(
+      and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, session.user.id)),
+    );
 }
 
 export async function deleteConversation(conversationId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return;
+  const session = await getSession();
+  if (!session) return;
 
   await db
     .delete(chatConversations)
-    .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, user.id)));
+    .where(
+      and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, session.user.id)),
+    );
 }
