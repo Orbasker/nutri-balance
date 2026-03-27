@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import { numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+import { user } from "./auth";
 import { foodVariants, foods } from "./foods";
 import { nutrients } from "./nutrients";
 
@@ -32,6 +33,10 @@ export const foodFeedback = pgTable("food_feedback", {
 
 // Relations
 export const foodFeedbackRelations = relations(foodFeedback, ({ one }) => ({
+  user: one(user, {
+    fields: [foodFeedback.userId],
+    references: [user.id],
+  }),
   food: one(foods, {
     fields: [foodFeedback.foodId],
     references: [foods.id],
