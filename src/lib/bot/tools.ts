@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { and, eq, gte, ilike, inArray, or } from "drizzle-orm";
 
 import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
@@ -305,6 +306,7 @@ export async function recordMeal(
 
   try {
     await db.insert(consumptionLogs).values({
+      id: randomUUID(),
       userId: ctx.userId,
       foodVariantId: params.foodVariantId,
       servingMeasureId: params.servingMeasureId ?? null,
