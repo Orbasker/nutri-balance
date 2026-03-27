@@ -1,27 +1,26 @@
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
-import { eq, ilike, inArray, or } from "drizzle-orm";
+import { and, eq, gte, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
+import { getSession } from "@/lib/auth-session";
 import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodAliases, foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { profiles } from "@/lib/db/schema/users";
-import { createClient } from "@/lib/supabase/server";
+import { consumptionLogs, profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const user = session.user;
 
   const { messages: uiMessages } = await req.json();
   const messages = await convertToModelMessages(uiMessages);
@@ -33,12 +32,18 @@ export async function POST(req: Request) {
     .where(eq(profiles.id, user.id));
 
   // Fetch user nutrient limits for context
-  const { data: userLimits } = await supabase
-    .from("user_nutrient_limits")
-    .select("nutrient_id, daily_limit, mode, range_min, range_max")
-    .eq("user_id", user.id);
+  const userLimits = await db
+    .select({
+      nutrient_id: userNutrientLimits.nutrientId,
+      daily_limit: userNutrientLimits.dailyLimit,
+      mode: userNutrientLimits.mode,
+      range_min: userNutrientLimits.rangeMin,
+      range_max: userNutrientLimits.rangeMax,
+    })
+    .from(userNutrientLimits)
+    .where(eq(userNutrientLimits.userId, user.id));
 
-  const limitNutrientIds = (userLimits ?? []).map((l: { nutrient_id: string }) => l.nutrient_id);
+  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
   let limitsContext = "";
   if (limitNutrientIds.length > 0) {
     const nutrientRows = await db
@@ -237,17 +242,15 @@ TOOL USAGE:
           // Get today's consumption
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const todayStr = today.toISOString();
 
-          const { data: logs } = await supabase
-            .from("consumption_logs")
-            .select("nutrient_snapshot")
-            .eq("user_id", user.id)
-            .gte("logged_at", todayStr);
+          const logs = await db
+            .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+            .from(consumptionLogs)
+            .where(and(eq(consumptionLogs.userId, user.id), gte(consumptionLogs.loggedAt, today)));
 
           const todayTotals: Record<string, number> = {};
-          for (const log of logs ?? []) {
-            const snap = log.nutrient_snapshot as Record<string, number> | null;
+          for (const log of logs) {
+            const snap = log.nutrientSnapshot as Record<string, number> | null;
             if (!snap) continue;
             for (const [nId, amt] of Object.entries(snap)) {
               todayTotals[nId] = (todayTotals[nId] ?? 0) + amt;
@@ -355,18 +358,14 @@ TOOL USAGE:
             );
           }
 
-          const { error } = await supabase.from("consumption_logs").insert({
-            user_id: user.id,
-            food_variant_id: foodVariantId,
-            serving_measure_id: servingMeasureId ?? null,
+          await db.insert(consumptionLogs).values({
+            userId: user.id,
+            foodVariantId,
+            servingMeasureId: servingMeasureId ?? null,
             quantity: String(quantity),
-            nutrient_snapshot: snapshot,
-            meal_label: mealLabel ?? null,
+            nutrientSnapshot: snapshot,
+            mealLabel: mealLabel ?? null,
           });
-
-          if (error) {
-            return { success: false, error: error.message };
-          }
 
           // Get food name for confirmation
           const [variantInfo] = await db
@@ -396,18 +395,16 @@ TOOL USAGE:
         execute: async () => {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const todayStr = today.toISOString();
 
-          const { data: logs } = await supabase
-            .from("consumption_logs")
-            .select("nutrient_snapshot, food_variant_id, quantity, meal_label, logged_at")
-            .eq("user_id", user.id)
-            .gte("logged_at", todayStr)
-            .order("logged_at", { ascending: true });
+          const logs = await db
+            .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+            .from(consumptionLogs)
+            .where(and(eq(consumptionLogs.userId, user.id), gte(consumptionLogs.loggedAt, today)))
+            .orderBy(consumptionLogs.loggedAt);
 
           const totals: Record<string, number> = {};
-          for (const log of logs ?? []) {
-            const snap = log.nutrient_snapshot as Record<string, number> | null;
+          for (const log of logs) {
+            const snap = log.nutrientSnapshot as Record<string, number> | null;
             if (!snap) continue;
             for (const [nId, amt] of Object.entries(snap)) {
               totals[nId] = (totals[nId] ?? 0) + amt;
@@ -416,7 +413,7 @@ TOOL USAGE:
 
           if (limitNutrientIds.length === 0) {
             return {
-              mealCount: (logs ?? []).length,
+              mealCount: logs.length,
               trackedNutrients: [],
               message: "No nutrient limits configured.",
             };
@@ -452,7 +449,7 @@ TOOL USAGE:
           });
 
           return {
-            mealCount: (logs ?? []).length,
+            mealCount: logs.length,
             trackedNutrients: summary,
           };
         },

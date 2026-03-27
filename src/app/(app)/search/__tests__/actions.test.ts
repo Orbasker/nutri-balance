@@ -9,12 +9,11 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-// Mock supabase server client
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn().mockResolvedValue({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: "test-user" } } }),
-    },
+// Mock auth session
+vi.mock("@/lib/auth-session", () => ({
+  getSession: vi.fn().mockResolvedValue({
+    user: { id: "test-user", email: "test@example.com", name: "Test" },
+    session: { id: "s1", token: "tok" },
   }),
 }));
 

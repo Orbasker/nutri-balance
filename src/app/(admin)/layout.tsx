@@ -1,26 +1,25 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { eq } from "drizzle-orm";
+
 import { AdminNav } from "@/components/admin/admin-nav";
 
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth-session";
+import { db } from "@/lib/db";
+import { profiles } from "@/lib/db/schema/users";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  // Check admin role from profiles table
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  const [profile] = await db
+    .select({ role: profiles.role })
+    .from(profiles)
+    .where(eq(profiles.id, session.user.id));
 
   if (profile?.role !== "admin") {
     redirect("/dashboard");

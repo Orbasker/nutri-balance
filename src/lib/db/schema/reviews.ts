@@ -9,7 +9,7 @@ export const reviews = pgTable("reviews", {
   id: uuid().defaultRandom().primaryKey(),
   entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
-  reviewerId: uuid("reviewer_id").notNull(),
+  reviewerId: text("reviewer_id").notNull(),
   status: reviewStatusEnum().notNull(),
   notes: text(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }).defaultNow().notNull(),

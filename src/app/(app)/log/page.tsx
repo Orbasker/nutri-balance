@@ -1,10 +1,14 @@
 import Link from "next/link";
 
+import { eq } from "drizzle-orm";
+
 import { DailySummary } from "@/components/log/daily-summary";
 import { DaySelector } from "@/components/log/day-selector";
 import { LogEntryList } from "@/components/log/log-entry-list";
 
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth-session";
+import { db } from "@/lib/db";
+import { profiles } from "@/lib/db/schema/users";
 
 import { getDailySummary, getLogEntries, getNutrientInfo } from "./actions";
 
@@ -21,19 +25,15 @@ export default async function LogPage({
   const todayStr = getTodayStr();
   const currentDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayStr;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
   let firstName: string | null = null;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("first_name, display_name")
-      .eq("id", user.id)
-      .single();
-    firstName = profile?.first_name ?? profile?.display_name?.split(/\s+/)[0] ?? null;
+  if (session) {
+    const [profile] = await db
+      .select({ firstName: profiles.firstName, displayName: profiles.displayName })
+      .from(profiles)
+      .where(eq(profiles.id, session.user.id));
+    firstName = profile?.firstName ?? profile?.displayName?.split(/\s+/)[0] ?? null;
   }
 
   const entries = await getLogEntries(currentDate);

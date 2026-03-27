@@ -2,15 +2,14 @@
 
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/auth-session";
 
 export type AuthState = {
   error?: string;
 } | null;
 
 export async function login(prevState: AuthState, formData: FormData): Promise<AuthState> {
-  const supabase = await createClient();
-
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
@@ -18,23 +17,23 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
     return { error: "Email and password are required." };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const result = await auth.api.signInEmail({
+    body: { email, password },
+  });
 
-  if (error) {
-    return { error: error.message };
+  if (!result) {
+    return { error: "Invalid email or password." };
   }
 
   redirect("/dashboard");
 }
 
 export async function register(prevState: AuthState, formData: FormData): Promise<AuthState> {
-  const supabase = await createClient();
-
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const firstName = (formData.get("firstName") as string) || undefined;
   const lastName = (formData.get("lastName") as string) || undefined;
-  const displayName = [firstName, lastName].filter(Boolean).join(" ") || undefined;
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || "User";
 
   if (!email || !password) {
     return { error: "Email and password are required." };
@@ -44,28 +43,30 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     return { error: "Password must be at least 6 characters." };
   }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { display_name: displayName, first_name: firstName, last_name: lastName },
-    },
-  });
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  // If email confirmation is required, the user won't have a session yet
-  if (!data.session) {
-    return { error: "Check your email for a confirmation link." };
+  try {
+    await auth.api.signUpEmail({
+      body: {
+        email,
+        password,
+        name: displayName,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Registration failed.";
+    return { error: message };
   }
 
   redirect("/dashboard");
 }
 
 export async function logout() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  const session = await getSession();
+  if (session) {
+    await auth.api.signOut({
+      headers: await import("next/headers").then((m) => m.headers()),
+    });
+  }
   redirect("/login");
 }

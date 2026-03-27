@@ -5,31 +5,15 @@ import { revalidatePath } from "next/cache";
 import type { PendingObservation } from "@/types";
 import { eq, inArray } from "drizzle-orm";
 
+import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { evidenceItems, nutrientObservations } from "@/lib/db/schema/observations";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { reviews } from "@/lib/db/schema/reviews";
 import { reviewObservationSchema } from "@/lib/validators";
 
 export type ReviewActionResult = { ok: true } | { error: string };
-
-async function requireAdmin(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  return profile?.role === "admin" ? user.id : null;
-}
 
 export async function getPendingObservations(): Promise<PendingObservation[]> {
   const adminId = await requireAdmin();
@@ -108,26 +92,20 @@ export async function reviewObservation(raw: unknown): Promise<ReviewActionResul
   const parsed = reviewObservationSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  const admin = createAdminClient();
-
   // Update the observation's review status
-  const { error: obsError } = await admin
-    .from("nutrient_observations")
-    .update({ review_status: parsed.data.status })
-    .eq("id", parsed.data.observationId);
-
-  if (obsError) return { error: obsError.message };
+  await db
+    .update(nutrientObservations)
+    .set({ reviewStatus: parsed.data.status as "approved" | "rejected" | "pending" })
+    .where(eq(nutrientObservations.id, parsed.data.observationId));
 
   // Create a review record
-  const { error: reviewError } = await admin.from("reviews").insert({
-    entity_type: "nutrient_observation",
-    entity_id: parsed.data.observationId,
-    reviewer_id: adminId,
-    status: parsed.data.status,
+  await db.insert(reviews).values({
+    entityType: "nutrient_observation",
+    entityId: parsed.data.observationId,
+    reviewerId: adminId,
+    status: parsed.data.status as "approved" | "rejected" | "pending",
     notes: parsed.data.notes || null,
   });
-
-  if (reviewError) return { error: reviewError.message };
 
   revalidatePath("/review");
   return { ok: true };

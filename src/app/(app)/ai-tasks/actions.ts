@@ -5,19 +5,16 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 
 import { processNutrientResearchTask } from "@/lib/ai/nutrient-researcher";
+import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
-import { createClient } from "@/lib/supabase/server";
 
 export type AiTaskActionResult = { ok: true; taskId: string } | { error: string };
 
 export async function createAiTask(nutrientId: string): Promise<AiTaskActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return { error: "You must be signed in." };
   }
 
@@ -38,7 +35,7 @@ export async function createAiTask(nutrientId: string): Promise<AiTaskActionResu
       targetNutrientId: nutrientId,
       status: "pending",
       createdBy: "user",
-      userId: user.id,
+      userId: session.user.id,
     })
     .returning({ id: aiTasks.id });
 
@@ -47,12 +44,9 @@ export async function createAiTask(nutrientId: string): Promise<AiTaskActionResu
 }
 
 export async function runAiTask(taskId: string): Promise<{ ok: true } | { error: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return { error: "You must be signed in." };
   }
 

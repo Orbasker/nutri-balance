@@ -24,11 +24,11 @@ import {
 
 import { aiResearchFood } from "@/lib/ai/food-search-agent";
 import { aiSearchByNutrient } from "@/lib/ai/nutrient-search-agent";
+import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { foodAliases, foodVariants, foods } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { createClient } from "@/lib/supabase/server";
 import { searchInputSchema } from "@/lib/validators";
 
 import { type SearchRow, mapSearchRows } from "./search-utils";
@@ -455,16 +455,13 @@ export async function aiSearchFood(query: string): Promise<AiSearchResult> {
     return { status: "error", message: "Search query too short." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return { status: "error", message: "You must be signed in." };
   }
 
-  const result = await aiResearchFood(parsed.data.query, user.id);
+  const result = await aiResearchFood(parsed.data.query, session.user.id);
 
   if ("error" in result) {
     return { status: "error", message: result.error };
@@ -484,16 +481,13 @@ export type AiNutrientSearchResult =
 export async function aiDiscoverFoodsByNutrient(
   nutrientId: string,
 ): Promise<AiNutrientSearchResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return { status: "error", message: "You must be signed in." };
   }
 
-  const result = await aiSearchByNutrient(nutrientId, user.id);
+  const result = await aiSearchByNutrient(nutrientId, session.user.id);
 
   if ("error" in result) {
     return { status: "error", message: result.error };
@@ -515,12 +509,9 @@ export type PdfUploadResult =
  * Extracts all food entries and adds them to the database.
  */
 export async function uploadNutrientPdf(formData: FormData): Promise<PdfUploadResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
-  if (!user) {
+  if (!session) {
     return { status: "error", message: "You must be signed in." };
   }
 
@@ -543,7 +534,7 @@ export async function uploadNutrientPdf(formData: FormData): Promise<PdfUploadRe
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  const result = await parsePdfToFoods(buffer, file.name, user.id, sourceUrl);
+  const result = await parsePdfToFoods(buffer, file.name, session.user.id, sourceUrl);
 
   if ("error" in result) {
     return { status: "error", message: result.error };
