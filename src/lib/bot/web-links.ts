@@ -11,5 +11,6 @@ export function getWebLinksBlock(appUrl?: string): string {
 - Food details: ${url}/food/{foodId}
 - Your settings: ${url}/settings
 - Daily log: ${url}/log
-- Dashboard: ${url}/dashboard`;
+- Dashboard: ${url}/dashboard
+- Link your web account: use the linkWebAccount tool (generates a personalized link)`;
 }

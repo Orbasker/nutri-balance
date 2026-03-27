@@ -4,7 +4,7 @@ import { createPostgresState } from "@chat-adapter/state-pg";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 import { stepCountIs, streamText } from "ai";
 import { Chat, toAiMessages } from "chat";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
@@ -18,10 +18,11 @@ import {
   searchFood,
 } from "@/lib/bot/tools";
 import { db } from "@/lib/db";
+import { user } from "@/lib/db/schema/auth";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
-import { handleOnboarding } from "./onboarding";
+import { generateLinkUrl } from "./account-link";
 import { findOrCreatePlatformAccount } from "./user-linking";
 import { getWebLinksBlock } from "./web-links";
 
@@ -60,11 +61,21 @@ export function getBot(): Chat {
 }
 
 /**
- * Build the system prompt for the AI, same as the web chat route.
+ * Build the system prompt for the AI. Adapts dynamically based on what user
+ * data is actually present in the database — no onboarding state to track.
  */
 async function buildSystemPrompt(userId: string): Promise<string> {
+  // Check if the user's account is linked to a web account
+  const [authUser] = await db.select({ email: user.email }).from(user).where(eq(user.id, userId));
+
+  const isLinked = authUser?.email ? !authUser.email.endsWith("@bot.nutribalance.local") : false;
+
   const [profile] = await db
-    .select({ displayName: profiles.displayName, clinicalNotes: profiles.clinicalNotes })
+    .select({
+      displayName: profiles.displayName,
+      clinicalNotes: profiles.clinicalNotes,
+      healthGoal: profiles.healthGoal,
+    })
     .from(profiles)
     .where(eq(profiles.id, userId));
 
@@ -96,22 +107,48 @@ async function buildSystemPrompt(userId: string): Promise<string> {
       .join("\n");
   }
 
+  // Detect what's missing and build setup guidance dynamically
+  const missing: string[] = [];
+  if (!profile?.displayName || profile.displayName === "Bot User") missing.push("name");
+  if (!profile?.healthGoal) missing.push("health goal or dietary concern");
+  if (userLimits.length === 0) missing.push("nutrient limits");
+
+  const accountLinkBlock = !isLinked
+    ? `\nACCOUNT LINKING:
+This user's bot account is NOT linked to a NutriBalance web account. After initial setup is complete (name + at least one nutrient limit), mention once that they can link their account to access the web dashboard, view detailed charts, and sync their data across devices. Use the linkWebAccount tool to generate a personal link. Don't push it repeatedly — one friendly mention is enough.
+`
+    : "";
+
+  const setupBlock =
+    missing.length > 0
+      ? `\nSETUP NEEDED:
+This user still needs: ${missing.join(", ")}.
+${missing.includes("name") ? "- Ask their name and save with updateProfile." : ""}
+${missing.includes("health goal or dietary concern") ? "- Ask about their health goal / dietary concern and save with updateProfile." : ""}
+${missing.includes("nutrient limits") ? "- Help them set at least one nutrient limit. Use listAvailableNutrients to find IDs, then setNutrientLimit." : ""}
+
+Be conversational and natural. If the user provides multiple pieces of info in one message (e.g. "I'm Or, I take blood thinners and need to keep Vitamin K under 10mcg"), extract ALL of it and call the relevant tools in one go. Don't force them through rigid steps — adapt to what they give you.
+`
+      : "";
+
   return `You are NutriBalance Assistant, a specialized nutrition agent for ${profile?.displayName ?? "the user"}.
 
 IMPORTANT PRIVACY RULES:
 - You ONLY discuss this specific user's dietary data, limits, and food logs. Never reference other users.
 - All data you access is private to this user, protected by row-level security.
 - If asked about other people's diets, politely decline.
-
+${setupBlock}${accountLinkBlock}
 YOUR CAPABILITIES:
 - Search for foods in the database and check their nutrient content
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
 - Record meals / log food consumption
 - Provide the user's current daily nutrient summary
 - Research foods not in the database using AI (triggers background research)
+- Update the user's profile (name, health goal) and nutrient limits
+- Link this bot account to a NutriBalance web account (use linkWebAccount)
 
 USER'S NUTRIENT LIMITS:
-${limitsContext || "No limits configured yet. Suggest they set up limits in Settings."}
+${limitsContext || "No limits configured yet."}
 
 ${profile?.clinicalNotes ? `CLINICAL NOTES:\n${profile.clinicalNotes}` : ""}
 
@@ -132,7 +169,7 @@ TOOL USAGE:
 }
 
 /**
- * Build AI tool definitions with the given context.
+ * Build all AI tool definitions — includes both nutrition tools and profile/onboarding tools.
  */
 function buildTools(toolCtx: ToolContext) {
   return {
@@ -200,11 +237,112 @@ function buildTools(toolCtx: ToolContext) {
       }),
       execute: async (params: { foodName: string }) => aiResearchFood(params, toolCtx),
     },
+
+    // --- Profile & onboarding tools ---
+    updateProfile: {
+      description:
+        "Update the user's profile. Use to set their display name, health goal, or clinical notes. Can set one or more fields at a time.",
+      inputSchema: z.object({
+        displayName: z.string().optional().describe("The user's name"),
+        healthGoal: z.string().optional().describe("Short health goal label"),
+        clinicalNotes: z
+          .string()
+          .optional()
+          .describe("Detailed clinical context or dietary concerns"),
+      }),
+      execute: async (params: {
+        displayName?: string;
+        healthGoal?: string;
+        clinicalNotes?: string;
+      }) => {
+        const updates: Record<string, string> = {};
+        if (params.displayName) updates.displayName = params.displayName;
+        if (params.healthGoal) updates.healthGoal = params.healthGoal;
+        if (params.clinicalNotes) updates.clinicalNotes = params.clinicalNotes;
+
+        if (Object.keys(updates).length > 0) {
+          await db.update(profiles).set(updates).where(eq(profiles.id, toolCtx.userId));
+        }
+        return { success: true, updated: Object.keys(updates) };
+      },
+    },
+    listAvailableNutrients: {
+      description:
+        "List all nutrients available for tracking. Returns nutrient IDs, names, and units. Use before setNutrientLimit to find the correct nutrient ID.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const rows = await db
+          .select({
+            id: nutrients.id,
+            displayName: nutrients.displayName,
+            unit: nutrients.unit,
+          })
+          .from(nutrients)
+          .orderBy(nutrients.sortOrder);
+        return { nutrients: rows };
+      },
+    },
+    setNutrientLimit: {
+      description:
+        "Set a daily nutrient limit for the user. Use the nutrient ID from listAvailableNutrients. If a limit already exists for this nutrient, it will be updated.",
+      inputSchema: z.object({
+        nutrientId: z.string().describe("The nutrient UUID from listAvailableNutrients"),
+        dailyLimit: z.number().positive().describe("The daily limit value in the nutrient's unit"),
+        mode: z
+          .enum(["strict", "stability"])
+          .optional()
+          .describe("Tracking mode: strict (hard cap) or stability (range). Defaults to strict."),
+      }),
+      execute: async (params: { nutrientId: string; dailyLimit: number; mode?: string }) => {
+        const [existing] = await db
+          .select({ id: userNutrientLimits.id })
+          .from(userNutrientLimits)
+          .where(
+            and(
+              eq(userNutrientLimits.userId, toolCtx.userId),
+              eq(userNutrientLimits.nutrientId, params.nutrientId),
+            ),
+          );
+
+        const mode = (params.mode as "strict" | "stability") ?? "strict";
+
+        if (existing) {
+          await db
+            .update(userNutrientLimits)
+            .set({ dailyLimit: String(params.dailyLimit), mode })
+            .where(eq(userNutrientLimits.id, existing.id));
+          return { success: true, action: "updated" };
+        }
+
+        await db.insert(userNutrientLimits).values({
+          userId: toolCtx.userId,
+          nutrientId: params.nutrientId,
+          dailyLimit: String(params.dailyLimit),
+          mode,
+        });
+        return { success: true, action: "created" };
+      },
+    },
+
+    linkWebAccount: {
+      description:
+        "Generate a link for the user to connect their bot account with their NutriBalance web account. This lets them access the same data on both the bot and the web dashboard. The link expires in 15 minutes.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const url = await generateLinkUrl(toolCtx.userId);
+        return {
+          success: true,
+          url,
+          message:
+            "Link generated. The user should click it to sign in and connect their accounts.",
+        };
+      },
+    },
   };
 }
 
 /**
- * Handle an AI-powered message for an onboarded user.
+ * Handle an AI-powered message.
  */
 async function handleAiMessage(
   thread: Parameters<Parameters<Chat["onNewMention"]>[0]>[0],
@@ -255,16 +393,10 @@ function registerHandlers(bot: Chat) {
   bot.onNewMention(async (thread, message) => {
     try {
       const adapterName = thread.id.split(":")[0];
+      await thread.startTyping();
       const account = await resolveAccount(adapterName, message);
 
-      if (account.onboardingState !== "complete") {
-        await handleOnboarding(account, message.text, (text: string) => thread.post(text));
-        await thread.subscribe();
-        return;
-      }
-
       await thread.subscribe();
-      await thread.startTyping();
       await handleAiMessage(thread, message, account.userId);
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling message:", error);
@@ -280,14 +412,9 @@ function registerHandlers(bot: Chat) {
   bot.onSubscribedMessage(async (thread, message) => {
     try {
       const adapterName = thread.id.split(":")[0];
+      await thread.startTyping();
       const account = await resolveAccount(adapterName, message);
 
-      if (account.onboardingState !== "complete") {
-        await handleOnboarding(account, message.text, (text: string) => thread.post(text));
-        return;
-      }
-
-      await thread.startTyping();
       await handleAiMessage(thread, message, account.userId);
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling message:", error);
