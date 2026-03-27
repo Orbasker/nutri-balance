@@ -52,6 +52,7 @@ export function getBot(): Chat {
     adapters,
     state,
     concurrency: { strategy: "queue" },
+    onLockConflict: "force",
   });
 
   // Register handlers on the freshly-created instance
