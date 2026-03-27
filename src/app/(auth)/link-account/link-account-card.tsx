@@ -110,7 +110,11 @@ export function LinkAccountCard({
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => router.push(`/login?callbackUrl=/link-account?token=${token}`)}
+                onClick={() =>
+                  router.push(
+                    `/login?callbackUrl=${encodeURIComponent(`/link-account?token=${token}`)}`,
+                  )
+                }
               >
                 Sign in with email
               </Button>
