@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { date, jsonb, numeric, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { date, jsonb, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 import { foodVariants, servingMeasures } from "./foods";
@@ -26,13 +26,11 @@ export const profiles = pgTable("profiles", {
 });
 
 export const userNutrientLimits = pgTable("user_nutrient_limits", {
-  id: text()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
+  id: uuid().defaultRandom().primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  nutrientId: text("nutrient_id")
+  nutrientId: uuid("nutrient_id")
     .notNull()
     .references(() => nutrients.id, { onDelete: "cascade" }),
   dailyLimit: numeric("daily_limit").notNull(),
@@ -42,16 +40,14 @@ export const userNutrientLimits = pgTable("user_nutrient_limits", {
 });
 
 export const consumptionLogs = pgTable("consumption_logs", {
-  id: text()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
+  id: uuid().defaultRandom().primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  foodVariantId: text("food_variant_id")
+  foodVariantId: uuid("food_variant_id")
     .notNull()
     .references(() => foodVariants.id, { onDelete: "cascade" }),
-  servingMeasureId: text("serving_measure_id").references(() => servingMeasures.id, {
+  servingMeasureId: uuid("serving_measure_id").references(() => servingMeasures.id, {
     onDelete: "set null",
   }),
   quantity: numeric().notNull(),
