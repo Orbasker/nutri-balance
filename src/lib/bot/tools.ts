@@ -40,25 +40,37 @@ function buildLimitsMap(
 }
 
 export async function searchFood(params: { query: string }, _ctx: ToolContext) {
-  const searchTerm = `%${params.query}%`;
-  const matchingFoods = await db
-    .select({
-      foodId: foods.id,
-      foodName: foods.name,
-      category: foods.category,
-      variantId: foodVariants.id,
-      preparationMethod: foodVariants.preparationMethod,
-      isDefault: foodVariants.isDefault,
-      servingId: servingMeasures.id,
-      servingLabel: servingMeasures.label,
-      gramsEquivalent: servingMeasures.gramsEquivalent,
-    })
-    .from(foods)
-    .leftJoin(foodAliases, eq(foodAliases.foodId, foods.id))
-    .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-    .leftJoin(servingMeasures, eq(servingMeasures.foodVariantId, foodVariants.id))
-    .where(or(ilike(foods.name, searchTerm), ilike(foodAliases.alias, searchTerm)))
-    .limit(30);
+  const searchTerm = `%${params.query.trim()}%`;
+  if (!params.query.trim()) {
+    return { found: false, message: "Please provide a food name to search for." };
+  }
+  let matchingFoods;
+  try {
+    matchingFoods = await db
+      .select({
+        foodId: foods.id,
+        foodName: foods.name,
+        category: foods.category,
+        variantId: foodVariants.id,
+        preparationMethod: foodVariants.preparationMethod,
+        isDefault: foodVariants.isDefault,
+        servingId: servingMeasures.id,
+        servingLabel: servingMeasures.label,
+        gramsEquivalent: servingMeasures.gramsEquivalent,
+      })
+      .from(foods)
+      .leftJoin(foodAliases, eq(foodAliases.foodId, foods.id))
+      .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
+      .leftJoin(servingMeasures, eq(servingMeasures.foodVariantId, foodVariants.id))
+      .where(or(ilike(foods.name, searchTerm), ilike(foodAliases.alias, searchTerm)))
+      .limit(30);
+  } catch (err) {
+    console.error("[searchFood] DB query failed:", err);
+    return {
+      found: false,
+      message: `Search failed: ${err instanceof Error ? err.message : "database error"}`,
+    };
+  }
 
   if (matchingFoods.length === 0) {
     return { found: false, message: `No foods found matching "${params.query}".` };
@@ -159,6 +171,19 @@ export async function checkCanIEat(
   params: { foodVariantId: string; portionGrams: number },
   ctx: ToolContext,
 ) {
+  // Validate the food variant exists first
+  const [variantInfo] = await db
+    .select({ foodName: foods.name, method: foodVariants.preparationMethod })
+    .from(foodVariants)
+    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
+    .where(eq(foodVariants.id, params.foodVariantId));
+
+  if (!variantInfo) {
+    return {
+      error: `Food variant not found (ID: ${params.foodVariantId}). Try searching again.`,
+    };
+  }
+
   const userLimits = await fetchUserLimits(ctx);
 
   // Get today's consumption
@@ -191,13 +216,6 @@ export async function checkCanIEat(
     .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
     .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId))
     .orderBy(nutrients.sortOrder);
-
-  // Get variant + food name
-  const [variantInfo] = await db
-    .select({ foodName: foods.name, method: foodVariants.preparationMethod })
-    .from(foodVariants)
-    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .where(eq(foodVariants.id, params.foodVariantId));
 
   const limitsMap = buildLimitsMap(userLimits);
 
@@ -245,6 +263,21 @@ export async function recordMeal(
   },
   ctx: ToolContext,
 ) {
+  // Validate the food variant exists before doing anything
+  const [variantInfo] = await db
+    .select({ foodName: foods.name, method: foodVariants.preparationMethod })
+    .from(foodVariants)
+    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
+    .where(eq(foodVariants.id, params.foodVariantId));
+
+  if (!variantInfo) {
+    console.error("[recordMeal] Food variant not found:", params.foodVariantId);
+    return {
+      success: false,
+      error: `Food variant not found (ID: ${params.foodVariantId}). The food may have been removed. Try searching again.`,
+    };
+  }
+
   // Calculate nutrient snapshot
   const nutrientRows = await db
     .select({
@@ -254,6 +287,14 @@ export async function recordMeal(
     .from(resolvedNutrientValues)
     .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId));
 
+  if (nutrientRows.length === 0) {
+    console.error("[recordMeal] No nutrient data for variant:", params.foodVariantId);
+    return {
+      success: false,
+      error: `No nutrient data found for "${variantInfo.foodName}". The food may need to be researched first using aiResearchFood.`,
+    };
+  }
+
   const snapshot: Record<string, number> = {};
   for (const row of nutrientRows) {
     snapshot[row.nutrientId] = calculateNutrientAmount(
@@ -262,27 +303,28 @@ export async function recordMeal(
     );
   }
 
-  await db.insert(consumptionLogs).values({
-    userId: ctx.userId,
-    foodVariantId: params.foodVariantId,
-    servingMeasureId: params.servingMeasureId ?? null,
-    quantity: String(params.quantity),
-    nutrientSnapshot: snapshot,
-    mealLabel: params.mealLabel ?? null,
-  });
-
-  // Get food name for confirmation
-  const [variantInfo] = await db
-    .select({ foodName: foods.name, method: foodVariants.preparationMethod })
-    .from(foodVariants)
-    .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .where(eq(foodVariants.id, params.foodVariantId));
+  try {
+    await db.insert(consumptionLogs).values({
+      userId: ctx.userId,
+      foodVariantId: params.foodVariantId,
+      servingMeasureId: params.servingMeasureId ?? null,
+      quantity: String(params.quantity),
+      nutrientSnapshot: snapshot,
+      mealLabel: params.mealLabel ?? null,
+    });
+  } catch (err) {
+    console.error("[recordMeal] DB insert failed:", err);
+    return {
+      success: false,
+      error: `Failed to save meal log: ${err instanceof Error ? err.message : "database error"}`,
+    };
+  }
 
   return {
     success: true,
     logged: {
-      food: variantInfo?.foodName ?? "Unknown",
-      preparationMethod: variantInfo?.method,
+      food: variantInfo.foodName,
+      preparationMethod: variantInfo.method,
       quantity: params.quantity,
       portionGrams: params.portionGrams,
       mealLabel: params.mealLabel ?? null,
@@ -350,16 +392,25 @@ export async function getDailySummary(_params: Record<string, never>, ctx: ToolC
 }
 
 export async function aiResearchFood(params: { foodName: string }, ctx: ToolContext) {
-  const { aiResearchFood: doResearch } = await import("@/lib/ai/food-search-agent");
-  const result = await doResearch(params.foodName, ctx.userId);
+  try {
+    const { aiResearchFood: doResearch } = await import("@/lib/ai/food-search-agent");
+    const result = await doResearch(params.foodName, ctx.userId);
 
-  if ("error" in result) {
-    return { success: false, error: result.error };
+    if ("error" in result) {
+      console.error("[aiResearchFood] Research failed:", result.error);
+      return { success: false, error: result.error };
+    }
+
+    return {
+      success: true,
+      foodId: result.foodId,
+      message: `Successfully researched and added "${params.foodName}" to the database. You can now search for it.`,
+    };
+  } catch (err) {
+    console.error("[aiResearchFood] Exception:", err);
+    return {
+      success: false,
+      error: `Failed to research "${params.foodName}": ${err instanceof Error ? err.message : "unknown error"}`,
+    };
   }
-
-  return {
-    success: true,
-    foodId: result.foodId,
-    message: `Successfully researched and added "${params.foodName}" to the database. You can now search for it.`,
-  };
 }

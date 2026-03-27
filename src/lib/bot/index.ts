@@ -367,6 +367,28 @@ async function handleAiMessage(
     messages: history,
     stopWhen: stepCountIs(5),
     tools: buildTools(toolCtx),
+    onStepFinish: ({ toolCalls, toolResults }) => {
+      if (toolCalls && toolCalls.length > 0) {
+        for (let i = 0; i < toolCalls.length; i++) {
+          const call = toolCalls[i];
+          const res = toolResults?.[i];
+          const isError =
+            res && typeof res === "object" && "result" in res
+              ? typeof (res as Record<string, unknown>).result === "object" &&
+                (res as Record<string, unknown>).result !== null &&
+                "success" in ((res as Record<string, unknown>).result as Record<string, unknown>) &&
+                !((res as Record<string, unknown>).result as Record<string, unknown>).success
+              : false;
+          console.log(
+            `[NutriBalance Bot] Tool: ${call.toolName}`,
+            JSON.stringify({
+              toolName: call.toolName,
+              ...(isError ? { error: res } : { ok: true }),
+            }),
+          );
+        }
+      }
+    },
   });
 
   await thread.post(result.fullStream);
