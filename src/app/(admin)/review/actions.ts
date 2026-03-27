@@ -108,5 +108,6 @@ export async function reviewObservation(raw: unknown): Promise<ReviewActionResul
   });
 
   revalidatePath("/review");
+  revalidatePath("/ai-observations");
   return { ok: true };
 }

@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { SplashScreen } from "@/components/splash-screen";
 
 const SPLASH_KEY = "nutri-balance-splash-shown";
+const emptySubscribe = () => () => {};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [splashNeeded] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !sessionStorage.getItem(SPLASH_KEY);
-  });
+  const splashNeeded = useSyncExternalStore(
+    emptySubscribe,
+    () => !sessionStorage.getItem(SPLASH_KEY),
+    () => false,
+  );
   const [splashDone, setSplashDone] = useState(false);
 
   const handleSplashComplete = () => {

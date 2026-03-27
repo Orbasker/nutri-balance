@@ -176,6 +176,20 @@ export interface PendingObservation {
   evidenceItems: EvidenceItem[];
 }
 
+export interface AiObservationItem extends PendingObservation {
+  sourceName: string | null;
+  sourceType: string | null;
+  importedAt: string | null;
+}
+
+export interface AiObservationStatusCounts {
+  all: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  needsRevision: number;
+}
+
 export interface EvidenceItem {
   id: string;
   snippet: string | null;

@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { eq } from "drizzle-orm";
-
 import { AdminNav } from "@/components/admin/admin-nav";
 
+import { isAdminEmail } from "@/lib/auth-admin";
 import { getSession } from "@/lib/auth-session";
-import { db } from "@/lib/db";
-import { profiles } from "@/lib/db/schema/users";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -16,12 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect("/login");
   }
 
-  const [profile] = await db
-    .select({ role: profiles.role })
-    .from(profiles)
-    .where(eq(profiles.id, session.user.id));
-
-  if (profile?.role !== "admin") {
+  if (!isAdminEmail(session.user.email)) {
     redirect("/dashboard");
   }
 

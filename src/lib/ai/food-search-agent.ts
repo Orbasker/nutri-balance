@@ -17,6 +17,7 @@ import {
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
 import { getLangfuse } from "@/lib/langfuse";
 import { flushLangfuse } from "@/lib/langfuse";
+import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
 const AI_SOURCE_NAME = "NutriBalance AI Agent";
 
@@ -168,6 +169,21 @@ Rules:
         input: usage.inputTokens,
         output: usage.outputTokens,
         total: usage.totalTokens,
+      },
+    });
+
+    await recordAiUsageEvent({
+      feature: "food-search",
+      operation: "generate-food-profile",
+      model: modelName,
+      userId,
+      usage: {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+      },
+      metadata: {
+        query,
       },
     });
 

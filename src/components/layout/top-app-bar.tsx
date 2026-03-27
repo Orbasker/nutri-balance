@@ -20,23 +20,19 @@ function getInitials(name: string): string {
     .join("");
 }
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 export function TopAppBar({
   displayName,
+  greeting,
+  showAdminLink = false,
   avatarColor = "blue",
 }: {
   displayName: string | null;
+  greeting: string;
+  showAdminLink?: boolean;
   avatarColor?: string;
 }) {
   const firstName = displayName?.split(/\s+/)[0] ?? null;
   const initials = displayName ? getInitials(displayName) : null;
-  const greeting = getGreeting();
   const colors = avatarColors[avatarColor] ?? avatarColors.blue;
 
   return (
@@ -62,9 +58,19 @@ export function TopAppBar({
             </div>
           </Link>
         </div>
-        <button className="text-blue-700 hover:opacity-80 transition-opacity">
-          <span className="material-symbols-outlined">notifications</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {showAdminLink && (
+            <Link
+              href="/ai-observations"
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-blue-200 px-3 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
+            >
+              Admin
+            </Link>
+          )}
+          <button className="text-blue-700 transition-opacity hover:opacity-80">
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+        </div>
       </div>
     </header>
   );

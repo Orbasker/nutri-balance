@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/schema/observations";
 import { flushLangfuse } from "@/lib/langfuse";
 import { getLangfuse } from "@/lib/langfuse";
+import { finishJobRun, recordAiUsageEvent, startJobRun } from "@/lib/ops-monitoring";
 
 const AI_SOURCE_NAME = "NutriBalance AI Researcher";
 
@@ -84,6 +85,10 @@ async function researchBatch(
   nutrientName: string,
   nutrientUnit: string,
   batch: { variantId: string; foodName: string; preparationMethod: string }[],
+  options?: {
+    aiTaskId?: string;
+    jobRunId?: string;
+  },
 ) {
   const foodList = batch.map((b) => `- ${b.foodName} (${b.preparationMethod})`).join("\n");
   const model = getModel();
@@ -124,22 +129,56 @@ Rules:
     },
   });
 
+  await recordAiUsageEvent({
+    feature: "ai-task-research",
+    operation: "nutrient-research-batch",
+    model: modelName,
+    aiTaskId: options?.aiTaskId,
+    jobRunId: options?.jobRunId,
+    usage: {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+    },
+    metadata: {
+      nutrientName,
+      batchSize: batch.length,
+    },
+  });
+
   return object.results;
 }
 
 /**
  * Process a single AI task: research a nutrient across all foods missing data.
  */
-export async function processNutrientResearchTask(taskId: string): Promise<void> {
+export async function processNutrientResearchTask(
+  taskId: string,
+  source: "cron" | "manual" = "manual",
+): Promise<void> {
   const [task] = await db.select().from(aiTasks).where(eq(aiTasks.id, taskId)).limit(1);
   if (!task || task.status !== "pending") return;
 
-  await db
-    .update(aiTasks)
-    .set({ status: "running", startedAt: new Date() })
-    .where(eq(aiTasks.id, taskId));
+  const run = await startJobRun({
+    jobKey: "nutrient-research-task",
+    source,
+    aiTaskId: taskId,
+    metadata: {
+      targetNutrientId: task.targetNutrientId,
+    },
+  });
+
+  let processed = 0;
+  let errors = 0;
+  let totalMissing = 0;
+  let nutrientName = "Unknown nutrient";
 
   try {
+    await db
+      .update(aiTasks)
+      .set({ status: "running", startedAt: new Date() })
+      .where(eq(aiTasks.id, taskId));
+
     const [nutrient] = await db
       .select()
       .from(nutrients)
@@ -147,8 +186,10 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
       .limit(1);
 
     if (!nutrient) throw new Error("Nutrient not found");
+    nutrientName = nutrient.displayName;
 
     const missing = await findMissingVariants(nutrient.id);
+    totalMissing = missing.length;
 
     if (missing.length === 0) {
       await db
@@ -160,19 +201,29 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
           resultSummary: "No missing data found — all food variants already have observations.",
         })
         .where(eq(aiTasks.id, taskId));
+
+      await finishJobRun(run, {
+        status: "completed",
+        message: `No missing data found for ${nutrient.displayName}`,
+        metadata: {
+          nutrientId: nutrient.id,
+          nutrientName: nutrient.displayName,
+        },
+      });
       return;
     }
 
     const sourceId = await getOrCreateAiSource();
-    let processed = 0;
-    let errors = 0;
     const BATCH_SIZE = 10;
 
     for (let i = 0; i < missing.length; i += BATCH_SIZE) {
       const batch = missing.slice(i, i + BATCH_SIZE);
 
       try {
-        const results = await researchBatch(nutrient.name, nutrient.unit, batch);
+        const results = await researchBatch(nutrient.name, nutrient.unit, batch, {
+          aiTaskId: taskId,
+          jobRunId: run.id,
+        });
 
         for (const result of results) {
           const variant = batch.find(
@@ -228,15 +279,40 @@ export async function processNutrientResearchTask(taskId: string): Promise<void>
         resultSummary: `Researched ${processed} food variants for ${nutrient.displayName}. ${errors} errors.`,
       })
       .where(eq(aiTasks.id, taskId));
+
+    await finishJobRun(run, {
+      status: "completed",
+      message: `Researched ${processed} variants for ${nutrient.displayName}`,
+      recordsProcessed: processed,
+      errorCount: errors,
+      metadata: {
+        nutrientId: nutrient.id,
+        nutrientName: nutrient.displayName,
+        totalMissing: missing.length,
+      },
+    });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
     await db
       .update(aiTasks)
       .set({
         status: "failed",
         completedAt: new Date(),
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage,
       })
       .where(eq(aiTasks.id, taskId));
+
+    await finishJobRun(run, {
+      status: "failed",
+      message: `Research failed for ${nutrientName}`,
+      errorMessage,
+      recordsProcessed: processed,
+      errorCount: errors,
+      metadata: {
+        totalMissing,
+      },
+    });
   } finally {
     await flushLangfuse();
   }

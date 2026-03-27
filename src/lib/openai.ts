@@ -2,6 +2,7 @@ import { type ModelMessage, generateText } from "ai";
 
 import { getModel } from "@/lib/ai-provider";
 import { getLangfuse } from "@/lib/langfuse";
+import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
 /**
  * Create a traced chat completion using the Vercel AI SDK.
@@ -56,6 +57,19 @@ export async function tracedChatCompletion({
         output: result.usage.outputTokens,
         total: result.usage.totalTokens,
       },
+    });
+
+    await recordAiUsageEvent({
+      feature: "chat-completion",
+      operation: traceName,
+      model: typeof model === "string" ? model : model.modelId,
+      userId,
+      usage: {
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        totalTokens: result.usage.totalTokens,
+      },
+      metadata,
     });
 
     return { text: result.text, trace };
