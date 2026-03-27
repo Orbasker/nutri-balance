@@ -36,6 +36,34 @@
       "when": 1774616072112,
       "tag": "0009_better_auth_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774634339279,
+      "tag": "0010_platform_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774634344961,
+      "tag": "0011_account_link_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774634434445,
+      "tag": "0012_platform_accounts_userid_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774634440286,
+      "tag": "0013_account_link_tokens_used_at",
+      "breakpoints": true
     }
   ]
 }
