@@ -176,6 +176,50 @@ export interface PendingObservation {
   evidenceItems: EvidenceItem[];
 }
 
+export interface AiObservationItem extends PendingObservation {
+  sourceName: string | null;
+  sourceType: string | null;
+  importedAt: string | null;
+}
+
+export interface AiObservationStatusCounts {
+  all: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  needsRevision: number;
+}
+
+export interface AiRunItem {
+  id: string;
+  type: "food_generation" | "nutrient_research_task" | "ai_review";
+  status: "running" | "completed" | "failed";
+  goal: string;
+  source: string;
+  itemCount: number | null;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: number | null;
+  resultSummary: string | null;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  aiTaskId: string | null;
+  foodId: string | null;
+  triggerUserId: string | null;
+  triggerUserName: string | null;
+  triggerUserEmail: string | null;
+}
+
+export interface AiRunStatusCounts {
+  all: number;
+  running: number;
+  completed: number;
+  failed: number;
+}
+
 export interface EvidenceItem {
   id: string;
   snippet: string | null;

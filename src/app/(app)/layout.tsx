@@ -6,9 +6,17 @@ import { AppShell } from "@/components/app-shell";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 
+import { isAdminEmail } from "@/lib/auth-admin";
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema/users";
+
+function getGreeting(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -32,11 +40,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     profile?.displayName ||
     session.user.name ||
     null;
+  const showAdminLink = isAdminEmail(session.user.email);
 
   return (
     <AppShell>
       <div className="min-h-screen pb-24">
-        <TopAppBar displayName={displayName} avatarColor={profile?.avatarColor ?? "blue"} />
+        <TopAppBar
+          displayName={displayName}
+          greeting={getGreeting()}
+          showAdminLink={showAdminLink}
+          avatarColor={profile?.avatarColor ?? "blue"}
+        />
         <main className="pt-20">{children}</main>
         <BottomNav />
       </div>

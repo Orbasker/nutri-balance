@@ -461,7 +461,9 @@ export async function aiSearchFood(query: string): Promise<AiSearchResult> {
     return { status: "error", message: "You must be signed in." };
   }
 
-  const result = await aiResearchFood(parsed.data.query, session.user.id);
+  const result = await aiResearchFood(parsed.data.query, session.user.id, {
+    source: "app-search",
+  });
 
   if ("error" in result) {
     return { status: "error", message: result.error };

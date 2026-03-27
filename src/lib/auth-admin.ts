@@ -1,8 +1,18 @@
-import { eq } from "drizzle-orm";
-
 import { getSession } from "@/lib/auth-session";
-import { db } from "@/lib/db";
-import { profiles } from "@/lib/db/schema/users";
+
+function getAdminEmails(): Set<string> {
+  return new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return getAdminEmails().has(email.trim().toLowerCase());
+}
 
 /**
  * Verify the current user is an admin. Returns user ID if admin, null otherwise.
@@ -11,10 +21,5 @@ export async function requireAdmin(): Promise<string | null> {
   const session = await getSession();
   if (!session) return null;
 
-  const [profile] = await db
-    .select({ role: profiles.role })
-    .from(profiles)
-    .where(eq(profiles.id, session.user.id));
-
-  return profile?.role === "admin" ? session.user.id : null;
+  return isAdminEmail(session.user.email) ? session.user.id : null;
 }

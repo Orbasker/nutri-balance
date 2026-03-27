@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { foods } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { flushLangfuse, getLangfuse } from "@/lib/langfuse";
+import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 import {
   type USDASearchResponse,
   normalizeUSDAUnit,
@@ -229,6 +230,23 @@ Report what you found — list all URLs with useful data, especially any PDFs th
         ? { input: usage.inputTokens, output: usage.outputTokens, total: usage.totalTokens }
         : undefined,
     });
+
+    if (usage) {
+      await recordAiUsageEvent({
+        feature: "explorer-agent",
+        operation: "ai-web-explore",
+        model: modelName,
+        usage: {
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          totalTokens: usage.totalTokens,
+        },
+        metadata: {
+          nutrient: nutrient.displayName,
+          toolCalls: toolResults?.length ?? 0,
+        },
+      });
+    }
 
     // Process tool results into discovered sources
     if (toolResults) {
