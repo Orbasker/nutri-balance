@@ -108,12 +108,29 @@ async function handleNew(account: PlatformAccount, respond: (text: string) => Pr
   );
 }
 
+/**
+ * Extract the actual name from natural language input.
+ * Handles patterns like "My name is X", "I'm X", "It's X", "call me X", or just "X".
+ */
+function extractName(text: string): string {
+  const trimmed = text.trim();
+  // Match common patterns and extract the name part
+  const patterns = [
+    /^(?:my name is|i'm|im|i am|it's|its|they call me|call me|you can call me)\s+(.+)$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match) return match[1].trim();
+  }
+  return trimmed;
+}
+
 async function handleAwaitingName(
   account: PlatformAccount,
   messageText: string,
   respond: (text: string) => Promise<unknown>,
 ) {
-  const name = messageText.trim();
+  const name = extractName(messageText);
 
   // Save display name to profile
   await db.update(profiles).set({ displayName: name }).where(eq(profiles.id, account.userId));

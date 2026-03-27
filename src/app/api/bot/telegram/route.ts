@@ -1,5 +1,7 @@
 import { getBot } from "@/lib/bot";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request): Promise<Response> {
   try {
     return await getBot().webhooks.telegram(request);
