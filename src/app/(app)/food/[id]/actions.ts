@@ -3,14 +3,15 @@
 import { revalidatePath } from "next/cache";
 
 import type { FoodDetail, FoodVariantDetail, NutrientDetail, NutrientImpact } from "@/types";
-import { eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 
+import { getSession } from "@/lib/auth-session";
 import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { createClient } from "@/lib/supabase/server";
+import { consumptionLogs, userNutrientLimits } from "@/lib/db/schema/users";
 import { addConsumptionLogSchema } from "@/lib/validators";
 
 export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> {
@@ -98,28 +99,20 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
 }
 
 export async function getTodaysConsumption(): Promise<Record<string, number>> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return {};
+  const session = await getSession();
+  if (!session) return {};
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString();
 
-  const { data: logs } = await supabase
-    .from("consumption_logs")
-    .select("nutrient_snapshot")
-    .eq("user_id", user.id)
-    .gte("logged_at", todayStr);
-
-  if (!logs) return {};
+  const logs = await db
+    .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+    .from(consumptionLogs)
+    .where(and(eq(consumptionLogs.userId, session.user.id), gte(consumptionLogs.loggedAt, today)));
 
   const totals: Record<string, number> = {};
   for (const log of logs) {
-    const snapshot = log.nutrient_snapshot as Record<string, number> | null;
+    const snapshot = log.nutrientSnapshot as Record<string, number> | null;
     if (!snapshot) continue;
     for (const [nutrientId, amount] of Object.entries(snapshot)) {
       totals[nutrientId] = (totals[nutrientId] ?? 0) + amount;
@@ -137,26 +130,26 @@ export async function getUserNutrientLimits(): Promise<
     rangeMax: number | null;
   }>
 > {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) return [];
 
-  if (!user) return [];
-
-  const { data } = await supabase
-    .from("user_nutrient_limits")
-    .select("nutrient_id, daily_limit, mode, range_min, range_max")
-    .eq("user_id", user.id);
-
-  if (!data) return [];
+  const data = await db
+    .select({
+      nutrientId: userNutrientLimits.nutrientId,
+      dailyLimit: userNutrientLimits.dailyLimit,
+      mode: userNutrientLimits.mode,
+      rangeMin: userNutrientLimits.rangeMin,
+      rangeMax: userNutrientLimits.rangeMax,
+    })
+    .from(userNutrientLimits)
+    .where(eq(userNutrientLimits.userId, session.user.id));
 
   return data.map((row) => ({
-    nutrientId: row.nutrient_id,
-    dailyLimit: Number(row.daily_limit),
+    nutrientId: row.nutrientId,
+    dailyLimit: Number(row.dailyLimit),
     mode: row.mode as "strict" | "stability",
-    rangeMin: row.range_min ? Number(row.range_min) : null,
-    rangeMax: row.range_max ? Number(row.range_max) : null,
+    rangeMin: row.rangeMin ? Number(row.rangeMin) : null,
+    rangeMax: row.rangeMax ? Number(row.rangeMax) : null,
   }));
 }
 
@@ -204,23 +197,17 @@ export async function addToToday(raw: unknown): Promise<AddToTodayResult> {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) return { error: "You must be signed in." };
 
-  if (!user) return { error: "You must be signed in." };
-
-  const { error } = await supabase.from("consumption_logs").insert({
-    user_id: user.id,
-    food_variant_id: parsed.data.foodVariantId,
-    serving_measure_id: parsed.data.servingMeasureId,
+  await db.insert(consumptionLogs).values({
+    userId: session.user.id,
+    foodVariantId: parsed.data.foodVariantId,
+    servingMeasureId: parsed.data.servingMeasureId,
     quantity: String(parsed.data.quantity),
-    nutrient_snapshot: parsed.data.nutrientSnapshot,
-    meal_label: parsed.data.mealLabel ?? null,
+    nutrientSnapshot: parsed.data.nutrientSnapshot,
+    mealLabel: parsed.data.mealLabel ?? null,
   });
-
-  if (error) return { error: error.message };
 
   revalidatePath(`/food`);
   revalidatePath("/dashboard");

@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
-import { date, jsonb, numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { date, jsonb, numeric, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+import { user } from "./auth";
 import { foodVariants, servingMeasures } from "./foods";
 import { nutrients } from "./nutrients";
 
@@ -9,7 +10,9 @@ export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 export const limitModeEnum = pgEnum("limit_mode", ["strict", "stability"]);
 
 export const profiles = pgTable("profiles", {
-  id: uuid().primaryKey(),
+  id: text()
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
   displayName: text("display_name"),
   firstName: text("first_name"),
   lastName: text("last_name"),
@@ -23,9 +26,13 @@ export const profiles = pgTable("profiles", {
 });
 
 export const userNutrientLimits = pgTable("user_nutrient_limits", {
-  id: uuid().defaultRandom().primaryKey(),
-  userId: uuid("user_id").notNull(),
-  nutrientId: uuid("nutrient_id")
+  id: text()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  nutrientId: text("nutrient_id")
     .notNull()
     .references(() => nutrients.id, { onDelete: "cascade" }),
   dailyLimit: numeric("daily_limit").notNull(),
@@ -35,12 +42,16 @@ export const userNutrientLimits = pgTable("user_nutrient_limits", {
 });
 
 export const consumptionLogs = pgTable("consumption_logs", {
-  id: uuid().defaultRandom().primaryKey(),
-  userId: uuid("user_id").notNull(),
-  foodVariantId: uuid("food_variant_id")
+  id: text()
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  foodVariantId: text("food_variant_id")
     .notNull()
     .references(() => foodVariants.id, { onDelete: "cascade" }),
-  servingMeasureId: uuid("serving_measure_id").references(() => servingMeasures.id, {
+  servingMeasureId: text("serving_measure_id").references(() => servingMeasures.id, {
     onDelete: "set null",
   }),
   quantity: numeric().notNull(),

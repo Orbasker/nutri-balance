@@ -5,12 +5,11 @@ import { revalidatePath } from "next/cache";
 import type { AdminFoodDetail, AdminFoodListItem, AdminFoodVariant, NutrientOption } from "@/types";
 import { count, eq } from "drizzle-orm";
 
+import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import {
   addVariantSchema,
   createFoodSchema,
@@ -22,22 +21,6 @@ import {
 } from "@/lib/validators";
 
 export type AdminActionResult = { ok: true } | { error: string };
-
-async function requireAdmin(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  return profile?.role === "admin" ? user.id : null;
-}
 
 export async function getAdminFoods(): Promise<AdminFoodListItem[]> {
   const adminId = await requireAdmin();
@@ -176,18 +159,14 @@ export async function createFood(raw: unknown): Promise<AdminActionResult & { fo
   const parsed = createFoodSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("foods")
-    .insert({
+  const [data] = await db
+    .insert(foods)
+    .values({
       name: parsed.data.name,
       category: parsed.data.category || null,
       description: parsed.data.description || null,
     })
-    .select("id")
-    .single();
-
-  if (error) return { error: error.message };
+    .returning({ id: foods.id });
 
   revalidatePath("/review");
   return { ok: true, foodId: data.id };
@@ -200,18 +179,15 @@ export async function updateFood(raw: unknown): Promise<AdminActionResult> {
   const parsed = updateFoodSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("foods")
-    .update({
+  await db
+    .update(foods)
+    .set({
       name: parsed.data.name,
       category: parsed.data.category || null,
       description: parsed.data.description || null,
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq("id", parsed.data.foodId);
-
-  if (error) return { error: error.message };
+    .where(eq(foods.id, parsed.data.foodId));
 
   revalidatePath("/review");
   return { ok: true };
@@ -224,10 +200,7 @@ export async function deleteFood(raw: unknown): Promise<AdminActionResult> {
   const parsed = deleteFoodSchema.safeParse(raw);
   if (!parsed.success) return { error: "Invalid food ID." };
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("foods").delete().eq("id", parsed.data.foodId);
-
-  if (error) return { error: error.message };
+  await db.delete(foods).where(eq(foods.id, parsed.data.foodId));
 
   revalidatePath("/review");
   return { ok: true };
@@ -240,15 +213,23 @@ export async function addVariant(raw: unknown): Promise<AdminActionResult> {
   const parsed = addVariantSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("food_variants").insert({
-    food_id: parsed.data.foodId,
-    preparation_method: parsed.data.preparationMethod,
+  await db.insert(foodVariants).values({
+    foodId: parsed.data.foodId,
+    preparationMethod: parsed.data.preparationMethod as
+      | "raw"
+      | "boiled"
+      | "steamed"
+      | "grilled"
+      | "baked"
+      | "fried"
+      | "roasted"
+      | "sauteed"
+      | "poached"
+      | "blanched"
+      | "drained",
     description: parsed.data.description || null,
-    is_default: parsed.data.isDefault,
+    isDefault: parsed.data.isDefault,
   });
-
-  if (error) return { error: error.message };
 
   revalidatePath("/review");
   return { ok: true };
@@ -261,10 +242,7 @@ export async function deleteVariant(raw: unknown): Promise<AdminActionResult> {
   const parsed = deleteVariantSchema.safeParse(raw);
   if (!parsed.success) return { error: "Invalid variant ID." };
 
-  const admin = createAdminClient();
-  const { error } = await admin.from("food_variants").delete().eq("id", parsed.data.variantId);
-
-  if (error) return { error: error.message };
+  await db.delete(foodVariants).where(eq(foodVariants.id, parsed.data.variantId));
 
   revalidatePath("/review");
   return { ok: true };
@@ -277,30 +255,22 @@ export async function saveNutrientValue(raw: unknown): Promise<AdminActionResult
   const parsed = saveNutrientValueSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  const admin = createAdminClient();
-
   if (parsed.data.resolvedId) {
-    // Update existing
-    const { error } = await admin
-      .from("resolved_nutrient_values")
-      .update({
-        value_per_100g: String(parsed.data.valuePer100g),
-        confidence_score: parsed.data.confidenceScore,
-        resolved_at: new Date().toISOString(),
+    await db
+      .update(resolvedNutrientValues)
+      .set({
+        valuePer100g: String(parsed.data.valuePer100g),
+        confidenceScore: parsed.data.confidenceScore,
+        resolvedAt: new Date(),
       })
-      .eq("id", parsed.data.resolvedId);
-
-    if (error) return { error: error.message };
+      .where(eq(resolvedNutrientValues.id, parsed.data.resolvedId));
   } else {
-    // Insert new
-    const { error } = await admin.from("resolved_nutrient_values").insert({
-      food_variant_id: parsed.data.foodVariantId,
-      nutrient_id: parsed.data.nutrientId,
-      value_per_100g: String(parsed.data.valuePer100g),
-      confidence_score: parsed.data.confidenceScore,
+    await db.insert(resolvedNutrientValues).values({
+      foodVariantId: parsed.data.foodVariantId,
+      nutrientId: parsed.data.nutrientId,
+      valuePer100g: String(parsed.data.valuePer100g),
+      confidenceScore: parsed.data.confidenceScore,
     });
-
-    if (error) return { error: error.message };
   }
 
   revalidatePath("/review");
@@ -314,13 +284,9 @@ export async function deleteNutrientValue(raw: unknown): Promise<AdminActionResu
   const parsed = deleteNutrientValueSchema.safeParse(raw);
   if (!parsed.success) return { error: "Invalid ID." };
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("resolved_nutrient_values")
-    .delete()
-    .eq("id", parsed.data.resolvedId);
-
-  if (error) return { error: error.message };
+  await db
+    .delete(resolvedNutrientValues)
+    .where(eq(resolvedNutrientValues.id, parsed.data.resolvedId));
 
   revalidatePath("/review");
   return { ok: true };

@@ -3,14 +3,15 @@
 import { revalidatePath } from "next/cache";
 
 import type { DailyNutrientTotal, LogEntry, LogEntryNutrientInfo } from "@/types";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 
+import { getSession } from "@/lib/auth-session";
 import { getNutrientStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { createClient } from "@/lib/supabase/server";
+import { consumptionLogs, userNutrientLimits } from "@/lib/db/schema/users";
 import { deleteConsumptionLogSchema, updateConsumptionLogSchema } from "@/lib/validators";
 
 export type LogActionResult = { ok: true } | { error: string };
@@ -19,33 +20,37 @@ export type LogActionResult = { ok: true } | { error: string };
  * Fetch all consumption log entries for a given date, joined with food/variant names.
  */
 export async function getLogEntries(dateStr: string): Promise<LogEntry[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) return [];
 
-  if (!user) return [];
+  const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+  const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
 
-  const startOfDay = `${dateStr}T00:00:00.000Z`;
-  const endOfDay = `${dateStr}T23:59:59.999Z`;
-
-  const { data: logs } = await supabase
-    .from("consumption_logs")
-    .select(
-      "id, food_variant_id, quantity, nutrient_snapshot, logged_at, meal_label, serving_measure_id",
+  const logs = await db
+    .select({
+      id: consumptionLogs.id,
+      foodVariantId: consumptionLogs.foodVariantId,
+      quantity: consumptionLogs.quantity,
+      nutrientSnapshot: consumptionLogs.nutrientSnapshot,
+      loggedAt: consumptionLogs.loggedAt,
+      mealLabel: consumptionLogs.mealLabel,
+      servingMeasureId: consumptionLogs.servingMeasureId,
+    })
+    .from(consumptionLogs)
+    .where(
+      and(
+        eq(consumptionLogs.userId, session.user.id),
+        gte(consumptionLogs.loggedAt, startOfDay),
+        lte(consumptionLogs.loggedAt, endOfDay),
+      ),
     )
-    .eq("user_id", user.id)
-    .gte("logged_at", startOfDay)
-    .lte("logged_at", endOfDay)
-    .order("logged_at", { ascending: true });
+    .orderBy(consumptionLogs.loggedAt);
 
-  if (!logs || logs.length === 0) return [];
+  if (logs.length === 0) return [];
 
   // Gather variant IDs and serving measure IDs for batch lookup
-  const variantIds = [...new Set(logs.map((l) => l.food_variant_id))];
-  const servingIds = [
-    ...new Set(logs.map((l) => l.serving_measure_id).filter(Boolean)),
-  ] as string[];
+  const variantIds = [...new Set(logs.map((l) => l.foodVariantId))];
+  const servingIds = [...new Set(logs.map((l) => l.servingMeasureId).filter(Boolean))] as string[];
 
   // Batch fetch variant + food info
   const variantRows = await db
@@ -71,19 +76,17 @@ export async function getLogEntries(dateStr: string): Promise<LogEntry[]> {
   }
 
   return logs.map((log) => {
-    const variant = variantMap.get(log.food_variant_id);
+    const variant = variantMap.get(log.foodVariantId);
     return {
       id: log.id,
-      foodVariantId: log.food_variant_id,
+      foodVariantId: log.foodVariantId,
       foodName: variant?.foodName ?? "Unknown food",
       preparationMethod: variant?.preparationMethod ?? "raw",
       quantity: Number(log.quantity),
-      servingLabel: log.serving_measure_id
-        ? (servingMap.get(log.serving_measure_id) ?? null)
-        : null,
-      mealLabel: log.meal_label,
-      loggedAt: log.logged_at,
-      nutrientSnapshot: (log.nutrient_snapshot as Record<string, number>) ?? {},
+      servingLabel: log.servingMeasureId ? (servingMap.get(log.servingMeasureId) ?? null) : null,
+      mealLabel: log.mealLabel,
+      loggedAt: log.loggedAt.toISOString(),
+      nutrientSnapshot: (log.nutrientSnapshot as Record<string, number>) ?? {},
     };
   });
 }
@@ -115,12 +118,8 @@ export async function getNutrientInfo(nutrientIds: string[]): Promise<LogEntryNu
  * Get user nutrient limits and compute daily totals from log entries.
  */
 export async function getDailySummary(entries: LogEntry[]): Promise<DailyNutrientTotal[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return [];
+  const session = await getSession();
+  if (!session) return [];
 
   // Aggregate totals from all entries
   const totals: Record<string, number> = {};
@@ -131,14 +130,18 @@ export async function getDailySummary(entries: LogEntry[]): Promise<DailyNutrien
   }
 
   // Fetch user limits
-  const { data: limits } = await supabase
-    .from("user_nutrient_limits")
-    .select("nutrient_id, daily_limit, mode")
-    .eq("user_id", user.id);
+  const limits = await db
+    .select({
+      nutrientId: userNutrientLimits.nutrientId,
+      dailyLimit: userNutrientLimits.dailyLimit,
+      mode: userNutrientLimits.mode,
+    })
+    .from(userNutrientLimits)
+    .where(eq(userNutrientLimits.userId, session.user.id));
 
-  if (!limits || limits.length === 0) return [];
+  if (limits.length === 0) return [];
 
-  const limitNutrientIds = limits.map((l) => l.nutrient_id);
+  const limitNutrientIds = limits.map((l) => l.nutrientId);
 
   // Fetch nutrient display info for tracked nutrients
   const nutrientRows = await db
@@ -155,14 +158,14 @@ export async function getDailySummary(entries: LogEntry[]): Promise<DailyNutrien
 
   const result: DailyNutrientTotal[] = [];
   for (const limit of limits) {
-    const nutrient = nutrientMap.get(limit.nutrient_id);
+    const nutrient = nutrientMap.get(limit.nutrientId);
     if (!nutrient) continue;
 
-    const total = totals[limit.nutrient_id] ?? 0;
-    const dailyLimit = Number(limit.daily_limit);
+    const total = totals[limit.nutrientId] ?? 0;
+    const dailyLimit = Number(limit.dailyLimit);
 
     result.push({
-      nutrientId: limit.nutrient_id,
+      nutrientId: limit.nutrientId,
       displayName: nutrient.displayName!,
       unit: nutrient.unit,
       total,
@@ -202,20 +205,14 @@ export async function deleteLogEntry(raw: unknown): Promise<LogActionResult> {
   const parsed = deleteConsumptionLogSchema.safeParse(raw);
   if (!parsed.success) return { error: "Invalid log ID." };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) return { error: "You must be signed in." };
 
-  if (!user) return { error: "You must be signed in." };
-
-  const { error } = await supabase
-    .from("consumption_logs")
-    .delete()
-    .eq("id", parsed.data.logId)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  await db
+    .delete(consumptionLogs)
+    .where(
+      and(eq(consumptionLogs.id, parsed.data.logId), eq(consumptionLogs.userId, session.user.id)),
+    );
 
   revalidatePath("/log");
   revalidatePath("/dashboard");
@@ -232,23 +229,18 @@ export async function updateLogEntry(raw: unknown): Promise<LogActionResult> {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
+  if (!session) return { error: "You must be signed in." };
 
-  if (!user) return { error: "You must be signed in." };
-
-  const { error } = await supabase
-    .from("consumption_logs")
-    .update({
+  await db
+    .update(consumptionLogs)
+    .set({
       quantity: String(parsed.data.quantity),
-      nutrient_snapshot: parsed.data.nutrientSnapshot,
+      nutrientSnapshot: parsed.data.nutrientSnapshot,
     })
-    .eq("id", parsed.data.logId)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+    .where(
+      and(eq(consumptionLogs.id, parsed.data.logId), eq(consumptionLogs.userId, session.user.id)),
+    );
 
   revalidatePath("/log");
   revalidatePath("/dashboard");

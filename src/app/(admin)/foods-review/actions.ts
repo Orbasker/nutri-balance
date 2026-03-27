@@ -5,32 +5,16 @@ import { revalidatePath } from "next/cache";
 import type { FoodFeedbackItem, FoodReviewItem } from "@/types";
 import { and, avg, count, eq, inArray, sql } from "drizzle-orm";
 
+import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodFeedback } from "@/lib/db/schema/feedback";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
 import { nutrients } from "@/lib/db/schema/nutrients";
 import { nutrientObservations } from "@/lib/db/schema/observations";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { reviews } from "@/lib/db/schema/reviews";
 import { approveFoodSchema, deleteFoodSchema, dismissFeedbackSchema } from "@/lib/validators";
 
 export type AdminActionResult = { ok: true } | { error: string };
-
-async function requireAdmin(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  return profile?.role === "admin" ? user.id : null;
-}
 
 export async function getPendingFoods(): Promise<FoodReviewItem[]> {
   const adminId = await requireAdmin();
@@ -216,23 +200,21 @@ export async function approveFood(raw: unknown): Promise<AdminActionResult> {
 
   const obsIds = pendingObs.map((o) => o.id);
 
-  // Bulk update observations to approved using Drizzle
+  // Bulk update observations to approved
   await db
     .update(nutrientObservations)
     .set({ reviewStatus: "approved" })
     .where(inArray(nutrientObservations.id, obsIds));
 
-  // Insert review records using admin client (bypasses RLS)
-  const admin = createAdminClient();
-  const reviewRecords = obsIds.map((obsId) => ({
-    entity_type: "nutrient_observation",
-    entity_id: obsId,
-    reviewer_id: adminId,
-    status: "approved",
-  }));
-
-  const { error: reviewError } = await admin.from("reviews").insert(reviewRecords);
-  if (reviewError) return { error: reviewError.message };
+  // Insert review records
+  await db.insert(reviews).values(
+    obsIds.map((obsId) => ({
+      entityType: "nutrient_observation",
+      entityId: obsId,
+      reviewerId: adminId,
+      status: "approved" as const,
+    })),
+  );
 
   revalidatePath("/foods-review");
   return { ok: true };
@@ -245,11 +227,7 @@ export async function deleteFood(raw: unknown): Promise<AdminActionResult> {
   const parsed = deleteFoodSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  // Use admin client to delete -- cascade handles all related data
-  const admin = createAdminClient();
-  const { error } = await admin.from("foods").delete().eq("id", parsed.data.foodId);
-
-  if (error) return { error: error.message };
+  await db.delete(foods).where(eq(foods.id, parsed.data.foodId));
 
   revalidatePath("/foods-review");
   return { ok: true };
@@ -308,16 +286,13 @@ export async function dismissFeedback(raw: unknown): Promise<AdminActionResult> 
   const parsed = dismissFeedbackSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("food_feedback")
-    .update({
+  await db
+    .update(foodFeedback)
+    .set({
       status: "dismissed",
-      reviewed_at: new Date().toISOString(),
+      reviewedAt: new Date(),
     })
-    .eq("id", parsed.data.feedbackId);
-
-  if (error) return { error: error.message };
+    .where(eq(foodFeedback.id, parsed.data.feedbackId));
 
   revalidatePath("/foods-review");
   return { ok: true };

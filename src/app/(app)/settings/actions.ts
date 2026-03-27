@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/lib/supabase/server";
+import { and, eq } from "drizzle-orm";
+
+import { getSession } from "@/lib/auth-session";
+import { db } from "@/lib/db";
+import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 import {
   deleteUserNutrientLimitSchema,
   saveUserNutrientLimitSchema,
@@ -18,12 +22,8 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
     return { error: first?.message ?? "Invalid input." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getSession();
+  if (!session) {
     return { error: "You must be signed in." };
   }
 
@@ -31,67 +31,58 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
   const { limitId, nutrientId } = parsed.data;
 
   if (limitId) {
-    const { error } = await supabase
-      .from("user_nutrient_limits")
-      .update({
-        daily_limit: row.daily_limit,
-        mode: row.mode,
-        range_min: row.range_min,
-        range_max: row.range_max,
+    await db
+      .update(userNutrientLimits)
+      .set({
+        dailyLimit: row.daily_limit,
+        mode: row.mode as "strict" | "stability",
+        rangeMin: row.range_min,
+        rangeMax: row.range_max,
       })
-      .eq("id", limitId)
-      .eq("user_id", user.id);
+      .where(
+        and(eq(userNutrientLimits.id, limitId), eq(userNutrientLimits.userId, session.user.id)),
+      );
 
-    if (error) {
-      return { error: error.message };
-    }
     revalidatePath("/settings");
     return { ok: true };
   }
 
-  const { data: existingRows, error: selectError } = await supabase
-    .from("user_nutrient_limits")
-    .select("id")
-    .eq("nutrient_id", nutrientId)
+  const [existing] = await db
+    .select({ id: userNutrientLimits.id })
+    .from(userNutrientLimits)
+    .where(
+      and(
+        eq(userNutrientLimits.nutrientId, nutrientId),
+        eq(userNutrientLimits.userId, session.user.id),
+      ),
+    )
     .limit(1);
 
-  if (selectError) {
-    return { error: selectError.message };
-  }
-
-  const existing = existingRows?.[0];
-
   if (existing?.id) {
-    const { error } = await supabase
-      .from("user_nutrient_limits")
-      .update({
-        daily_limit: row.daily_limit,
-        mode: row.mode,
-        range_min: row.range_min,
-        range_max: row.range_max,
+    await db
+      .update(userNutrientLimits)
+      .set({
+        dailyLimit: row.daily_limit,
+        mode: row.mode as "strict" | "stability",
+        rangeMin: row.range_min,
+        rangeMax: row.range_max,
       })
-      .eq("id", existing.id)
-      .eq("user_id", user.id);
+      .where(
+        and(eq(userNutrientLimits.id, existing.id), eq(userNutrientLimits.userId, session.user.id)),
+      );
 
-    if (error) {
-      return { error: error.message };
-    }
     revalidatePath("/settings");
     return { ok: true };
   }
 
-  const { error } = await supabase.from("user_nutrient_limits").insert({
-    user_id: user.id,
-    nutrient_id: nutrientId,
-    daily_limit: row.daily_limit,
-    mode: row.mode,
-    range_min: row.range_min,
-    range_max: row.range_max,
+  await db.insert(userNutrientLimits).values({
+    userId: session.user.id,
+    nutrientId,
+    dailyLimit: row.daily_limit,
+    mode: row.mode as "strict" | "stability",
+    rangeMin: row.range_min,
+    rangeMax: row.range_max,
   });
-
-  if (error) {
-    return { error: error.message };
-  }
 
   revalidatePath("/settings");
   return { ok: true };
@@ -105,34 +96,37 @@ export async function saveProfile(data: {
   healthGoal: string;
   avatarColor: string;
 }): Promise<NutrientLimitActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getSession();
+  if (!session) {
     return { error: "You must be signed in." };
   }
 
   const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
 
-  const { error } = await supabase.from("profiles").upsert(
-    {
-      id: user.id,
-      first_name: data.firstName || null,
-      last_name: data.lastName || null,
-      display_name: displayName,
-      date_of_birth: data.dateOfBirth,
+  await db
+    .insert(profiles)
+    .values({
+      id: session.user.id,
+      firstName: data.firstName || null,
+      lastName: data.lastName || null,
+      displayName,
+      dateOfBirth: data.dateOfBirth,
       gender: data.gender,
-      health_goal: data.healthGoal,
-      avatar_color: data.avatarColor,
-    },
-    { onConflict: "id" },
-  );
-
-  if (error) {
-    return { error: error.message };
-  }
+      healthGoal: data.healthGoal,
+      avatarColor: data.avatarColor,
+    })
+    .onConflictDoUpdate({
+      target: profiles.id,
+      set: {
+        firstName: data.firstName || null,
+        lastName: data.lastName || null,
+        displayName,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        healthGoal: data.healthGoal,
+        avatarColor: data.avatarColor,
+      },
+    });
 
   revalidatePath("/settings");
   revalidatePath("/dashboard");
@@ -142,23 +136,12 @@ export async function saveProfile(data: {
 }
 
 export async function saveMedicalNotes(notes: string): Promise<NutrientLimitActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getSession();
+  if (!session) {
     return { error: "You must be signed in." };
   }
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({ clinical_notes: notes })
-    .eq("id", user.id);
-
-  if (error) {
-    return { error: error.message };
-  }
+  await db.update(profiles).set({ clinicalNotes: notes }).where(eq(profiles.id, session.user.id));
 
   revalidatePath("/settings");
   return { ok: true };
@@ -170,24 +153,19 @@ export async function removeNutrientLimit(raw: unknown): Promise<NutrientLimitAc
     return { error: "Invalid limit id." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getSession();
+  if (!session) {
     return { error: "You must be signed in." };
   }
 
-  const { error } = await supabase
-    .from("user_nutrient_limits")
-    .delete()
-    .eq("id", parsed.data.limitId)
-    .eq("user_id", user.id);
-
-  if (error) {
-    return { error: error.message };
-  }
+  await db
+    .delete(userNutrientLimits)
+    .where(
+      and(
+        eq(userNutrientLimits.id, parsed.data.limitId),
+        eq(userNutrientLimits.userId, session.user.id),
+      ),
+    );
 
   revalidatePath("/settings");
   return { ok: true };

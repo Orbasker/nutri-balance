@@ -22,7 +22,7 @@ export const aiTasks = pgTable("ai_tasks", {
     .references(() => nutrients.id, { onDelete: "cascade" }),
   status: aiTaskStatusEnum().default("pending").notNull(),
   createdBy: aiTaskCreatorEnum("created_by").notNull(),
-  userId: uuid("user_id"),
+  userId: text("user_id"),
   progress: jsonb().$type<{ processed: number; total: number; errors: number }>(),
   resultSummary: text("result_summary"),
   errorMessage: text("error_message"),

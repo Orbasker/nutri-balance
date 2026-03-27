@@ -1,21 +1,21 @@
+import { eq } from "drizzle-orm";
+
 import { SearchInput } from "@/components/food/search-input";
 
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth-session";
+import { db } from "@/lib/db";
+import { profiles } from "@/lib/db/schema/users";
 
 export default async function SearchPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = await getSession();
 
   let firstName: string | null = null;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("first_name, display_name")
-      .eq("id", user.id)
-      .single();
-    firstName = profile?.first_name ?? profile?.display_name?.split(/\s+/)[0] ?? null;
+  if (session) {
+    const [profile] = await db
+      .select({ firstName: profiles.firstName, displayName: profiles.displayName })
+      .from(profiles)
+      .where(eq(profiles.id, session.user.id));
+    firstName = profile?.firstName ?? profile?.displayName?.split(/\s+/)[0] ?? null;
   }
 
   return (
