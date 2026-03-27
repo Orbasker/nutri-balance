@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SplashScreen } from "@/components/splash-screen";
 
 const SPLASH_KEY = "nutri-balance-splash-shown";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [splashNeeded] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !sessionStorage.getItem(SPLASH_KEY);
-  });
+  const [splashNeeded, setSplashNeeded] = useState(false);
   const [splashDone, setSplashDone] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(SPLASH_KEY)) return;
+    queueMicrotask(() => {
+      setSplashNeeded(true);
+    });
+  }, []);
 
   const handleSplashComplete = () => {
     sessionStorage.setItem(SPLASH_KEY, "1");

@@ -117,8 +117,11 @@ async function buildSystemPrompt(userId: string): Promise<string> {
   const accountLinkBlock = !isLinked
     ? `\nACCOUNT LINKING:
 This user's bot account is NOT linked to a NutriBalance web account. After initial setup is complete (name + at least one nutrient limit), mention once that they can link their account to access the web dashboard, view detailed charts, and sync their data across devices. Use the linkWebAccount tool to generate a personal link. Don't push it repeatedly — one friendly mention is enough.
+If the user asks whether their account is linked, tell them it is NOT linked yet and offer to generate a link.
 `
-    : "";
+    : `\nACCOUNT LINKING:
+This user's bot account IS linked to a NutriBalance web account. Their data syncs between the bot and web dashboard. If the user asks about linking, confirm their account is already linked.
+`;
 
   const setupBlock =
     missing.length > 0
@@ -390,6 +393,12 @@ async function handleAiMessage(
       }
     },
   });
+
+  if (thread.id.startsWith("telegram:")) {
+    const finalText = (await result.text).trim();
+    await thread.post(finalText || "Sorry, I couldn't generate a response. Please try again.");
+    return;
+  }
 
   await thread.post(result.fullStream);
 }

@@ -55,7 +55,10 @@ vi.mock("@/lib/ai-provider", () => ({
 }));
 
 vi.mock("ai", () => ({
-  streamText: vi.fn().mockReturnValue({ fullStream: (async function* () {})() }),
+  streamText: vi.fn().mockReturnValue({
+    fullStream: (async function* () {})(),
+    text: Promise.resolve("Test reply"),
+  }),
   stepCountIs: vi.fn(),
 }));
 
@@ -150,6 +153,10 @@ vi.mock("@/lib/calculations", () => ({
 vi.mock("zod", () => ({
   z: {
     object: vi.fn().mockReturnValue({}),
+    enum: vi.fn().mockReturnValue({
+      optional: vi.fn().mockReturnValue({ describe: vi.fn().mockReturnValue({}) }),
+      describe: vi.fn().mockReturnValue({}),
+    }),
     string: vi.fn().mockReturnValue({
       describe: vi.fn().mockReturnValue({}),
       optional: vi.fn().mockReturnValue({ describe: vi.fn().mockReturnValue({}) }),
@@ -184,6 +191,40 @@ describe("bot core module", () => {
 });
 
 describe("bot handler error recovery", () => {
+  it("posts finalized plain text replies for Telegram threads", async () => {
+    const { getBot } = await import("../index");
+    getBot();
+    const handler = mockBot.onNewMention.mock.calls[0][0];
+
+    const mockPost = vi.fn().mockResolvedValue(undefined);
+    const mockThread = {
+      id: "telegram:chat-789",
+      post: mockPost,
+      subscribe: vi.fn().mockResolvedValue(undefined),
+      startTyping: vi.fn().mockResolvedValue(undefined),
+      allMessages: (async function* () {})(),
+    };
+    const mockMessage = {
+      text: "hello",
+      author: { userId: "tg-123", userName: "tester", fullName: "Tester" },
+    };
+
+    vi.mocked(findOrCreatePlatformAccount).mockResolvedValueOnce({
+      id: "platform-account-1",
+      createdAt: new Date(),
+      userId: "user-123",
+      platform: "telegram",
+      platformUserId: "tg-123",
+      platformUsername: "tester",
+      onboardingState: "complete",
+      onboardingData: null,
+    });
+
+    await handler(mockThread, mockMessage);
+
+    expect(mockPost).toHaveBeenCalledWith("Test reply");
+  });
+
   it("onNewMention handler catches errors and posts error message", async () => {
     // Ensure bot is initialised so handlers are registered
     const { getBot } = await import("../index");
