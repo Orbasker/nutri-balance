@@ -1,5 +1,5 @@
 -- ============================================================
--- NUTRIENTS (6 core)
+-- SUBSTANCES (6 core)
 -- ============================================================
 
 INSERT INTO substances (id, name, unit, display_name, sort_order) VALUES
@@ -142,7 +142,7 @@ INSERT INTO serving_measures (food_variant_id, label, grams_equivalent) VALUES
   ('d0000000-0000-0000-0000-000000000022', 'per cup (244g)', '244');
 
 -- ============================================================
--- RESOLVED NUTRIENT VALUES (per 100g, USDA-sourced)
+-- RESOLVED SUBSTANCE VALUES (per 100g, USDA-sourced)
 -- Substance IDs: K=001, A=002, C=003, Potassium=004, Sodium=005, Iron=006
 -- ============================================================
 

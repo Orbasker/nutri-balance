@@ -25,6 +25,14 @@ ALTER TABLE IF EXISTS public.nutrient_observations RENAME TO substance_observati
 ALTER TABLE IF EXISTS public.resolved_nutrient_values RENAME TO resolved_substance_values;
 ALTER TABLE IF EXISTS public.user_nutrient_limits RENAME TO user_substance_limits;
 
+-- Drop old RLS policies that were attached to the nutrients table (now renamed to substances).
+-- Without this, the old permissive nutrients_select USING(true) policy would OR-combine with
+-- the new restrictive substances_select policy, defeating row-level isolation.
+DROP POLICY IF EXISTS "nutrients_select" ON substances;
+DROP POLICY IF EXISTS "nutrients_insert" ON substances;
+DROP POLICY IF EXISTS "nutrients_update" ON substances;
+DROP POLICY IF EXISTS "nutrients_delete" ON substances;
+
 DO $$
 BEGIN
   IF EXISTS (

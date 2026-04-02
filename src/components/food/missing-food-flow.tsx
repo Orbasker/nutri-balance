@@ -131,7 +131,7 @@ export function MissingFoodFlow({ onReturnToSearch }: MissingFoodFlowProps) {
             <h4 className="font-bold text-xl mb-3">Why verify?</h4>
             <p className="text-md-on-surface-variant leading-relaxed text-sm">
               Standard databases often contain user-submitted errors. Our &ldquo;Sanctuary&rdquo;
-              protocol ensures that every calorie and macrosubstance logged contributes to
+              protocol ensures that every calorie and macronutrient logged contributes to
               medical-grade tracking accuracy.
             </p>
             <div className="mt-4 flex gap-6">

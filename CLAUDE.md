@@ -65,7 +65,7 @@ src/
     db/
       index.ts       # Drizzle client (DATABASE_URL)
       schema/        # Drizzle table definitions (auth, foods, substances, observations, cooking, reviews, users)
-    calculations.ts  # Nutrient math
+    calculations.ts  # Substance math
     validators.ts    # Zod schemas
   types/
     index.ts
@@ -112,7 +112,7 @@ GOOGLE_CLIENT_SECRET=              # Google OAuth (configured in Supabase Dashbo
 - **Server Actions** for mutations (not API routes) — auth checked via `getSession()`
 - **React Server Components** by default; use `"use client"` only when needed
 - **All DB queries use Drizzle ORM** — no raw SQL or PostgREST
-- **Nutrient calculation**: `amount = (base_per_100g) × (portion_g / 100) × retention_factor`
+- **Substance calculation**: `amount = (base_per_100g) × (portion_g / 100) × retention_factor`
 - **Status thresholds**: safe (<80% limit), caution (80-100%), exceed (>100%)
 - **Confidence model**: High (90-100), Good (80-89), Moderate (60-79), Low (<60)
 
