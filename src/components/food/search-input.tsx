@@ -16,6 +16,7 @@ import type { PaginatedSearchResult, SearchFilters, SubstanceOption } from "@/ty
 
 import { cn } from "@/lib/utils";
 
+import { useAiResearchTracker } from "./ai-research-tracker-provider";
 import { SearchResults } from "./search-results";
 import { SubstancePicker } from "./substance-picker";
 
@@ -37,6 +38,9 @@ export function SearchInput() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Floating tracker state
+  const { researchTracker, setResearchTracker, resetResearchTracker } = useAiResearchTracker();
 
   // -- Food search state --
   const [query, setQuery] = useState("");
@@ -72,6 +76,7 @@ export function SearchInput() {
       setAiSuccess(null);
       setSelectedSubstance(null);
       setShowUpload(false);
+      resetResearchTracker();
 
       // Load substances on first switch to substance mode
       if (newMode === "substance" && !substancesLoaded) {
@@ -87,7 +92,7 @@ export function SearchInput() {
           .finally(() => setSubstancesLoading(false));
       }
     },
-    [mode, substancesLoaded],
+    [mode, resetResearchTracker, substancesLoaded],
   );
 
   // -- Food search handlers (existing behavior preserved) --
@@ -166,11 +171,21 @@ export function SearchInput() {
       setAiError(null);
       setAiSuccess(null);
       setFilters({});
+      setResearchTracker({
+        phase: "searching",
+        label: `Researching "${trimmed}"`,
+        detail: `Resolving substance "${trimmed}"...`,
+      });
 
       try {
         const resolved = await resolveSubstanceSearchTerm(trimmed);
         if (resolved.status === "error") {
           setAiError(resolved.message);
+          setResearchTracker({
+            phase: "error",
+            label: `Research "${trimmed}"`,
+            error: resolved.message,
+          });
           return;
         }
 
@@ -178,7 +193,16 @@ export function SearchInput() {
         addSubstanceOption(resolved.substance);
         setSelectedSubstance(resolved.substance);
 
+        setResearchTracker((prev) => ({
+          ...prev,
+          detail: `Searching USDA + AI for ${resolved.substance.displayName} foods...`,
+        }));
+
         const result = await aiDiscoverFoodsBySubstance(resolved.substance.id);
+        setResearchTracker((prev) => ({
+          ...prev,
+          detail: `Refreshing foods for ${resolved.substance.displayName}...`,
+        }));
         const refreshed = await searchBySubstanceId(
           resolved.substance.id,
           {},
@@ -188,21 +212,36 @@ export function SearchInput() {
         setHasSearched(true);
 
         if (result.status === "found") {
-          setAiSuccess(
+          const msg =
             resolved.status === "created"
               ? `${resolved.message} ${result.summary}`
-              : result.summary,
-          );
+              : result.summary;
+          setAiSuccess(msg);
+          setResearchTracker({
+            phase: "done",
+            label: `Research "${trimmed}"`,
+            result: msg,
+          });
         } else {
           setAiError(result.message);
+          setResearchTracker({
+            phase: "error",
+            label: `Research "${trimmed}"`,
+            error: result.message,
+          });
         }
       } catch {
         setAiError("Something went wrong. Please try again.");
+        setResearchTracker({
+          phase: "error",
+          label: `Research "${trimmed}"`,
+          error: "Something went wrong. Please try again.",
+        });
       } finally {
         setIsAiSearching(false);
       }
     },
-    [addSubstanceOption],
+    [addSubstanceOption, setResearchTracker],
   );
 
   // -- Shared handlers --
@@ -235,33 +274,64 @@ export function SearchInput() {
     if (!query.trim()) return;
     setIsAiSearching(true);
     setAiError(null);
+    setAiSuccess(null);
+    setResearchTracker({
+      phase: "searching",
+      label: `Research "${query}"`,
+      detail: `Looking up substance data for "${query}"...`,
+    });
 
     try {
       const result = await aiSearchFood(query);
       if (result.status === "found") {
-        setAiSuccess(`Added "${query}" with substance data - pending admin review`);
+        const msg = `Added "${query}" with substance data - pending admin review`;
+        setAiSuccess(msg);
         executeFoodSearch(query, filters, 1);
+        setResearchTracker({ phase: "done", label: `Research "${query}"`, result: msg });
       } else {
         setAiError(result.message);
+        setResearchTracker({
+          phase: "error",
+          label: `Research "${query}"`,
+          error: result.message,
+        });
       }
     } catch {
       setAiError("Something went wrong. Please try again.");
+      setResearchTracker({
+        phase: "error",
+        label: `Research "${query}"`,
+        error: "Something went wrong. Please try again.",
+      });
     } finally {
       setIsAiSearching(false);
     }
-  }, [query, filters, executeFoodSearch]);
+  }, [executeFoodSearch, filters, query, setResearchTracker]);
 
   // AI agent: discover more foods for a substance
   const handleAiSubstanceSearch = useCallback(async () => {
     const substanceId = selectedSubstance?.id ?? searchResult?.substanceId;
+    const substanceName =
+      selectedSubstance?.displayName ?? searchResult?.substanceName ?? "substance";
     if (!substanceId) return;
     setIsAiSearching(true);
     setAiError(null);
+    setAiSuccess(null);
+    setResearchTracker({
+      phase: "searching",
+      label: `Discover ${substanceName} foods`,
+      detail: `Searching USDA database + AI for ${substanceName} foods...`,
+    });
 
     try {
       const result = await aiDiscoverFoodsBySubstance(substanceId);
       if (result.status === "found") {
         setAiSuccess(result.summary);
+        setResearchTracker({
+          phase: "done",
+          label: `Discover ${substanceName} foods`,
+          result: result.summary,
+        });
         if (selectedSubstance) {
           executeSubstanceSearch(selectedSubstance.id, filters, 1);
         } else if (query.trim().length >= 2) {
@@ -269,19 +339,31 @@ export function SearchInput() {
         }
       } else {
         setAiError(result.message);
+        setResearchTracker({
+          phase: "error",
+          label: `Discover ${substanceName} foods`,
+          error: result.message,
+        });
       }
     } catch {
       setAiError("Something went wrong. Please try again.");
+      setResearchTracker({
+        phase: "error",
+        label: `Discover ${substanceName} foods`,
+        error: "Something went wrong. Please try again.",
+      });
     } finally {
       setIsAiSearching(false);
     }
   }, [
     selectedSubstance,
     searchResult?.substanceId,
+    searchResult?.substanceName,
     query,
     filters,
     executeFoodSearch,
     executeSubstanceSearch,
+    setResearchTracker,
   ]);
 
   // PDF upload handler
@@ -355,11 +437,9 @@ export function SearchInput() {
     }
   }, [isSubstanceSearch, handleAiSubstanceSearch, handleAiFoodSearch]);
 
-  const showResults =
-    !isPending && !isAiSearching && hasSearched && searchResult && searchResult.totalCount > 0;
+  const showResults = !isPending && hasSearched && searchResult && searchResult.totalCount > 0;
   const showFilteredEmpty =
     !isPending &&
-    !isAiSearching &&
     hasSearched &&
     searchResult &&
     searchResult.totalCount === 0 &&
@@ -527,25 +607,25 @@ export function SearchInput() {
         </div>
       )}
 
-      {/* AI Searching State */}
-      {isAiSearching && (
-        <div className="text-center py-12">
-          <div className="inline-flex flex-col items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-md-primary to-md-tertiary flex items-center justify-center">
-              <span className="material-symbols-outlined text-white animate-pulse">neurology</span>
+      {/* Non-blocking AI research hint */}
+      {isAiSearching && !showResults && !showFilteredEmpty && (
+        <div className="rounded-3xl border border-md-primary/15 bg-gradient-to-br from-md-primary/5 via-white to-md-tertiary/8 p-6 shadow-[0_18px_50px_rgba(0,68,147,0.08)]">
+          <div className="flex items-start gap-4">
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-md-primary to-md-tertiary text-white shadow-lg">
+              <span className="absolute inset-0 rounded-2xl bg-md-primary/25 animate-ping" />
+              <span className="material-symbols-outlined relative text-[22px] animate-pulse">
+                neurology
+              </span>
             </div>
-            <div>
-              <p className="text-md-on-surface font-bold">AI Agent Researching</p>
-              <p className="text-md-on-surface-variant text-sm mt-1">
-                {isSubstanceSearch
-                  ? `Searching USDA database + AI for ${selectedSubstance?.displayName ?? searchResult?.substanceName} foods...`
-                  : `Looking up substance data for \u201c${query}\u201d...`}
+            <div className="min-w-0">
+              <p className="font-bold text-md-on-surface">AI research is running</p>
+              <p className="mt-1 text-sm text-md-on-surface-variant">
+                {researchTracker.detail ??
+                  "We are checking USDA data and research sources for you."}
               </p>
-              {isSubstanceSearch && (
-                <p className="text-md-outline text-xs mt-2">
-                  Fetching from USDA FoodData Central API - this may add 30-50+ foods
-                </p>
-              )}
+              <p className="mt-2 text-xs font-medium text-md-primary">
+                Use the floating tracker in the corner to follow progress and open the result.
+              </p>
             </div>
           </div>
         </div>
