@@ -7,20 +7,7 @@ import type {
   SearchFilters,
   SubstanceOption,
 } from "@/types";
-import {
-  and,
-  asc,
-  count,
-  countDistinct,
-  desc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  lte,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, asc, countDistinct, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 
 import { aiResearchFood } from "@/lib/ai/food-search-agent";
 import { aiSearchBySubstance } from "@/lib/ai/substance-search-agent";
@@ -31,9 +18,17 @@ import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
 import { substances } from "@/lib/db/schema/substances";
 import { searchInputSchema } from "@/lib/validators";
 
+import {
+  dedupeSearchTerms,
+  escapeLikePattern,
+  generateAiSearchAssist,
+  getSimilarityThreshold,
+  normalizeSearchTerm,
+} from "./search-assist";
 import { type SearchRow, mapSearchRows } from "./search-utils";
 
 const DEFAULT_PAGE_SIZE = 20;
+const MAX_SEARCH_MATCHES = 120;
 
 function createSubstanceSlug(value: string) {
   return value
@@ -117,6 +112,131 @@ async function findMatchingSubstance(query: string) {
         n.name.toLowerCase().replace(/_/g, " ") === term,
     ) ?? null
   );
+}
+
+type RankedFoodMatch = {
+  id: string;
+  relevance: number;
+};
+
+function orderFoodsByRelevance(
+  matches: RankedFoodMatch[],
+  candidateIds?: Iterable<string>,
+): string[] {
+  const relevanceById = new Map<string, number>();
+
+  for (const match of matches) {
+    const current = relevanceById.get(match.id) ?? Number.NEGATIVE_INFINITY;
+    if (match.relevance > current) {
+      relevanceById.set(match.id, match.relevance);
+    }
+  }
+
+  const rankedIds = [...relevanceById.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([id]) => id);
+
+  if (!candidateIds) {
+    return rankedIds;
+  }
+
+  const candidateSet = new Set(candidateIds);
+  return rankedIds.filter((id) => candidateSet.has(id));
+}
+
+async function searchFoodsForTerm(term: string): Promise<RankedFoodMatch[]> {
+  const normalizedTerm = normalizeSearchTerm(term);
+
+  if (normalizedTerm.length < 2) {
+    return [];
+  }
+
+  const likePattern = `%${escapeLikePattern(normalizedTerm.toLowerCase())}%`;
+  const similarityThreshold = getSimilarityThreshold(normalizedTerm);
+  const nameSimilarity = sql<number>`extensions.similarity(lower(${foods.name}), lower(${normalizedTerm}))`;
+  const aliasSimilarity = sql<number>`extensions.similarity(lower(${foodAliases.alias}), lower(${normalizedTerm}))`;
+  const relevance = sql<number>`GREATEST(
+    CASE WHEN lower(${foods.name}) = lower(${normalizedTerm}) THEN 1000 ELSE 0 END,
+    COALESCE(MAX(CASE WHEN lower(${foodAliases.alias}) = lower(${normalizedTerm}) THEN 980 ELSE 0 END), 0),
+    CASE WHEN lower(${foods.name}) LIKE ${likePattern} ESCAPE '\\' THEN 720 ELSE 0 END,
+    COALESCE(MAX(CASE WHEN lower(${foodAliases.alias}) LIKE ${likePattern} ESCAPE '\\' THEN 680 ELSE 0 END), 0),
+    ${nameSimilarity} * 100,
+    COALESCE(MAX(${aliasSimilarity} * 95), 0)
+  )`;
+
+  const rows = await db
+    .select({
+      id: foods.id,
+      relevance,
+    })
+    .from(foods)
+    .leftJoin(foodAliases, eq(foodAliases.foodId, foods.id))
+    .where(
+      or(
+        sql`lower(${foods.name}) LIKE ${likePattern} ESCAPE '\\'`,
+        sql`lower(${foodAliases.alias}) LIKE ${likePattern} ESCAPE '\\'`,
+        sql`${nameSimilarity} >= ${similarityThreshold}`,
+        sql`${aliasSimilarity} >= ${similarityThreshold}`,
+      ),
+    )
+    .groupBy(foods.id, foods.name)
+    .orderBy(desc(relevance), asc(foods.name))
+    .limit(MAX_SEARCH_MATCHES);
+
+  return rows.map((row) => ({
+    id: row.id,
+    relevance: Number(row.relevance),
+  }));
+}
+
+async function findMatchingFoodIds(query: string, extraTerms: string[] = []) {
+  const searchTerms = dedupeSearchTerms([query, ...extraTerms]);
+  const matchSets = await Promise.all(searchTerms.map((term) => searchFoodsForTerm(term)));
+
+  return orderFoodsByRelevance(matchSets.flat()).slice(0, MAX_SEARCH_MATCHES);
+}
+
+async function findSearchSubstance(query: string) {
+  const exactMatch = await findMatchingSubstance(query);
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const normalizedTerm = normalizeSearchTerm(query);
+  const likePattern = `%${escapeLikePattern(normalizedTerm.toLowerCase())}%`;
+  const similarityThreshold = getSimilarityThreshold(normalizedTerm);
+  const displayNameSimilarity = sql<number>`extensions.similarity(lower(${substances.displayName}), lower(${normalizedTerm}))`;
+  const internalNameSimilarity = sql<number>`extensions.similarity(replace(lower(${substances.name}), '_', ' '), lower(${normalizedTerm}))`;
+  const relevance = sql<number>`GREATEST(
+    CASE WHEN lower(${substances.displayName}) = lower(${normalizedTerm}) THEN 1000 ELSE 0 END,
+    CASE WHEN replace(lower(${substances.name}), '_', ' ') = lower(${normalizedTerm}) THEN 980 ELSE 0 END,
+    CASE WHEN lower(${substances.displayName}) LIKE ${likePattern} ESCAPE '\\' THEN 720 ELSE 0 END,
+    CASE WHEN replace(lower(${substances.name}), '_', ' ') LIKE ${likePattern} ESCAPE '\\' THEN 680 ELSE 0 END,
+    ${displayNameSimilarity} * 100,
+    ${internalNameSimilarity} * 95
+  )`;
+
+  const [match] = await db
+    .select({
+      id: substances.id,
+      name: substances.name,
+      displayName: substances.displayName,
+      unit: substances.unit,
+      relevance,
+    })
+    .from(substances)
+    .where(
+      or(
+        sql`lower(${substances.displayName}) LIKE ${likePattern} ESCAPE '\\'`,
+        sql`replace(lower(${substances.name}), '_', ' ') LIKE ${likePattern} ESCAPE '\\'`,
+        sql`${displayNameSimilarity} >= ${similarityThreshold}`,
+        sql`${internalNameSimilarity} >= ${similarityThreshold}`,
+      ),
+    )
+    .orderBy(desc(relevance), asc(substances.sortOrder))
+    .limit(1);
+
+  return match ?? null;
 }
 
 /** Confidence score ranges by label */
@@ -262,18 +382,9 @@ async function searchByName(
   query: string,
   filters: SearchFilters,
   pagination: PaginationParams,
+  extraTerms: string[] = [],
 ): Promise<{ results: FoodSearchResult[]; totalCount: number; categories: string[] }> {
-  const searchTerm = `%${query}%`;
-
-  // Get all matching food IDs by name/alias
-  const matchingRows = await db
-    .select({ id: foods.id })
-    .from(foods)
-    .leftJoin(foodAliases, eq(foodAliases.foodId, foods.id))
-    .where(or(ilike(foods.name, searchTerm), ilike(foodAliases.alias, searchTerm)))
-    .groupBy(foods.id);
-
-  const allMatchingIds = matchingRows.map((r) => r.id);
+  const allMatchingIds = await findMatchingFoodIds(query, extraTerms);
   if (allMatchingIds.length === 0) {
     return { results: [], totalCount: 0, categories: [] };
   }
@@ -288,57 +399,33 @@ async function searchByName(
   // For filters that need joins (confidence, AI), we need the full join
   const needsSubstanceJoin = filters.confidenceLevel || filters.aiGeneratedOnly;
 
-  let totalCount: number;
+  let filteredIds: string[];
   if (needsSubstanceJoin) {
-    const [countResult] = await db
-      .select({ total: countDistinct(foods.id) })
+    const rows = await db
+      .select({ id: foods.id })
       .from(foods)
       .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
       .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
       .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
       .where(and(...baseConditions));
-    totalCount = Number(countResult?.total ?? 0);
+    const filteredIdSet = new Set(rows.map((row) => row.id));
+    filteredIds = allMatchingIds.filter((id) => filteredIdSet.has(id));
   } else {
     const countConditions = [inArray(foods.id, allMatchingIds)];
     if (filters.category) {
       countConditions.push(eq(foods.category, filters.category));
     }
-    const [countResult] = await db
-      .select({ total: count() })
+    const rows = await db
+      .select({ id: foods.id })
       .from(foods)
       .where(and(...countConditions));
-    totalCount = Number(countResult?.total ?? 0);
+    const filteredIdSet = new Set(rows.map((row) => row.id));
+    filteredIds = allMatchingIds.filter((id) => filteredIdSet.has(id));
   }
 
-  // Get paginated food IDs
-  let paginatedIdRows;
-  if (needsSubstanceJoin) {
-    paginatedIdRows = await db
-      .select({ id: foods.id })
-      .from(foods)
-      .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-      .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
-      .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
-      .where(and(...baseConditions))
-      .groupBy(foods.id)
-      .orderBy(foods.name)
-      .limit(pagination.pageSize)
-      .offset((pagination.page - 1) * pagination.pageSize);
-  } else {
-    const paginateConditions = [inArray(foods.id, allMatchingIds)];
-    if (filters.category) {
-      paginateConditions.push(eq(foods.category, filters.category));
-    }
-    paginatedIdRows = await db
-      .select({ id: foods.id })
-      .from(foods)
-      .where(and(...paginateConditions))
-      .orderBy(foods.name)
-      .limit(pagination.pageSize)
-      .offset((pagination.page - 1) * pagination.pageSize);
-  }
-
-  const foodIds = paginatedIdRows.map((r) => r.id);
+  const totalCount = filteredIds.length;
+  const startIndex = (pagination.page - 1) * pagination.pageSize;
+  const foodIds = filteredIds.slice(startIndex, startIndex + pagination.pageSize);
   if (foodIds.length === 0) {
     return { results: [], totalCount, categories };
   }
@@ -366,8 +453,13 @@ async function searchByName(
     .where(inArray(foods.id, foodIds))
     .orderBy(foods.name);
 
+  const orderIndex = new Map(foodIds.map((id, index) => [id, index]));
+  const results = mapSearchRows(rows as SearchRow[]).sort(
+    (left, right) => (orderIndex.get(left.id) ?? 0) - (orderIndex.get(right.id) ?? 0),
+  );
+
   return {
-    results: mapSearchRows(rows as SearchRow[]),
+    results,
     totalCount,
     categories,
   };
@@ -547,20 +639,79 @@ export async function searchFoods(
     };
   }
 
-  // Standard food name/alias search
-  const { results, totalCount, categories } = await searchByName(
+  const directFoodSearch = await searchByName(parsed.data.query, filters, pagination);
+  if (directFoodSearch.totalCount > 0) {
+    return {
+      results: directFoodSearch.results,
+      totalCount: directFoodSearch.totalCount,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalPages: Math.ceil(directFoodSearch.totalCount / pagination.pageSize),
+      searchType: "food",
+      availableCategories: directFoodSearch.categories,
+    };
+  }
+
+  const fuzzySubstanceMatch = await findSearchSubstance(parsed.data.query);
+  if (fuzzySubstanceMatch) {
+    const { results, totalCount, categories } = await searchBySubstance(
+      fuzzySubstanceMatch.id,
+      filters,
+      pagination,
+    );
+    return {
+      results,
+      totalCount,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalPages: Math.ceil(totalCount / pagination.pageSize),
+      searchType: "substance",
+      substanceName: fuzzySubstanceMatch.displayName,
+      substanceId: fuzzySubstanceMatch.id,
+      availableCategories: categories,
+    };
+  }
+
+  const aiSearchAssist = await generateAiSearchAssist(parsed.data.query);
+
+  for (const term of aiSearchAssist.substanceTerms) {
+    const aiSubstanceMatch = await findSearchSubstance(term);
+    if (!aiSubstanceMatch) {
+      continue;
+    }
+
+    const { results, totalCount, categories } = await searchBySubstance(
+      aiSubstanceMatch.id,
+      filters,
+      pagination,
+    );
+    return {
+      results,
+      totalCount,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      totalPages: Math.ceil(totalCount / pagination.pageSize),
+      searchType: "substance",
+      substanceName: aiSubstanceMatch.displayName,
+      substanceId: aiSubstanceMatch.id,
+      availableCategories: categories,
+    };
+  }
+
+  const assistedFoodSearch = await searchByName(
     parsed.data.query,
     filters,
     pagination,
+    aiSearchAssist.foodTerms,
   );
   return {
-    results,
-    totalCount,
+    results: assistedFoodSearch.results,
+    totalCount: assistedFoodSearch.totalCount,
     page: pagination.page,
     pageSize: pagination.pageSize,
-    totalPages: Math.ceil(totalCount / pagination.pageSize),
+    totalPages: Math.ceil(assistedFoodSearch.totalCount / pagination.pageSize),
     searchType: "food",
-    availableCategories: categories,
+    availableCategories: assistedFoodSearch.categories,
   };
 }
 

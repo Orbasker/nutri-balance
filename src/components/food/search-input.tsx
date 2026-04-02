@@ -496,7 +496,7 @@ export function SearchInput() {
             value={query}
             onChange={(e) => handleChange(e.target.value)}
             className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-28 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
-            placeholder="Search foods, ingredients, or substances..."
+            placeholder="Search foods or substances in English or Hebrew..."
           />
           <div className="absolute inset-y-0 right-4 flex items-center gap-1">
             {hasQuery && (
