@@ -15,7 +15,7 @@ type PlatformAccount = typeof platformAccounts.$inferSelect;
  * 3. Creates a platform_accounts row with onboarding_state='new'
  */
 export async function findOrCreatePlatformAccount(
-  platform: "telegram" | "discord",
+  platform: "telegram" | "discord" | "whatsapp",
   platformUserId: string,
   platformUsername: string | null,
 ): Promise<PlatformAccount> {

@@ -2,6 +2,7 @@ import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { createPostgresState } from "@chat-adapter/state-pg";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
+import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
 import { stepCountIs, streamText } from "ai";
 import { Chat, toAiMessages } from "chat";
 import { and, eq, inArray } from "drizzle-orm";
@@ -23,6 +24,17 @@ import { nutrients } from "@/lib/db/schema/nutrients";
 import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 import { generateLinkUrl } from "./account-link";
+import {
+  buildClarifyResearchReply,
+  buildRequestFailureReply,
+  buildResearchOutcomeReply,
+  buildToolOnlyReply,
+  containsHebrew,
+  extractFoodResearchRequest,
+  findMostRecentResearchFood,
+  hasRecentResearchContext,
+  isResearchConfirmation,
+} from "./message-recovery";
 import { findOrCreatePlatformAccount } from "./user-linking";
 import { getWebLinksBlock } from "./web-links";
 
@@ -69,6 +81,10 @@ export function getBot(): Chat {
 
   if (process.env.DISCORD_BOT_TOKEN) {
     adapters.discord = createDiscordAdapter();
+  }
+
+  if (process.env.WHATSAPP_ACCESS_TOKEN) {
+    adapters.whatsapp = createWhatsAppAdapter();
   }
 
   const hasPostgresState = Boolean(process.env.POSTGRES_URL) || Boolean(process.env.DATABASE_URL);
@@ -159,7 +175,27 @@ ${missing.includes("nutrient limits") ? "- Help them set at least one nutrient l
 
 Be conversational and natural. If the user provides multiple pieces of info in one message (e.g. "I'm Or, I take blood thinners and need to keep Vitamin K under 10mcg"), extract ALL of it and call the relevant tools in one go. Don't force them through rigid steps — adapt to what they give you.
 `
-      : "";
+      : `\nRETURNING USER:
+This user's profile is fully set up${isLinked ? " and their account is linked" : ""}. Do NOT ask onboarding questions (name, health goals, or what nutrients to track) — you already have all of this information in context.
+When they greet you or say hi, respond warmly by name and offer to help with something specific — like checking if they can eat something, logging a meal, or reviewing their daily summary. Be proactive: if they have nutrient limits configured, you can mention you're ready to help them track today's intake.
+`;
+
+  // Build a user profile summary so the AI knows who it's talking to
+  const profileLines: string[] = [];
+  if (profile?.displayName && profile.displayName !== "Bot User") {
+    profileLines.push(`- Name: ${profile.displayName}`);
+  }
+  if (profile?.healthGoal) {
+    profileLines.push(`- Health goal: ${profile.healthGoal}`);
+  }
+  if (profile?.clinicalNotes) {
+    profileLines.push(`- Clinical notes: ${profile.clinicalNotes}`);
+  }
+  if (isLinked) {
+    profileLines.push("- Account: linked to web dashboard (data syncs automatically)");
+  }
+
+  const profileBlock = profileLines.length > 0 ? `\nUSER PROFILE:\n${profileLines.join("\n")}` : "";
 
   return `You are NutriBalance Assistant, a specialized nutrition agent for ${profile?.displayName ?? "the user"}.
 
@@ -167,26 +203,26 @@ IMPORTANT PRIVACY RULES:
 - You ONLY discuss this specific user's dietary data, limits, and food logs. Never reference other users.
 - All data you access is private to this user, protected by row-level security.
 - If asked about other people's diets, politely decline.
+${profileBlock}
 ${setupBlock}${accountLinkBlock}
 YOUR CAPABILITIES:
 - Search for foods in the database and check their nutrient content
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
 - Record meals / log food consumption
 - Provide the user's current daily nutrient summary
-- Research foods not in the database using AI (triggers background research)
+- Research foods not in the database using AI and return usable nutrient data in the same reply
 - Update the user's profile (name, health goal) and nutrient limits
 - Link this bot account to a NutriBalance web account (use linkWebAccount)
 
 USER'S NUTRIENT LIMITS:
 ${limitsContext || "No limits configured yet."}
 
-${profile?.clinicalNotes ? `CLINICAL NOTES:\n${profile.clinicalNotes}` : ""}
-
 ${getWebLinksBlock()}
 
 RESPONSE STYLE:
 - CRITICAL: You MUST always write a text response after using tools. Never end your turn with only tool calls. Summarize what you found and answer the user's question in plain language.
-- Be concise and direct
+- Be concise and direct. Use the user's name when greeting them.
+- Never ask the user for information you already have in context (their name, health goal, nutrient limits). Reference it naturally instead.
 - When checking if the user can eat something, always show: current intake, what the food would add, new total, and the limit
 - Use status indicators: safe (<80% of limit), caution (80-100%), exceed (>100%)
 - When recording a meal, confirm what was logged with the nutrient impact
@@ -261,7 +297,7 @@ function buildTools(toolCtx: ToolContext) {
     },
     aiResearchFood: {
       description:
-        "Research a food not found in the database using AI. This triggers a background research process that creates the food with AI-generated nutrient estimates.",
+        "Research a food not found in the database using AI. Returns the researched food and default-variant nutrient data so you can answer immediately in the same turn.",
       inputSchema: z.object({
         foodName: z.string().describe("The name of the food to research"),
       }),
@@ -384,6 +420,7 @@ async function handleAiMessage(
 ) {
   const toolCtx: ToolContext = { userId };
   const { isLinked } = await getAccountLinkStatus(userId);
+  const userText = typeof message.text === "string" ? message.text : "";
   const systemPrompt = await buildSystemPrompt(userId, isLinked);
 
   // Build conversation history from thread
@@ -391,7 +428,14 @@ async function handleAiMessage(
   for await (const msg of thread.allMessages) {
     messages.push(msg);
   }
+
+  if (await tryHandleDeterministicResearch(thread, message, messages, toolCtx)) {
+    return;
+  }
+
   const history = await toAiMessages(messages);
+  let lastToolCall: unknown = null;
+  let lastToolResult: unknown = null;
 
   const result = streamText({
     model: getModel(),
@@ -401,6 +445,9 @@ async function handleAiMessage(
     tools: buildTools(toolCtx),
     onStepFinish: ({ toolCalls, toolResults }) => {
       if (toolCalls && toolCalls.length > 0) {
+        lastToolCall = toolCalls[toolCalls.length - 1];
+        lastToolResult = toolResults?.[toolResults.length - 1] ?? null;
+
         for (let i = 0; i < toolCalls.length; i++) {
           const call = toolCalls[i];
           const res = toolResults?.[i];
@@ -417,13 +464,89 @@ async function handleAiMessage(
     },
   });
 
-  if (thread.id.startsWith("telegram:")) {
+  if (thread.id.startsWith("telegram:") || thread.id.startsWith("whatsapp:")) {
     const finalText = (await result.text).trim();
-    await thread.post(finalText || "Sorry, I couldn't generate a response. Please try again.");
+    const fallbackText =
+      buildToolOnlyReply({
+        userText,
+        toolCall: lastToolCall,
+        toolResult: lastToolResult,
+      }) ?? buildRequestFailureReply(userText);
+
+    await thread.post(finalText || fallbackText);
     return;
   }
 
   await thread.post(result.fullStream);
+}
+
+async function tryHandleDeterministicResearch(
+  thread: Parameters<Parameters<Chat["onNewMention"]>[0]>[0],
+  message: Parameters<Parameters<Chat["onNewMention"]>[0]>[1],
+  messages: unknown[],
+  toolCtx: ToolContext,
+): Promise<boolean> {
+  const userText = typeof message.text === "string" ? message.text : "";
+  if (!userText.trim()) {
+    return false;
+  }
+
+  const prefersHebrew = containsHebrew(userText);
+  let foodName = extractFoodResearchRequest(userText);
+
+  if (!foodName && isResearchConfirmation(userText)) {
+    const previousMessages = messages.slice(0, -1);
+    if (!hasRecentResearchContext(previousMessages)) {
+      return false;
+    }
+
+    foodName = findMostRecentResearchFood(previousMessages);
+    if (!foodName) {
+      await thread.post(buildClarifyResearchReply(prefersHebrew));
+      return true;
+    }
+  }
+
+  if (!foodName) {
+    return false;
+  }
+
+  const existing = await searchFood({ query: foodName }, toolCtx);
+  if (
+    "found" in existing &&
+    existing.found &&
+    Array.isArray(existing.foods) &&
+    existing.foods.length > 0
+  ) {
+    const matchingFood = existing.foods[0];
+    const defaultVariant =
+      matchingFood.variants.find((variant) => variant.isDefault) ?? matchingFood.variants[0];
+
+    if (!defaultVariant) {
+      await thread.post(buildRequestFailureReply(userText));
+      return true;
+    }
+
+    const nutrientsResult = await getFoodNutrients({ foodVariantId: defaultVariant.id }, toolCtx);
+    await thread.post(
+      buildResearchOutcomeReply(
+        matchingFood.name,
+        {
+          success: true,
+          defaultVariant: {
+            preparationMethod: defaultVariant.preparationMethod,
+            nutrients: nutrientsResult.nutrients,
+          },
+        },
+        prefersHebrew,
+      ),
+    );
+    return true;
+  }
+
+  const researchResult = await aiResearchFood({ foodName }, toolCtx);
+  await thread.post(buildResearchOutcomeReply(foodName, researchResult, prefersHebrew));
+  return true;
 }
 
 /**
@@ -433,7 +556,7 @@ async function resolveAccount(
   adapterName: string,
   message: { author: { userId: string; userName: string; fullName: string } },
 ) {
-  const platform = adapterName as "telegram" | "discord";
+  const platform = adapterName as "telegram" | "discord" | "whatsapp";
   const platformUserId = message.author.userId;
   const platformUsername = message.author.userName || message.author.fullName || null;
 
@@ -456,7 +579,9 @@ function registerHandlers(bot: Chat) {
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling message:", error);
       try {
-        await thread.post("Sorry, something went wrong. Please try again.");
+        await thread.post(
+          buildRequestFailureReply(typeof message.text === "string" ? message.text : ""),
+        );
       } catch {
         console.error("[NutriBalance Bot] Failed to send error message");
       }
@@ -474,7 +599,9 @@ function registerHandlers(bot: Chat) {
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling message:", error);
       try {
-        await thread.post("Sorry, something went wrong. Please try again.");
+        await thread.post(
+          buildRequestFailureReply(typeof message.text === "string" ? message.text : ""),
+        );
       } catch {
         console.error("[NutriBalance Bot] Failed to send error message");
       }

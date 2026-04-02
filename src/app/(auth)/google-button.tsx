@@ -11,13 +11,17 @@ export function GoogleButton({ callbackURL = "/dashboard" }: { callbackURL?: str
 
   async function handleGoogleSignIn() {
     setLoading(true);
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(callbackURL)}`,
-      },
-    });
+    try {
+      const supabase = createClient();
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(callbackURL)}`,
+        },
+      });
+    } catch {
+      setLoading(false);
+    }
   }
 
   return (

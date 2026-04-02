@@ -23,6 +23,7 @@
     "@chat-adapter/state-memory": "^4.23.0",
     "@chat-adapter/state-pg": "^4.23.0",
     "@chat-adapter/telegram": "^4.23.0",
+    "@chat-adapter/whatsapp": "^4.23.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "ai": "^6.0.134",
