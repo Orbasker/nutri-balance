@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AiResearchTrackerProvider } from "@/components/food/ai-research-tracker-provider";
 import { SplashScreen } from "@/components/splash-screen";
 
 const SPLASH_KEY = "nutri-balance-splash-shown";
@@ -25,9 +26,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showSplash = splashNeeded && !splashDone;
 
   return (
-    <>
+    <AiResearchTrackerProvider>
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       {children}
-    </>
+    </AiResearchTrackerProvider>
   );
 }
