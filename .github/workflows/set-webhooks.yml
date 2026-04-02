@@ -1,0 +1,86 @@
+name: Set Bot Webhooks
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL (e.g. https://nutritionmasterbot.com or https://abc123.ngrok.io)"
+        required: true
+        default: "https://nutritionmasterbot.com"
+      platforms:
+        description: "Platforms to update (comma-separated: telegram,discord)"
+        required: true
+        default: "telegram"
+
+jobs:
+  set-webhooks:
+    name: Set Bot Webhooks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Telegram — setWebhook
+        if: contains(inputs.platforms, 'telegram')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET_TOKEN: ${{ secrets.TELEGRAM_WEBHOOK_SECRET_TOKEN }}
+        run: |
+          WEBHOOK_URL="${{ inputs.base_url }}/api/bot/telegram"
+          echo "Setting Telegram webhook to: $WEBHOOK_URL"
+
+          RESPONSE=$(curl -sf -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\":\"${WEBHOOK_URL}\",\"secret_token\":\"${TELEGRAM_WEBHOOK_SECRET_TOKEN}\"}")
+          echo "$RESPONSE"
+
+          if echo "$RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
+            echo "✅ Telegram webhook set successfully"
+          else
+            echo "❌ Telegram webhook failed"
+            exit 1
+          fi
+
+      - name: Telegram — verify
+        if: contains(inputs.platforms, 'telegram')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          RESPONSE=$(curl -sf "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo")
+          echo "$RESPONSE" | jq .
+
+      - name: Discord — update Interactions Endpoint
+        if: contains(inputs.platforms, 'discord')
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_APP_ID: ${{ secrets.DISCORD_APP_ID }}
+        run: |
+          WEBHOOK_URL="${{ inputs.base_url }}/api/bot/discord"
+          echo "Setting Discord interactions endpoint to: $WEBHOOK_URL"
+
+          RESPONSE=$(curl -sf -X PATCH \
+            "https://discord.com/api/v10/applications/${DISCORD_APP_ID}" \
+            -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"interactions_endpoint_url\": \"${WEBHOOK_URL}\"}")
+          echo "$RESPONSE" | jq '{id, name, interactions_endpoint_url}'
+
+          if echo "$RESPONSE" | jq -e '.interactions_endpoint_url' > /dev/null 2>&1; then
+            echo "✅ Discord interactions endpoint set successfully"
+          else
+            echo "❌ Discord interactions endpoint failed"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Webhook Configuration Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ inputs.platforms }}" == *"telegram"* ]]; then
+            echo "| Telegram | ${{ inputs.base_url }}/api/bot/telegram |" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ inputs.platforms }}" == *"discord"* ]]; then
+            echo "| Discord | ${{ inputs.base_url }}/api/bot/discord |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **WhatsApp** webhooks must be configured manually in the [Meta Developer Dashboard](https://developers.facebook.com/)." >> $GITHUB_STEP_SUMMARY
