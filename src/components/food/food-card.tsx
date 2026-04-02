@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 import type { FoodSearchResult } from "@/types";
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const tagColors: Record<string, string> = {
   high: "bg-md-tertiary-fixed text-md-on-tertiary-fixed-variant",
@@ -43,9 +47,19 @@ export function FoodCard({ food }: FoodCardProps) {
             <h4 className="text-xl font-bold text-md-on-surface">{food.name}</h4>
           </div>
           {topSubstance && (
-            <div className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase`}>
-              {topSubstance.displayName}
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase cursor-help`}
+                  onClick={(e) => e.preventDefault()}
+                >
+                  {topSubstance.displayName}
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-[11px]">
+                  Top substance in this food
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
 
@@ -83,7 +97,19 @@ export function FoodCard({ food }: FoodCardProps) {
 
         <div className="space-y-2">
           <div className="flex justify-between text-[11px] font-bold text-md-outline uppercase tracking-tighter">
-            <span>Substance Density</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger
+                  className="cursor-help underline decoration-dotted underline-offset-2"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  Substance Density
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-[11px]">
+                  Data confidence from source quality
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <span className="text-md-primary">{densityPct}%</span>
           </div>
           <div className="h-2 w-full bg-md-surface-container-high rounded-full overflow-hidden">
