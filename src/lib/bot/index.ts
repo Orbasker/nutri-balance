@@ -32,7 +32,9 @@ import {
   containsHebrew,
   extractFoodResearchRequest,
   findMostRecentResearchFood,
+  findPendingResearchFood,
   hasRecentResearchContext,
+  isAwaitingFoodName,
   isResearchConfirmation,
 } from "./message-recovery";
 import { findOrCreatePlatformAccount } from "./user-linking";
@@ -586,10 +588,20 @@ async function tryHandleDeterministicResearch(
       return false;
     }
 
-    foodName = findMostRecentResearchFood(previousMessages);
+    // Try explicit "research X" patterns first, then look in bot "not found" messages
+    foodName =
+      findMostRecentResearchFood(previousMessages) ?? findPendingResearchFood(previousMessages);
     if (!foodName) {
       await thread.post(buildClarifyResearchReply(prefersHebrew));
       return true;
+    }
+  }
+
+  // After bot asked "which food?", treat a short plain message as the food name
+  if (!foodName && isAwaitingFoodName(messages.slice(0, -1))) {
+    const plain = userText.trim();
+    if (plain && plain.split(/\s+/).length <= 5) {
+      foodName = plain.replace(/^[`"'""׳״]+|[`"'""׳״.,!?;:]+$/g, "").trim();
     }
   }
 
