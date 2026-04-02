@@ -33,6 +33,7 @@
     "@chat-adapter/whatsapp": "^4.23.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
+    "@vercel/analytics": "^2.0.1",
     "ai": "^6.0.134",
     "chat": "^4.23.0",
     "class-variance-authority": "^0.7.1",

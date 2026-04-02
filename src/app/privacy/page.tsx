@@ -8,7 +8,7 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-16 font-[family-name:var(--font-inter)] text-neutral-800">
       <h1 className="mb-8 text-3xl font-bold">Privacy Policy</h1>
-      <p className="mb-4 text-sm text-neutral-500">Last updated: April 2, 2025</p>
+      <p className="mb-4 text-sm text-neutral-500">Last updated: April 3, 2026</p>
 
       <section className="space-y-6 text-sm leading-relaxed">
         <div>
@@ -39,6 +39,11 @@ export default function PrivacyPage() {
               Telegram, Discord, or WhatsApp, we store your platform user ID to link your
               conversations to your account.
             </li>
+            <li>
+              <strong>Usage analytics</strong> — aggregate page-view analytics collected through
+              Vercel Web Analytics. We remove query parameters and replace dynamic route IDs before
+              those URLs are sent.
+            </li>
           </ul>
         </div>
 
@@ -51,6 +56,10 @@ export default function PrivacyPage() {
               To generate AI-powered food analysis using third-party AI providers (your messages are
               sent to the AI model to generate responses; no data is stored by AI providers beyond
               the request).
+            </li>
+            <li>
+              To measure feature usage and site performance using privacy-conscious, aggregated page
+              analytics.
             </li>
           </ul>
         </div>
@@ -70,6 +79,10 @@ export default function PrivacyPage() {
           <ul className="mt-2 list-disc space-y-1 pl-6">
             <li>
               <strong>Vercel</strong> — hosting and serverless infrastructure.
+            </li>
+            <li>
+              <strong>Vercel Web Analytics</strong> — aggregate traffic and page-view analytics with
+              sanitized URLs.
             </li>
             <li>
               <strong>AI providers</strong> (via Vercel AI Gateway) — for food analysis and
