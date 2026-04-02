@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import { removeNutrientLimit, saveMedicalNotes, saveNutrientLimit } from "./actions";
+import {
+  createCustomNutrient,
+  removeCustomNutrient,
+  removeNutrientLimit,
+  saveMedicalNotes,
+  saveNutrientLimit,
+} from "./actions";
 
 export type NutrientDto = {
   id: string;
@@ -14,6 +20,7 @@ export type NutrientDto = {
   unit: string;
   display_name: string;
   sort_order: number | null;
+  created_by: string | null;
 };
 
 export type UserNutrientLimitDto = {
@@ -74,6 +81,9 @@ export function NutrientLimitsSettings({
   const [draftNutrientIds, setDraftNutrientIds] = useState<Set<string>>(() => new Set());
   const [notes, setNotes] = useState(initialNotes);
   const [notesSaved, setNotesSaved] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newUnit, setNewUnit] = useState("");
 
   const limitByNutrient = useMemo(() => {
     const m = new Map<string, UserNutrientLimitDto>();
@@ -97,10 +107,67 @@ export function NutrientLimitsSettings({
 
       {/* Daily Nutrient Limits */}
       <section className="bg-md-surface-container-lowest p-8 rounded-xl shadow-[0_10px_30px_rgba(0,68,147,0.06)]">
-        <div className="flex items-center gap-3 mb-8">
-          <span className="material-symbols-outlined text-md-primary">clinical_notes</span>
-          <h3 className="font-bold text-lg">Daily Nutrient Limits</h3>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-md-primary">clinical_notes</span>
+            <h3 className="font-bold text-lg">Daily Tracking Limits</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAddForm((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-bold text-md-primary hover:text-md-primary/80 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[20px]">
+              {showAddForm ? "close" : "add_circle"}
+            </span>
+            {showAddForm ? "Cancel" : "Add Substance"}
+          </button>
         </div>
+
+        {showAddForm && (
+          <div className="mb-8 p-5 bg-md-surface-container-low rounded-xl space-y-4">
+            <p className="text-sm font-bold text-md-on-surface">Add a custom substance to track</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                className="flex-1 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
+                placeholder="Name (e.g. Gluten, Caffeine, Fiber)"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <input
+                className="w-full sm:w-28 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
+                placeholder="Unit (e.g. mg)"
+                value={newUnit}
+                onChange={(e) => setNewUnit(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={pending || !newName.trim() || !newUnit.trim()}
+                onClick={() => {
+                  setError(null);
+                  startTransition(async () => {
+                    const res = await createCustomNutrient({
+                      displayName: newName.trim(),
+                      unit: newUnit.trim(),
+                    });
+                    if ("error" in res) {
+                      setError(res.error);
+                      return;
+                    }
+                    setNewName("");
+                    setNewUnit("");
+                    setShowAddForm(false);
+                    refresh();
+                  });
+                }}
+                className="bg-md-primary text-white font-bold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50 active:scale-95 transition-all whitespace-nowrap"
+              >
+                {pending ? "Adding..." : "Add"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {nutrients.map((n, i) => {
             const limit = limitByNutrient.get(n.id);
@@ -113,6 +180,7 @@ export function NutrientLimitsSettings({
                 limit={limit}
                 isTracked={isTracked}
                 isFirst={i === 0}
+                isCustom={!!n.created_by}
                 disabled={pending}
                 onToggle={(on) => {
                   setError(null);
@@ -149,6 +217,17 @@ export function NutrientLimitsSettings({
                       next.delete(n.id);
                       return next;
                     });
+                    refresh();
+                  });
+                }}
+                onRemoveNutrient={() => {
+                  setError(null);
+                  startTransition(async () => {
+                    const res = await removeCustomNutrient({ nutrientId: n.id });
+                    if ("error" in res) {
+                      setError(res.error);
+                      return;
+                    }
                     refresh();
                   });
                 }}
@@ -244,14 +323,17 @@ function NutrientLimitField({
   limit,
   isTracked,
   isFirst,
+  isCustom,
   disabled,
   onToggle,
   onSave,
+  onRemoveNutrient,
 }: {
   nutrient: NutrientDto;
   limit: UserNutrientLimitDto | undefined;
   isTracked: boolean;
   isFirst: boolean;
+  isCustom: boolean;
   disabled: boolean;
   onToggle: (on: boolean) => void;
   onSave: (payload: {
@@ -262,21 +344,42 @@ function NutrientLimitField({
     rangeMin?: string;
     rangeMax?: string;
   }) => Promise<void>;
+  onRemoveNutrient: () => void;
 }) {
   const [dailyLimit, setDailyLimit] = useState(limit?.daily_limit ?? "");
 
   return (
     <div className="group border-b border-md-outline-variant/15 pb-4 focus-within:border-md-primary transition-all">
       <div className="flex justify-between items-start mb-1">
-        <label
-          className={cn(
-            "block text-xs font-bold uppercase tracking-widest",
-            isFirst ? "text-md-primary" : "text-md-outline",
+        <div className="flex items-center gap-2">
+          <label
+            className={cn(
+              "block text-xs font-bold uppercase tracking-widest",
+              isFirst ? "text-md-primary" : "text-md-outline",
+            )}
+          >
+            {nutrient.display_name}
+          </label>
+          {isCustom && (
+            <span className="text-[10px] font-bold text-md-primary/60 bg-md-primary/8 px-1.5 py-0.5 rounded">
+              CUSTOM
+            </span>
           )}
-        >
-          {nutrient.display_name}
-        </label>
-        <ToggleSwitch checked={isTracked} disabled={disabled} onCheckedChange={onToggle} />
+        </div>
+        <div className="flex items-center gap-2">
+          {isCustom && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onRemoveNutrient}
+              className="text-md-error/60 hover:text-md-error transition-colors disabled:opacity-50"
+              aria-label={`Remove ${nutrient.display_name}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          )}
+          <ToggleSwitch checked={isTracked} disabled={disabled} onCheckedChange={onToggle} />
+        </div>
       </div>
       {isTracked && (
         <div className="flex items-baseline gap-2">

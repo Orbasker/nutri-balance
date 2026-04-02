@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, isNull, or } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
@@ -20,8 +20,10 @@ export default async function SettingsPage() {
         unit: nutrients.unit,
         display_name: nutrients.displayName,
         sort_order: nutrients.sortOrder,
+        created_by: nutrients.createdBy,
       })
       .from(nutrients)
+      .where(or(isNull(nutrients.createdBy), eq(nutrients.createdBy, session!.user.id)))
       .orderBy(nutrients.sortOrder),
     db.select().from(userNutrientLimits).where(eq(userNutrientLimits.userId, session!.user.id)),
     db

@@ -17,7 +17,7 @@ function getTimeGreeting(): string {
 }
 
 function getInsightMessage(nutrients: NutrientProgress[], todayLogCount: number): string {
-  if (nutrients.length === 0) return "Set up your nutrient limits to start tracking.";
+  if (nutrients.length === 0) return "Set up your tracking limits to start monitoring.";
   if (todayLogCount === 0) return "Log your first meal to see how your day shapes up.";
 
   const exceeded = nutrients.filter((n) => n.status === "exceed");
@@ -240,7 +240,7 @@ export default async function DashboardPage() {
       <section className="space-y-6">
         <div className="flex justify-between items-end">
           <h3 className="text-2xl font-bold tracking-tight text-md-on-surface">
-            Key Micronutrients
+            Tracked Substances
           </h3>
           <Link href="/settings" className="text-sm font-semibold text-md-primary">
             See details
@@ -249,7 +249,7 @@ export default async function DashboardPage() {
         {nutrientProgress.length === 0 ? (
           <div className="bg-md-surface-container-lowest p-6 rounded-3xl">
             <p className="text-md-on-surface-variant text-sm">
-              No nutrient limits configured.{" "}
+              No tracking limits configured.{" "}
               <Link href="/settings" className="text-md-primary font-semibold underline">
                 Set up limits
               </Link>{" "}

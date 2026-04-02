@@ -109,6 +109,25 @@ export const updateConsumptionLogSchema = z.object({
   nutrientSnapshot: z.record(z.string(), z.number()),
 });
 
+// Custom nutrient validators
+
+export const createCustomNutrientSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(100, "Name must be under 100 characters"),
+  unit: z.string().trim().min(1, "Unit is required").max(20, "Unit must be under 20 characters"),
+});
+
+export type CreateCustomNutrientInput = z.infer<typeof createCustomNutrientSchema>;
+
+export const deleteCustomNutrientSchema = z.object({
+  nutrientId: uuidSchema,
+});
+
+export type DeleteCustomNutrientInput = z.infer<typeof deleteCustomNutrientSchema>;
+
 // Admin validators
 
 export const createFoodSchema = z.object({
