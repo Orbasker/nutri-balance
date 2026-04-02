@@ -1,6 +1,7 @@
 import type { FoodSearchResult, FoodVariantSummary, SubstanceSummary } from "@/types";
 
-import { getConfidenceLabel } from "@/lib/calculations";
+import { compareSubstanceProminence, getConfidenceLabel } from "@/lib/calculations";
+import type { SubstanceReferenceValues } from "@/lib/substance-reference-values";
 
 export interface SearchRow {
   foodId: string;
@@ -19,9 +20,12 @@ export interface SearchRow {
 
 /**
  * Transform flat DB rows (food x variant x substance join) into grouped FoodSearchResult[].
- * Picks the highest-value substance per variant as the topSubstance.
+ * Picks the most nutritionally prominent substance per variant as the topSubstance.
  */
-export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
+export function mapSearchRows(
+  rows: SearchRow[],
+  referenceValues?: SubstanceReferenceValues,
+): FoodSearchResult[] {
   if (rows.length === 0) return [];
 
   // Group by food, then by variant, collecting substances per variant
@@ -92,10 +96,28 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
     const variants: FoodVariantSummary[] = [];
 
     for (const variant of food.variants.values()) {
-      // Pick the substance with the highest value as the "top substance"
+      // Pick the substance with the strongest normalized prominence for the card badge.
       const topSubstance =
         variant.substances.length > 0
-          ? variant.substances.reduce((best, n) => (n.valuePer100g > best.valuePer100g ? n : best))
+          ? variant.substances.reduce((best, n) =>
+              compareSubstanceProminence(
+                {
+                  name: n.name,
+                  displayName: n.displayName,
+                  amount: n.valuePer100g,
+                  unit: n.unit,
+                },
+                {
+                  name: best.name,
+                  displayName: best.displayName,
+                  amount: best.valuePer100g,
+                  unit: best.unit,
+                },
+                referenceValues,
+              ) > 0
+                ? n
+                : best,
+            )
           : null;
 
       variants.push({

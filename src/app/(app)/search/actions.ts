@@ -24,6 +24,7 @@ import {
 
 import { aiResearchFood } from "@/lib/ai/food-search-agent";
 import { aiSearchBySubstance } from "@/lib/ai/substance-search-agent";
+import { getSubstanceReferenceValues } from "@/lib/app-config";
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { foodAliases, foodVariants, foods } from "@/lib/db/schema/foods";
@@ -189,6 +190,7 @@ async function searchBySubstance(
   filters: SearchFilters,
   pagination: PaginationParams,
 ): Promise<{ results: FoodSearchResult[]; totalCount: number; categories: string[] }> {
+  const substanceReferenceValues = await getSubstanceReferenceValues();
   const filterConditions = buildFilterConditions(filters);
   const baseWhere = and(eq(resolvedSubstanceValues.substanceId, substanceId), ...filterConditions);
 
@@ -249,7 +251,7 @@ async function searchBySubstance(
   const categories = await getCategoriesForSubstance(substanceId);
 
   return {
-    results: mapSearchRows(rows as SearchRow[]),
+    results: mapSearchRows(rows as SearchRow[], substanceReferenceValues),
     totalCount,
     categories,
   };
@@ -263,6 +265,7 @@ async function searchByName(
   filters: SearchFilters,
   pagination: PaginationParams,
 ): Promise<{ results: FoodSearchResult[]; totalCount: number; categories: string[] }> {
+  const substanceReferenceValues = await getSubstanceReferenceValues();
   const searchTerm = `%${query}%`;
 
   // Get all matching food IDs by name/alias
@@ -367,7 +370,7 @@ async function searchByName(
     .orderBy(foods.name);
 
   return {
-    results: mapSearchRows(rows as SearchRow[]),
+    results: mapSearchRows(rows as SearchRow[], substanceReferenceValues),
     totalCount,
     categories,
   };

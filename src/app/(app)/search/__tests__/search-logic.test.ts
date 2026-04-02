@@ -43,41 +43,41 @@ describe("mapSearchRows", () => {
     expect(results[0].variants[1].preparationMethod).toBe("boiled");
   });
 
-  it("picks the highest-value substance as topSubstance per variant", () => {
+  it("picks the most nutritionally prominent substance as topSubstance per variant", () => {
     const rows = [
       {
         foodId: "f1",
-        foodName: "Spinach",
+        foodName: "Carrot",
         category: "vegetables",
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        substanceName: "Vitamin K",
-        substanceDisplayName: "Vitamin K",
+        substanceName: "vitamin_a",
+        substanceDisplayName: "Vitamin A",
         substanceUnit: "mcg",
-        valuePer100g: "482.9",
+        valuePer100g: "835",
         confidenceScore: 95,
         sourceSummary: null,
       },
       {
         foodId: "f1",
-        foodName: "Spinach",
+        foodName: "Carrot",
         category: "vegetables",
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        substanceName: "Iron",
-        substanceDisplayName: "Iron",
+        substanceName: "niacin",
+        substanceDisplayName: "Vitamin B3 (Niacin)",
         substanceUnit: "mg",
-        valuePer100g: "2.7",
+        valuePer100g: "1.3",
         confidenceScore: 90,
         sourceSummary: null,
       },
     ];
 
     const results = mapSearchRows(rows);
-    expect(results[0].variants[0].topSubstance?.name).toBe("Vitamin K");
-    expect(results[0].variants[0].topSubstance?.valuePer100g).toBe(482.9);
+    expect(results[0].variants[0].topSubstance?.name).toBe("vitamin_a");
+    expect(results[0].variants[0].topSubstance?.valuePer100g).toBe(835);
   });
 
   it("handles variant with no substance data", () => {

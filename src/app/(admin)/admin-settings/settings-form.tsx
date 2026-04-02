@@ -31,6 +31,7 @@ const SOURCE_LABELS: Record<
 > = {
   database: { label: "Database", variant: "default" },
   env: { label: "Env var", variant: "secondary" },
+  default: { label: "Built-in default", variant: "outline" },
   unset: { label: "Not set", variant: "outline" },
 };
 
