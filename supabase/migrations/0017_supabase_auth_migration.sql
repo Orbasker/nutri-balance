@@ -25,7 +25,27 @@ INSERT INTO user_id_map (old_id)
 SELECT id FROM public."user";
 
 -- ============================================================
--- STEP 2: Migrate existing users to auth.users (with new UUIDs)
+-- STEP 2: Drop FK constraints and disable trigger BEFORE inserting into auth.users
+-- ============================================================
+-- The handle_new_user trigger on auth.users would try to insert into profiles,
+-- which still has a FK to the old user table with old IDs → FK violation.
+-- We must drop the constraints and disable the trigger first.
+
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_user_id_fk;
+ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_user_id_fk;
+ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_user_id_fk;
+ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
+ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
+
+-- Also drop Better Auth internal table FKs
+ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
+ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
+
+-- Disable the trigger so migrated users don't get duplicate profiles
+ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;
+
+-- ============================================================
+-- STEP 3: Migrate existing users to auth.users (with new UUIDs)
 -- ============================================================
 
 INSERT INTO auth.users (
@@ -58,19 +78,8 @@ WHERE NOT EXISTS (
   SELECT 1 FROM auth.users au WHERE au.email = u.email
 );
 
--- ============================================================
--- STEP 3: Drop FK constraints from public.user (must happen before ID updates)
--- ============================================================
-
-ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_user_id_fk;
-ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_user_id_fk;
-ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_user_id_fk;
-ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
-ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
-
--- Also drop Better Auth internal table FKs
-ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
-ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
+-- Re-enable the trigger for future signups
+ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;
 
 -- ============================================================
 -- STEP 4: Update all FK references from old text IDs to new UUID text IDs
