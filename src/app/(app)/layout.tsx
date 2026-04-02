@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell>
-      <div className="min-h-screen pb-24 md:pb-0 md:pl-20">
+      <div className="min-h-screen pb-24 md:pb-0 md:pl-64">
         <TopAppBar
           displayName={displayName}
           greeting={getGreeting()}
