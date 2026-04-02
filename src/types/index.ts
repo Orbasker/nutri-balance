@@ -32,11 +32,14 @@ export interface ServingMeasure {
   gramsEquivalent: number;
 }
 
+export type SubstanceCategory = "macronutrient" | "lipid" | "vitamin" | "mineral" | "other";
+
 export interface SubstanceDetail {
   substanceId: string;
   name: string;
   displayName: string;
   unit: string;
+  category: SubstanceCategory;
   valuePer100g: number;
   confidenceScore: number;
   confidenceLabel: ConfidenceLabel;
@@ -192,7 +195,7 @@ export interface AiObservationStatusCounts {
 
 export interface AiRunItem {
   id: string;
-  type: "food_generation" | "substance_research_task" | "ai_review";
+  type: "food_generation" | "substance_research_task" | "substance_discovery" | "ai_review";
   status: "running" | "completed" | "failed";
   goal: string;
   source: string;

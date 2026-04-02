@@ -118,6 +118,10 @@ export const createCustomSubstanceSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Name must be under 100 characters"),
   unit: z.string().trim().min(1, "Unit is required").max(20, "Unit must be under 20 characters"),
+  category: z
+    .enum(["macronutrient", "lipid", "vitamin", "mineral", "other"])
+    .optional()
+    .default("other"),
 });
 
 export type CreateCustomSubstanceInput = z.infer<typeof createCustomSubstanceSchema>;

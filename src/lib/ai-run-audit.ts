@@ -6,7 +6,11 @@ import { sendResendEmailAlert } from "@/lib/ops-alerts";
 
 type JsonRecord = Record<string, unknown>;
 
-type AiRunType = "food_generation" | "substance_research_task" | "ai_review";
+type AiRunType =
+  | "food_generation"
+  | "substance_research_task"
+  | "substance_discovery"
+  | "ai_review";
 
 export interface AiRunHandle {
   id: string;

@@ -3,16 +3,22 @@ import { notFound } from "next/navigation";
 
 import { FeedbackForm } from "@/components/food/feedback-form";
 
-import { getFoodDetail, getTodaysConsumption, getUserSubstanceLimits } from "./actions";
+import {
+  getFoodDetail,
+  getTodaysConsumption,
+  getTotalSubstanceCount,
+  getUserSubstanceLimits,
+} from "./actions";
 import { FoodDetailClient } from "./food-detail-client";
 
 export default async function FoodDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [food, todaysConsumption, userLimits] = await Promise.all([
+  const [food, todaysConsumption, userLimits, totalSubstanceCount] = await Promise.all([
     getFoodDetail(id),
     getTodaysConsumption(),
     getUserSubstanceLimits(),
+    getTotalSubstanceCount(),
   ]);
 
   if (!food) notFound();
@@ -50,7 +56,12 @@ export default async function FoodDetailPage({ params }: { params: Promise<{ id:
         </div>
       </section>
 
-      <FoodDetailClient food={food} todaysConsumption={todaysConsumption} userLimits={userLimits} />
+      <FoodDetailClient
+        food={food}
+        totalSubstanceCount={totalSubstanceCount}
+        todaysConsumption={todaysConsumption}
+        userLimits={userLimits}
+      />
 
       <FeedbackForm
         foodId={food.id}

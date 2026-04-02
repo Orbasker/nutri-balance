@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { FoodDetail, FoodVariantDetail, SubstanceDetail, SubstanceImpact } from "@/types";
-import { and, eq, gte } from "drizzle-orm";
+import { and, count, eq, gte } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import {
@@ -36,6 +36,7 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
       substanceName: substances.name,
       substanceDisplayName: substances.displayName,
       substanceUnit: substances.unit,
+      substanceCategory: substances.category,
       valuePer100g: resolvedSubstanceValues.valuePer100g,
       confidenceScore: resolvedSubstanceValues.confidenceScore,
       sourceSummary: resolvedSubstanceValues.sourceSummary,
@@ -85,6 +86,7 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
         name: row.substanceName!,
         displayName: row.substanceDisplayName!,
         unit: row.substanceUnit!,
+        category: (row.substanceCategory as SubstanceDetail["category"]) ?? "other",
         valuePer100g: Number(row.valuePer100g),
         confidenceScore: score,
         confidenceLabel: getConfidenceLabel(score),
@@ -217,4 +219,24 @@ export async function addToToday(raw: unknown): Promise<AddToTodayResult> {
   revalidatePath("/dashboard");
   revalidatePath("/log");
   return { ok: true };
+}
+
+export async function getTotalSubstanceCount(): Promise<number> {
+  const [result] = await db.select({ count: count() }).from(substances);
+  return Number(result?.count ?? 0);
+}
+
+export async function enrichFoodWithAi(
+  foodId: string,
+  foodVariantId: string,
+): Promise<{ ok: true; enriched: number } | { error: string }> {
+  const session = await getSession();
+  if (!session) return { error: "You must be signed in." };
+
+  // Dynamically import to keep the main actions bundle lean
+  const { enrichFoodVariant } = await import("@/lib/ai/food-enricher");
+  const result = await enrichFoodVariant(foodId, foodVariantId, session.user.id);
+
+  revalidatePath(`/food/${foodId}`);
+  return result;
 }
