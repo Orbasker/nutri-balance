@@ -59,17 +59,16 @@ export function FoodCard({ food }: FoodCardProps) {
             <h4 className="text-xl font-bold text-md-on-surface">{food.name}</h4>
           </div>
           {topSubstance && (
-            <div className="flex items-center gap-1.5">
-              <InfoTooltip
-                title="Top Substance"
-                description={`This food's most notable substance is ${topSubstance.displayName}. Badge color reflects data confidence: ${confidenceDescriptions[confidenceLevel]}`}
-                accent={tagAccentColors[confidenceLevel] ?? "bg-md-primary"}
-                side="left"
-              />
+            <InfoTooltip
+              title="Top Substance"
+              description={`This food's most notable substance is ${topSubstance.displayName}. Badge color reflects data confidence: ${confidenceDescriptions[confidenceLevel]}`}
+              accent={tagAccentColors[confidenceLevel] ?? "bg-md-primary"}
+              side="left"
+            >
               <div className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase`}>
                 {topSubstance.displayName}
               </div>
-            </div>
+            </InfoTooltip>
           )}
         </div>
 
@@ -107,15 +106,14 @@ export function FoodCard({ food }: FoodCardProps) {
 
         <div className="space-y-2">
           <div className="flex justify-between items-center text-[11px] font-bold text-md-outline uppercase tracking-tighter">
-            <span className="flex items-center gap-1">
-              Substance Density
-              <InfoTooltip
-                title="Substance Density"
-                description="How confident we are in this food's substance data. Higher % means more reliable values from verified sources. Lower % means estimates that may need review."
-                accent={barColor}
-                side="top"
-              />
-            </span>
+            <InfoTooltip
+              title="Substance Density"
+              description="How confident we are in this food's substance data. Higher % means more reliable values from verified sources. Lower % means estimates that may need review."
+              accent={barColor}
+              side="top"
+            >
+              <span>Substance Density</span>
+            </InfoTooltip>
             <span className="text-md-primary">{densityPct}%</span>
           </div>
           <div className="h-2 w-full bg-md-surface-container-high rounded-full overflow-hidden">
