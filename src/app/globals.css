@@ -242,3 +242,22 @@
 .splash-shimmer {
   animation: splash-shimmer 2s infinite linear;
 }
+
+/* AI research tracker: indeterminate progress bar */
+@keyframes progress-indeterminate {
+  0% {
+    width: 20%;
+    transform: translateX(-100%);
+  }
+  50% {
+    width: 40%;
+  }
+  100% {
+    width: 20%;
+    transform: translateX(400%);
+  }
+}
+
+.animate-progress-indeterminate {
+  animation: progress-indeterminate 1.8s ease-in-out infinite;
+}
