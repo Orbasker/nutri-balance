@@ -11,12 +11,23 @@
 -- ============================================================
 
 -- ============================================================
--- STEP 1: Migrate existing users to auth.users
+-- STEP 1: Create ID mapping table (Better Auth text IDs → new UUIDs)
 -- ============================================================
 
--- Copy users from Better Auth public.user to Supabase auth.users.
--- Preserves IDs so all FK references remain valid.
--- Passwords are bcrypt hashes in the account table — compatible with Supabase Auth.
+-- Better Auth IDs are random strings (not UUIDs), but auth.users.id is uuid.
+-- Generate new UUIDs and keep a mapping so we can update all FK references.
+CREATE TEMP TABLE user_id_map (
+  old_id text PRIMARY KEY,
+  new_id uuid NOT NULL DEFAULT gen_random_uuid()
+);
+
+INSERT INTO user_id_map (old_id)
+SELECT id FROM public."user";
+
+-- ============================================================
+-- STEP 2: Migrate existing users to auth.users (with new UUIDs)
+-- ============================================================
+
 INSERT INTO auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, raw_user_meta_data, raw_app_meta_data,
@@ -24,7 +35,7 @@ INSERT INTO auth.users (
 )
 SELECT
   '00000000-0000-0000-0000-000000000000',
-  u.id::uuid,
+  m.new_id,
   'authenticated',
   'authenticated',
   u.email,
@@ -41,13 +52,56 @@ SELECT
   '',
   ''
 FROM public."user" u
+JOIN user_id_map m ON m.old_id = u.id
 LEFT JOIN public.account a ON a.user_id = u.id AND a.provider_id = 'credential'
 WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users au WHERE au.id = u.id::uuid
+  SELECT 1 FROM auth.users au WHERE au.email = u.email
 );
 
 -- ============================================================
--- STEP 2: Migrate Google OAuth identities
+-- STEP 3: Drop FK constraints from public.user (must happen before ID updates)
+-- ============================================================
+
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_user_id_fk;
+ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_user_id_fk;
+ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_user_id_fk;
+ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
+ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
+
+-- Also drop Better Auth internal table FKs
+ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
+ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
+
+-- ============================================================
+-- STEP 4: Update all FK references from old text IDs to new UUID text IDs
+-- ============================================================
+
+UPDATE profiles SET id = m.new_id::text
+FROM user_id_map m WHERE profiles.id = m.old_id;
+
+UPDATE consumption_logs SET user_id = m.new_id::text
+FROM user_id_map m WHERE consumption_logs.user_id = m.old_id;
+
+UPDATE user_nutrient_limits SET user_id = m.new_id::text
+FROM user_id_map m WHERE user_nutrient_limits.user_id = m.old_id;
+
+UPDATE chat_conversations SET user_id = m.new_id::text
+FROM user_id_map m WHERE chat_conversations.user_id = m.old_id;
+
+UPDATE food_feedback SET user_id = m.new_id::text
+FROM user_id_map m WHERE food_feedback.user_id = m.old_id;
+
+UPDATE platform_accounts SET user_id = m.new_id::text
+FROM user_id_map m WHERE platform_accounts.user_id = m.old_id;
+
+UPDATE ai_tasks SET user_id = m.new_id::text
+FROM user_id_map m WHERE ai_tasks.user_id = m.old_id;
+
+UPDATE ai_runs SET trigger_user_id = m.new_id::text
+FROM user_id_map m WHERE ai_runs.trigger_user_id = m.old_id;
+
+-- ============================================================
+-- STEP 5: Migrate Google OAuth identities
 -- ============================================================
 
 INSERT INTO auth.identities (
@@ -56,7 +110,7 @@ INSERT INTO auth.identities (
 SELECT
   gen_random_uuid(),
   a.account_id,
-  a.user_id::uuid,
+  m.new_id,
   jsonb_build_object('sub', a.account_id, 'email', u.email),
   'google',
   now(),
@@ -64,10 +118,11 @@ SELECT
   a.updated_at
 FROM public.account a
 JOIN public."user" u ON u.id = a.user_id
+JOIN user_id_map m ON m.old_id = a.user_id
 WHERE a.provider_id = 'google'
 AND NOT EXISTS (
   SELECT 1 FROM auth.identities ai
-  WHERE ai.user_id = a.user_id::uuid AND ai.provider = 'google'
+  WHERE ai.user_id = m.new_id AND ai.provider = 'google'
 );
 
 -- Also add email identities for password users
@@ -90,21 +145,7 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================
--- STEP 3: Drop FK constraints from public.user
--- ============================================================
-
-ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_user_id_fk;
-ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_user_id_fk;
-ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_user_id_fk;
-ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
-ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
-
--- Also drop Better Auth internal table FKs
-ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
-ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
-
--- ============================================================
--- STEP 4: Drop Better Auth tables and replace user table with view
+-- STEP 6: Drop Better Auth tables and replace user table with view
 -- ============================================================
 
 DROP TABLE IF EXISTS public.session CASCADE;
@@ -127,7 +168,7 @@ SELECT
 FROM auth.users;
 
 -- ============================================================
--- STEP 5: Re-add FK constraints pointing to auth.users
+-- STEP 7: Re-add FK constraints pointing to auth.users
 -- Note: user_id columns are text, auth.users.id is uuid
 -- We create a helper function to enable text→uuid FK validation
 -- ============================================================
@@ -163,7 +204,7 @@ CREATE TRIGGER on_auth_user_deleted
   EXECUTE FUNCTION public.handle_user_deleted();
 
 -- ============================================================
--- STEP 6: Update handle_new_user trigger to handle Google metadata
+-- STEP 8: Update handle_new_user trigger to handle Google metadata
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -189,7 +230,7 @@ END;
 $$;
 
 -- ============================================================
--- STEP 7: Update is_admin() to cast auth.uid() to text
+-- STEP 9: Update is_admin() to cast auth.uid() to text
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.is_admin()
@@ -205,7 +246,7 @@ AS $$
 $$;
 
 -- ============================================================
--- STEP 8: Re-enable RLS on all tables with comprehensive policies
+-- STEP 10: Re-enable RLS on all tables with comprehensive policies
 -- ============================================================
 
 -- First, drop all existing policies to start fresh
