@@ -19,11 +19,11 @@ export function AppNav() {
   return (
     <>
       {/* Desktop: vertical sidebar */}
-      <nav className="hidden md:flex fixed left-0 top-0 h-full w-20 z-50 flex-col items-center pt-6 pb-6 bg-white/70 backdrop-blur-xl border-r border-slate-200/60">
-        <Link href="/dashboard" className="mb-8">
-          <span className="text-2xl font-extrabold text-blue-800">N</span>
+      <nav className="hidden md:flex fixed left-0 top-0 h-full w-64 z-50 flex-col pt-8 pb-8 px-5 bg-white/70 backdrop-blur-xl border-r border-slate-200/60">
+        <Link href="/dashboard" className="mb-10 px-3">
+          <span className="text-4xl font-extrabold text-blue-800">N</span>
         </Link>
-        <div className="flex flex-col items-center gap-1 flex-1">
+        <div className="flex flex-col gap-2 flex-1">
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -34,21 +34,19 @@ export function AppNav() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200 active:scale-95",
+                  "flex items-center gap-4 px-4 h-14 rounded-xl transition-all duration-200 active:scale-[0.98]",
                   isActive
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-400 hover:text-blue-600 hover:bg-slate-50",
                 )}
               >
                 <span
-                  className="material-symbols-outlined text-[22px]"
+                  className="material-symbols-outlined text-[26px]"
                   style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
                 >
                   {item.icon}
                 </span>
-                <span className="text-[9px] font-semibold uppercase tracking-wider mt-0.5">
-                  {item.label}
-                </span>
+                <span className="text-base font-medium">{item.label}</span>
               </Link>
             );
           })}
