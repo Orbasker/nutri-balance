@@ -24,6 +24,14 @@ CREATE TEMP TABLE user_id_map (
 INSERT INTO user_id_map (old_id)
 SELECT id FROM public."user";
 
+-- If a previous run already inserted this user into auth.users (matched by email),
+-- reuse that UUID instead of the freshly generated one.
+UPDATE user_id_map m
+SET new_id = au.id
+FROM public."user" u
+JOIN auth.users au ON au.email = u.email
+WHERE m.old_id = u.id;
+
 -- ============================================================
 -- STEP 2: Drop FK constraints and disable trigger BEFORE inserting into auth.users
 -- ============================================================
@@ -32,17 +40,25 @@ SELECT id FROM public."user";
 -- We must drop the constraints and disable the trigger first.
 
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_user_id_fk;
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
 ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_user_id_fk;
+ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_fkey;
 ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_user_id_fk;
+ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_fkey;
 ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
+ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_fkey;
 ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
+ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_fkey;
 
 -- Drop ai_runs FK to user (also references public.user)
 ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_trigger_user_id_user_id_fk;
+ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_trigger_user_id_fkey;
 
 -- Also drop Better Auth internal table FKs
 ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
+ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_fkey;
 ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
+ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_fkey;
 
 -- Disable all triggers so migrated users don't get duplicate profiles.
 -- We use session_replication_role instead of ALTER TABLE ... DISABLE TRIGGER
@@ -136,7 +152,7 @@ JOIN user_id_map m ON m.old_id = a.user_id
 WHERE a.provider_id = 'google'
 AND NOT EXISTS (
   SELECT 1 FROM auth.identities ai
-  WHERE ai.user_id = m.new_id AND ai.provider = 'google'
+  WHERE ai.provider = 'google' AND ai.provider_id = a.account_id
 );
 
 -- Also add email identities for password users
@@ -155,7 +171,7 @@ SELECT
 FROM auth.users au
 WHERE NOT EXISTS (
   SELECT 1 FROM auth.identities ai
-  WHERE ai.user_id = au.id AND ai.provider = 'email'
+  WHERE ai.provider = 'email' AND ai.provider_id = au.id::text
 );
 
 -- ============================================================
