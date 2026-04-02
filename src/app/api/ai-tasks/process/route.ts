@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { eq } from "drizzle-orm";
 
+import { executeAiReviewRun } from "@/lib/ai/review-runner";
 import { processSubstanceResearchTask } from "@/lib/ai/substance-researcher";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
@@ -51,6 +52,20 @@ export async function POST(request: Request) {
     }
 
     const errorCount = results.filter((result) => result.status === "error").length;
+    const successCount = results.length - errorCount;
+
+    // Automatically run review on newly created observations
+    let reviewResult = null;
+    if (successCount > 0) {
+      try {
+        reviewResult = await executeAiReviewRun({
+          source: "post-process",
+          jobRunId: run.id,
+        });
+      } catch (reviewError) {
+        console.error("Post-process review failed:", reviewError);
+      }
+    }
 
     await finishJobRun(run, {
       status: "completed",
@@ -59,10 +74,17 @@ export async function POST(request: Request) {
       errorCount,
       metadata: {
         results,
+        reviewResult: reviewResult
+          ? {
+              totalReviewed: reviewResult.totalReviewed,
+              approved: reviewResult.approved,
+              rejected: reviewResult.rejected,
+            }
+          : null,
       },
     });
 
-    return NextResponse.json({ processed: results.length, results });
+    return NextResponse.json({ processed: results.length, results, reviewResult });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 
