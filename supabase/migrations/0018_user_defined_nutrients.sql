@@ -1,5 +1,8 @@
 -- Add created_by column to nutrients (NULL = system nutrient, user_id = user-created)
-ALTER TABLE nutrients ADD COLUMN created_by text REFERENCES auth.users(id) ON DELETE CASCADE;
+-- No FK constraint: public.user is a view (cannot be FK target) and auth.users.id
+-- is uuid while our user IDs are stored as text. Drizzle ORM has the reference for
+-- relation mapping; RLS policies enforce ownership at the DB level.
+ALTER TABLE nutrients ADD COLUMN created_by text;
 
 -- Drop the unique constraint on name since users may create nutrients with duplicate names
 ALTER TABLE nutrients DROP CONSTRAINT IF EXISTS nutrients_name_unique;
