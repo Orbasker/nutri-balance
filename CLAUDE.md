@@ -25,8 +25,13 @@ bun run format       # Prettier format
 bun run format:check # Prettier check
 bun run typecheck    # tsc --noEmit
 
-bunx drizzle-kit generate  # Generate migrations from Drizzle schema
-bunx drizzle-kit push      # Push schema directly (dev only)
+bun run db:new <name>      # Scaffold a new idempotent migration
+bun run db:revert <number> # Generate a rollback migration for a given migration
+bun run db:lint [file]     # Check migrations for idempotency
+bun run db:lint:changed    # Check only changed migrations vs main
+bun run db:check           # Drizzle schema consistency check
+bun run db:generate        # Generate migration from Drizzle schema
+bun run db:push            # Push schema directly (dev only)
 ```
 
 ## Pre-commit Hook
@@ -82,6 +87,25 @@ supabase/
 - **Auth tables**: Managed by Supabase Auth in the `auth` schema. `public.user` is a **read-only view** over `auth.users` for Drizzle compatibility — do NOT insert/update via Drizzle.
 - **App tables**: profiles, user_substance_limits, consumption_logs, foods, food_variants, substances, etc.
 - **Authorization**: Row Level Security (RLS) enforced at database layer via `auth.uid()`. Application-layer checks via `getSession()` and `requireAdmin()` remain as defense-in-depth.
+
+### Migration Rules
+
+**NEVER edit an existing migration file.** Always create a new one. Migrations are append-only.
+
+- To add/change schema: `bun run db:new "description"` → write SQL → `bun run db:lint <file>`
+- To undo a migration: `bun run db:revert <number>` → review generated file → commit
+- To fix a broken migration: create a new migration that corrects the issue
+
+**All SQL must be idempotent** (CI enforces this via `scripts/lint-migrations.sh`):
+
+- Tables: `CREATE TABLE IF NOT EXISTS`
+- Columns: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+- Indexes: `CREATE INDEX IF NOT EXISTS`
+- Policies: `DROP POLICY IF EXISTS "name" ON "table";` before `CREATE POLICY`
+- Triggers: `DROP TRIGGER IF EXISTS "name" ON "table";` before `CREATE TRIGGER`
+- Functions: `CREATE OR REPLACE FUNCTION`
+
+**Do NOT** apply schema changes to the remote database outside of the migration pipeline (no manual SQL, no `supabase db push --linked` for ad-hoc changes). All changes go through migrations → PR → CI → merge → deploy.
 
 ## Auth (Supabase Auth)
 

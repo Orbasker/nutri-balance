@@ -8,10 +8,12 @@ CREATE TABLE IF NOT EXISTS "app_config" (
 -- RLS: only admins can read/write app_config
 ALTER TABLE "app_config" ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "admin_read_app_config" ON "app_config";
 CREATE POLICY "admin_read_app_config" ON "app_config"
   FOR SELECT TO authenticated
   USING (public.is_admin());
 
+DROP POLICY IF EXISTS "admin_write_app_config" ON "app_config";
 CREATE POLICY "admin_write_app_config" ON "app_config"
   FOR ALL TO authenticated
   USING (public.is_admin())
