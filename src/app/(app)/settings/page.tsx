@@ -2,30 +2,30 @@ import { eq, isNull, or } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { substances } from "@/lib/db/schema/substances";
+import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 
 import { LogoutButton } from "./logout-button";
-import { NutrientLimitsSettings } from "./nutrient-limits-settings";
 import { ProfileSettings } from "./profile-settings";
+import { SubstanceLimitsSettings } from "./substance-limits-settings";
 
 export default async function SettingsPage() {
   const session = await getSession();
 
-  const [allNutrients, limits, profile] = await Promise.all([
+  const [allSubstances, limits, profile] = await Promise.all([
     db
       .select({
-        id: nutrients.id,
-        name: nutrients.name,
-        unit: nutrients.unit,
-        display_name: nutrients.displayName,
-        sort_order: nutrients.sortOrder,
-        created_by: nutrients.createdBy,
+        id: substances.id,
+        name: substances.name,
+        unit: substances.unit,
+        display_name: substances.displayName,
+        sort_order: substances.sortOrder,
+        created_by: substances.createdBy,
       })
-      .from(nutrients)
-      .where(or(isNull(nutrients.createdBy), eq(nutrients.createdBy, session!.user.id)))
-      .orderBy(nutrients.sortOrder),
-    db.select().from(userNutrientLimits).where(eq(userNutrientLimits.userId, session!.user.id)),
+      .from(substances)
+      .where(or(isNull(substances.createdBy), eq(substances.createdBy, session!.user.id)))
+      .orderBy(substances.sortOrder),
+    db.select().from(userSubstanceLimits).where(eq(userSubstanceLimits.userId, session!.user.id)),
     db
       .select({
         first_name: profiles.firstName,
@@ -46,7 +46,7 @@ export default async function SettingsPage() {
   const mappedLimits = limits.map((l) => ({
     id: l.id,
     user_id: l.userId,
-    nutrient_id: l.nutrientId,
+    substance_id: l.substanceId,
     daily_limit: l.dailyLimit,
     mode: l.mode,
     range_min: l.rangeMin,
@@ -58,7 +58,7 @@ export default async function SettingsPage() {
       <div className="mb-10">
         <h2 className="font-extrabold text-3xl text-md-primary tracking-tight mb-2">Settings</h2>
         <p className="text-md-on-surface-variant font-medium">
-          Customize your clinical goals and tracker behavior.
+          Customize your clinical goals and tracked substances.
         </p>
       </div>
 
@@ -73,8 +73,8 @@ export default async function SettingsPage() {
 
       <div className="mt-8" />
 
-      <NutrientLimitsSettings
-        nutrients={allNutrients ?? []}
+      <SubstanceLimitsSettings
+        substances={allSubstances ?? []}
         limits={mappedLimits ?? []}
         medicalNotes={profile?.clinical_notes ?? ""}
       />

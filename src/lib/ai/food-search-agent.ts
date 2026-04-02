@@ -8,14 +8,14 @@ import { getModel } from "@/lib/ai-provider";
 import { finishAiRun, startAiRun } from "@/lib/ai-run-audit";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
 import {
   evidenceItems,
-  nutrientObservations,
   sourceRecords,
   sources,
+  substanceObservations,
 } from "@/lib/db/schema/observations";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { getLangfuse } from "@/lib/langfuse";
 import { flushLangfuse } from "@/lib/langfuse";
 import { recordAiUsageEvent } from "@/lib/ops-monitoring";
@@ -38,7 +38,7 @@ const VALID_PREP_METHODS = [
 
 type PrepMethod = (typeof VALID_PREP_METHODS)[number];
 
-export interface ResearchedFoodNutrient {
+export interface ResearchedFoodSubstance {
   displayName: string;
   unit: string;
   valuePer100g: number;
@@ -49,7 +49,7 @@ export interface ResearchedFoodVariantPreview {
   id: string;
   preparationMethod: PrepMethod;
   servings: Array<{ label: string; grams: number }>;
-  nutrients: ResearchedFoodNutrient[];
+  substances: ResearchedFoodSubstance[];
 }
 
 export interface ResearchedFoodResult {
@@ -95,9 +95,9 @@ const aiFoodSchema = z.object({
         preparationMethod: z.enum(VALID_PREP_METHODS).describe("How the food is prepared"),
         isDefault: z.boolean().describe("Whether this is the most common preparation"),
         description: z.string().describe("Brief variant description"),
-        nutrients: z.array(
+        substances: z.array(
           z.object({
-            nutrientName: z.string().describe("Internal nutrient name"),
+            substanceName: z.string().describe("Internal substance name"),
             valuePer100g: z.number().nonnegative().describe("Amount per 100g"),
             confidence: z.number().min(0).max(100).describe("Confidence 0-100"),
             reasoning: z.string().describe("Data source or reasoning"),
@@ -106,7 +106,7 @@ const aiFoodSchema = z.object({
       }),
     )
     .min(1)
-    .describe("Preparation variants with nutrient data"),
+    .describe("Preparation variants with substance data"),
 });
 
 /**
@@ -145,14 +145,14 @@ export async function aiResearchFood(
     source?: string;
   },
 ): Promise<ResearchedFoodResult | { error: string }> {
-  const allNutrients = await db.select().from(nutrients).orderBy(nutrients.sortOrder);
+  const allSubstances = await db.select().from(substances).orderBy(substances.sortOrder);
 
-  if (allNutrients.length === 0) {
-    return { error: "No nutrients configured in the system." };
+  if (allSubstances.length === 0) {
+    return { error: "No substances configured in the system." };
   }
 
-  const nutrientList = allNutrients.map((n) => `${n.displayName} (${n.unit})`).join(", ");
-  const nutrientNames = allNutrients.map((n) => n.name).join(", ");
+  const substanceList = allSubstances.map((n) => `${n.displayName} (${n.unit})`).join(", ");
+  const substanceNames = allSubstances.map((n) => n.name).join(", ");
 
   const langfuse = getLangfuse();
   const trace = langfuse.trace({
@@ -178,16 +178,16 @@ export async function aiResearchFood(
     const generation = trace.generation({
       name: "generate-food-profile",
       model: modelName,
-      input: { query, nutrients: nutrientNames },
+      input: { query, substances: substanceNames },
     });
 
     const { output: foodData, usage } = await generateText({
       model,
       output: Output.object({ schema: aiFoodSchema }),
-      prompt: `Research the full nutrient profile for: "${query}"
+      prompt: `Research the full substance profile for: "${query}"
 
-Provide nutrient values for ALL of these nutrients: ${nutrientList}
-Use nutrient names exactly as: ${nutrientNames}
+Provide substance values for ALL of these substances: ${substanceList}
+Use substance names exactly as: ${substanceNames}
 
 Rules:
 - Always include a "raw" variant as the primary form
@@ -235,7 +235,7 @@ Rules:
       return { error: "AI could not identify this food. Try a more specific name." };
     }
 
-    // Persist the food, variants, nutrients, and observations
+    // Persist the food, variants, substances, and observations
     const sourceId = await getOrCreateAiSource();
     let observationCount = 0;
 
@@ -248,7 +248,7 @@ Rules:
       })
       .returning({ id: foods.id });
 
-    const nutrientMap = new Map(allNutrients.map((n) => [n.name, n]));
+    const substanceMap = new Map(allSubstances.map((n) => [n.name, n]));
 
     const createdVariants: ResearchedFoodVariantPreview[] = [];
 
@@ -284,61 +284,61 @@ Rules:
         });
       }
 
-      const previewNutrients: ResearchedFoodNutrient[] = [];
+      const previewSubstances: ResearchedFoodSubstance[] = [];
 
-      // Create nutrient observations + resolved values
-      for (const nutrientData of variant.nutrients) {
-        const nutrient = nutrientMap.get(nutrientData.nutrientName);
-        if (!nutrient) continue;
+      // Create substance observations + resolved values
+      for (const substanceData of variant.substances) {
+        const substance = substanceMap.get(substanceData.substanceName);
+        if (!substance) continue;
 
-        previewNutrients.push({
-          displayName: nutrient.displayName,
-          unit: nutrient.unit,
-          valuePer100g: nutrientData.valuePer100g,
-          confidence: Math.min(nutrientData.confidence, 80),
+        previewSubstances.push({
+          displayName: substance.displayName,
+          unit: substance.unit,
+          valuePer100g: substanceData.valuePer100g,
+          confidence: Math.min(substanceData.confidence, 80),
         });
 
         const [record] = await db
           .insert(sourceRecords)
-          .values({ sourceId, rawData: nutrientData })
+          .values({ sourceId, rawData: substanceData })
           .returning({ id: sourceRecords.id });
 
         const [observation] = await db
-          .insert(nutrientObservations)
+          .insert(substanceObservations)
           .values({
             foodVariantId: fv.id,
-            nutrientId: nutrient.id,
-            value: String(nutrientData.valuePer100g),
-            unit: nutrient.unit,
+            substanceId: substance.id,
+            value: String(substanceData.valuePer100g),
+            unit: substance.unit,
             basisAmount: "100",
             basisUnit: "g",
             sourceRecordId: record.id,
             derivationType: "ai_extracted",
-            confidenceScore: Math.min(nutrientData.confidence, 80),
+            confidenceScore: Math.min(substanceData.confidence, 80),
             reviewStatus: "pending",
           })
-          .returning({ id: nutrientObservations.id });
+          .returning({ id: substanceObservations.id });
 
         await db.insert(evidenceItems).values({
           observationId: observation.id,
-          snippet: nutrientData.reasoning,
+          snippet: substanceData.reasoning,
         });
         observationCount++;
 
         const confidenceLabel =
-          nutrientData.confidence >= 80
+          substanceData.confidence >= 80
             ? "Good confidence"
-            : nutrientData.confidence >= 60
+            : substanceData.confidence >= 60
               ? "Moderate"
               : "Low";
 
-        await db.insert(resolvedNutrientValues).values({
+        await db.insert(resolvedSubstanceValues).values({
           foodVariantId: fv.id,
-          nutrientId: nutrient.id,
-          valuePer100g: String(nutrientData.valuePer100g),
-          confidenceScore: Math.min(nutrientData.confidence, 80),
+          substanceId: substance.id,
+          valuePer100g: String(substanceData.valuePer100g),
+          confidenceScore: Math.min(substanceData.confidence, 80),
           confidenceLabel,
-          sourceSummary: `AI-generated: ${nutrientData.reasoning}`,
+          sourceSummary: `AI-generated: ${substanceData.reasoning}`,
         });
       }
 
@@ -346,7 +346,7 @@ Rules:
         id: fv.id,
         preparationMethod: prepMethod,
         servings: variantServings,
-        nutrients: previewNutrients,
+        substances: previewSubstances,
       });
     }
 

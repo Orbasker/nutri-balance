@@ -9,9 +9,9 @@ import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodFeedback } from "@/lib/db/schema/feedback";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { nutrientObservations } from "@/lib/db/schema/observations";
+import { substanceObservations } from "@/lib/db/schema/observations";
 import { reviews } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { approveFoodSchema, deleteFoodSchema, dismissFeedbackSchema } from "@/lib/validators";
 
 export type AdminActionResult = { ok: true } | { error: string };
@@ -32,10 +32,10 @@ export async function getPendingFoods(): Promise<FoodReviewItem[]> {
     .from(foods)
     .innerJoin(foodVariants, eq(foodVariants.foodId, foods.id))
     .innerJoin(
-      nutrientObservations,
+      substanceObservations,
       and(
-        eq(nutrientObservations.foodVariantId, foodVariants.id),
-        eq(nutrientObservations.reviewStatus, "pending"),
+        eq(substanceObservations.foodVariantId, foodVariants.id),
+        eq(substanceObservations.reviewStatus, "pending"),
       ),
     )
     .groupBy(foods.id, foods.name, foods.category, foods.createdAt, foods.createdBy);
@@ -58,13 +58,13 @@ export async function getPendingFoods(): Promise<FoodReviewItem[]> {
   const obsStats = await db
     .select({
       foodId: foodVariants.foodId,
-      pendingCount: count(nutrientObservations.id),
-      avgConfidence: avg(nutrientObservations.confidenceScore),
+      pendingCount: count(substanceObservations.id),
+      avgConfidence: avg(substanceObservations.confidenceScore),
     })
-    .from(nutrientObservations)
-    .innerJoin(foodVariants, eq(foodVariants.id, nutrientObservations.foodVariantId))
+    .from(substanceObservations)
+    .innerJoin(foodVariants, eq(foodVariants.id, substanceObservations.foodVariantId))
     .where(
-      and(inArray(foodVariants.foodId, foodIds), eq(nutrientObservations.reviewStatus, "pending")),
+      and(inArray(foodVariants.foodId, foodIds), eq(substanceObservations.reviewStatus, "pending")),
     )
     .groupBy(foodVariants.foodId);
 
@@ -78,7 +78,7 @@ export async function getPendingFoods(): Promise<FoodReviewItem[]> {
     .where(inArray(foodFeedback.foodId, foodIds))
     .groupBy(foodFeedback.foodId);
 
-  // Batch fetch variants with their nutrients
+  // Batch fetch variants with their substances
   const variantRows = await db
     .select({
       id: foodVariants.id,
@@ -90,20 +90,20 @@ export async function getPendingFoods(): Promise<FoodReviewItem[]> {
 
   const variantIds = variantRows.map((v) => v.id);
 
-  const nutrientRows =
+  const substanceRows =
     variantIds.length > 0
       ? await db
           .select({
-            foodVariantId: nutrientObservations.foodVariantId,
-            nutrientDisplayName: nutrients.displayName,
-            value: nutrientObservations.value,
-            unit: nutrientObservations.unit,
-            confidenceScore: nutrientObservations.confidenceScore,
-            reviewStatus: nutrientObservations.reviewStatus,
+            foodVariantId: substanceObservations.foodVariantId,
+            substanceDisplayName: substances.displayName,
+            value: substanceObservations.value,
+            unit: substanceObservations.unit,
+            confidenceScore: substanceObservations.confidenceScore,
+            reviewStatus: substanceObservations.reviewStatus,
           })
-          .from(nutrientObservations)
-          .innerJoin(nutrients, eq(nutrients.id, nutrientObservations.nutrientId))
-          .where(inArray(nutrientObservations.foodVariantId, variantIds))
+          .from(substanceObservations)
+          .innerJoin(substances, eq(substances.id, substanceObservations.substanceId))
+          .where(inArray(substanceObservations.foodVariantId, variantIds))
       : [];
 
   // Build maps
@@ -116,25 +116,25 @@ export async function getPendingFoods(): Promise<FoodReviewItem[]> {
   );
   const feedbackCountMap = new Map(feedbackCounts.map((f) => [f.foodId, Number(f.feedbackCount)]));
 
-  // Build nutrient map per variant
-  const nutrientsByVariant = new Map<string, typeof nutrientRows>();
-  for (const n of nutrientRows) {
-    const list = nutrientsByVariant.get(n.foodVariantId) ?? [];
+  // Build substance map per variant
+  const substancesByVariant = new Map<string, typeof substanceRows>();
+  for (const n of substanceRows) {
+    const list = substancesByVariant.get(n.foodVariantId) ?? [];
     list.push(n);
-    nutrientsByVariant.set(n.foodVariantId, list);
+    substancesByVariant.set(n.foodVariantId, list);
   }
 
   // Build variant map per food
   const variantsByFood = new Map<
     string,
-    Array<{ id: string; preparationMethod: string; nutrients: typeof nutrientRows }>
+    Array<{ id: string; preparationMethod: string; substances: typeof substanceRows }>
   >();
   for (const v of variantRows) {
     const list = variantsByFood.get(v.foodId) ?? [];
     list.push({
       id: v.id,
       preparationMethod: v.preparationMethod,
-      nutrients: nutrientsByVariant.get(v.id) ?? [],
+      substances: substancesByVariant.get(v.id) ?? [],
     });
     variantsByFood.set(v.foodId, list);
   }
@@ -156,8 +156,8 @@ export async function getPendingFoods(): Promise<FoodReviewItem[]> {
       variants: foodVariantList.map((v) => ({
         id: v.id,
         preparationMethod: v.preparationMethod,
-        nutrients: v.nutrients.map((n) => ({
-          nutrientDisplayName: n.nutrientDisplayName,
+        substances: v.substances.map((n) => ({
+          substanceDisplayName: n.substanceDisplayName,
           value: Number(n.value),
           unit: n.unit,
           confidenceScore: n.confidenceScore ?? 50,
@@ -187,12 +187,12 @@ export async function approveFood(raw: unknown): Promise<AdminActionResult> {
 
   // Get pending observation IDs
   const pendingObs = await db
-    .select({ id: nutrientObservations.id })
-    .from(nutrientObservations)
+    .select({ id: substanceObservations.id })
+    .from(substanceObservations)
     .where(
       and(
-        inArray(nutrientObservations.foodVariantId, variantIds),
-        eq(nutrientObservations.reviewStatus, "pending"),
+        inArray(substanceObservations.foodVariantId, variantIds),
+        eq(substanceObservations.reviewStatus, "pending"),
       ),
     );
 
@@ -202,14 +202,14 @@ export async function approveFood(raw: unknown): Promise<AdminActionResult> {
 
   // Bulk update observations to approved
   await db
-    .update(nutrientObservations)
+    .update(substanceObservations)
     .set({ reviewStatus: "approved" })
-    .where(inArray(nutrientObservations.id, obsIds));
+    .where(inArray(substanceObservations.id, obsIds));
 
   // Insert review records
   await db.insert(reviews).values(
     obsIds.map((obsId) => ({
-      entityType: "nutrient_observation",
+      entityType: "substance_observation",
       entityId: obsId,
       reviewerId: adminId,
       status: "approved" as const,
@@ -241,7 +241,7 @@ export async function getFoodFeedback(foodId: string): Promise<FoodFeedbackItem[
     .select({
       id: foodFeedback.id,
       foodId: foodFeedback.foodId,
-      nutrientId: foodFeedback.nutrientId,
+      substanceId: foodFeedback.substanceId,
       foodVariantId: foodFeedback.foodVariantId,
       userId: foodFeedback.userId,
       type: foodFeedback.type,
@@ -252,18 +252,18 @@ export async function getFoodFeedback(foodId: string): Promise<FoodFeedbackItem[
       status: foodFeedback.status,
       createdAt: foodFeedback.createdAt,
       reviewedAt: foodFeedback.reviewedAt,
-      nutrientDisplayName: nutrients.displayName,
-      nutrientUnit: nutrients.unit,
+      substanceDisplayName: substances.displayName,
+      substanceUnit: substances.unit,
     })
     .from(foodFeedback)
-    .leftJoin(nutrients, eq(nutrients.id, foodFeedback.nutrientId))
+    .leftJoin(substances, eq(substances.id, foodFeedback.substanceId))
     .where(eq(foodFeedback.foodId, foodId))
     .orderBy(sql`${foodFeedback.createdAt} DESC`);
 
   return rows.map((r) => ({
     id: r.id,
     foodId: r.foodId,
-    nutrientId: r.nutrientId,
+    substanceId: r.substanceId,
     foodVariantId: r.foodVariantId,
     userId: r.userId,
     type: r.type,
@@ -274,8 +274,8 @@ export async function getFoodFeedback(foodId: string): Promise<FoodFeedbackItem[
     status: r.status,
     createdAt: r.createdAt.toISOString(),
     reviewedAt: r.reviewedAt?.toISOString() ?? null,
-    nutrientDisplayName: r.nutrientDisplayName ?? undefined,
-    nutrientUnit: r.nutrientUnit ?? undefined,
+    substanceDisplayName: r.substanceDisplayName ?? undefined,
+    substanceUnit: r.substanceUnit ?? undefined,
   }));
 }
 

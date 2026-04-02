@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { NutrientProgress, RecentLogEntry } from "@/types";
+import type { RecentLogEntry, SubstanceProgress as TrackedSubstanceProgress } from "@/types";
 
 import { fetchDashboardData } from "./actions";
 
@@ -16,12 +16,15 @@ function getTimeGreeting(): string {
   return "Good evening";
 }
 
-function getInsightMessage(nutrients: NutrientProgress[], todayLogCount: number): string {
-  if (nutrients.length === 0) return "Set up your tracking limits to start monitoring.";
+function getInsightMessage(
+  trackedSubstances: TrackedSubstanceProgress[],
+  todayLogCount: number,
+): string {
+  if (trackedSubstances.length === 0) return "Set up your tracking limits to start monitoring.";
   if (todayLogCount === 0) return "Log your first meal to see how your day shapes up.";
 
-  const exceeded = nutrients.filter((n) => n.status === "exceed");
-  const caution = nutrients.filter((n) => n.status === "caution");
+  const exceeded = trackedSubstances.filter((item) => item.status === "exceed");
+  const caution = trackedSubstances.filter((item) => item.status === "caution");
 
   if (exceeded.length > 0) {
     const names = exceeded.map((n) => n.displayName).join(", ");
@@ -32,22 +35,23 @@ function getInsightMessage(nutrients: NutrientProgress[], todayLogCount: number)
     return `${names} approaching your limit — choose carefully for the rest of the day.`;
   }
 
-  const avgPct = nutrients.reduce((s, n) => s + n.percentage, 0) / nutrients.length;
+  const avgPct =
+    trackedSubstances.reduce((sum, item) => sum + item.percentage, 0) / trackedSubstances.length;
   if (avgPct < 20) return "Just getting started — plenty of room for your meals today.";
   if (avgPct < 50) return "Looking good so far. You have room for a full meal.";
-  return "All nutrients within safe range. Great balance today!";
+  return "All tracked substances within safe range. Great balance today!";
 }
 
-function getOverallStatus(nutrients: NutrientProgress[]): {
+function getOverallStatus(trackedSubstances: TrackedSubstanceProgress[]): {
   label: string;
   icon: string;
   color: string;
 } {
-  if (nutrients.length === 0)
+  if (trackedSubstances.length === 0)
     return { label: "No limits set", icon: "tune", color: "text-blue-100/60" };
 
-  const exceeded = nutrients.filter((n) => n.status === "exceed").length;
-  const cautionCount = nutrients.filter((n) => n.status === "caution").length;
+  const exceeded = trackedSubstances.filter((item) => item.status === "exceed").length;
+  const cautionCount = trackedSubstances.filter((item) => item.status === "caution").length;
 
   if (exceeded > 0)
     return {
@@ -88,7 +92,7 @@ const statusBarColor: Record<string, string> = {
   exceed: "bg-md-error",
 };
 
-function NutrientCard({ item }: { item: NutrientProgress }) {
+function SubstanceCard({ item }: { item: TrackedSubstanceProgress }) {
   const badge = statusBadge[item.status] ?? statusBadge.safe;
   const barColor = statusBarColor[item.status] ?? statusBarColor.safe;
   const pct = Math.min(item.percentage, 100);
@@ -151,7 +155,7 @@ function MealRow({ log }: { log: RecentLogEntry }) {
 
 export default async function DashboardPage() {
   const {
-    nutrientProgress,
+    substanceProgress,
     recentLogs,
     displayName,
     healthGoal,
@@ -162,9 +166,10 @@ export default async function DashboardPage() {
 
   const firstName = displayName?.split(/\s+/)[0] ?? null;
   const greeting = getTimeGreeting();
-  const hasData = nutrientProgress.length > 0;
-  const insight = getInsightMessage(nutrientProgress, todayLogCount);
-  const overall = getOverallStatus(nutrientProgress);
+  const trackedSubstances = substanceProgress;
+  const hasData = trackedSubstances.length > 0;
+  const insight = getInsightMessage(trackedSubstances, todayLogCount);
+  const overall = getOverallStatus(trackedSubstances);
 
   return (
     <div className="px-6 max-w-screen-xl mx-auto space-y-8">
@@ -175,7 +180,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Daily Hero Summary */}
-      <section className="nutrient-glass rounded-[2.5rem] p-8 text-white shadow-[0_20px_40px_rgba(0,68,147,0.15)] relative overflow-hidden">
+      <section className="substance-glass rounded-[2.5rem] p-8 text-white shadow-[0_20px_40px_rgba(0,68,147,0.15)] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
         <div className="relative z-10">
           <p className="text-lg font-semibold mb-0.5">
@@ -208,11 +213,11 @@ export default async function DashboardPage() {
           {/* Personalized insight */}
           <p className="text-sm text-blue-100/80 mb-6 leading-relaxed max-w-md">{insight}</p>
 
-          {/* Mini nutrient bars */}
+          {/* Mini substance bars */}
           {hasData && (
             <div className="grid grid-cols-3 gap-4">
-              {nutrientProgress.slice(0, 3).map((n) => (
-                <div key={n.nutrientId} className="space-y-1">
+              {trackedSubstances.slice(0, 3).map((n) => (
+                <div key={n.substanceId} className="space-y-1">
                   <p className="text-[10px] text-blue-100/60 font-semibold uppercase">
                     {n.displayName}
                   </p>
@@ -236,7 +241,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {/* Key Micronutrients */}
+      {/* Key Microsubstances */}
       <section className="space-y-6">
         <div className="flex justify-between items-end">
           <h3 className="text-2xl font-bold tracking-tight text-md-on-surface">
@@ -246,10 +251,10 @@ export default async function DashboardPage() {
             See details
           </Link>
         </div>
-        {nutrientProgress.length === 0 ? (
+        {trackedSubstances.length === 0 ? (
           <div className="bg-md-surface-container-lowest p-6 rounded-3xl">
             <p className="text-md-on-surface-variant text-sm">
-              No tracking limits configured.{" "}
+              No tracked substances configured.{" "}
               <Link href="/settings" className="text-md-primary font-semibold underline">
                 Set up limits
               </Link>{" "}
@@ -258,8 +263,8 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {nutrientProgress.map((item) => (
-              <NutrientCard key={item.nutrientId} item={item} />
+            {trackedSubstances.map((item) => (
+              <SubstanceCard key={item.substanceId} item={item} />
             ))}
           </div>
         )}

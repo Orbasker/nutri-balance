@@ -4,25 +4,25 @@ import { useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { deleteNutrientValue, saveNutrientValue } from "@/app/(admin)/foods/actions";
-import type { AdminNutrientValue, NutrientOption } from "@/types";
+import { deleteSubstanceValue, saveSubstanceValue } from "@/app/(admin)/foods/actions";
+import type { AdminSubstanceValue, SubstanceOption } from "@/types";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-interface NutrientValueEditorProps {
+interface SubstanceValueEditorProps {
   foodVariantId: string;
-  nutrients: AdminNutrientValue[];
-  allNutrients: NutrientOption[];
+  substances: AdminSubstanceValue[];
+  allSubstances: SubstanceOption[];
 }
 
-export function NutrientValueEditor({
+export function SubstanceValueEditor({
   foodVariantId,
-  nutrients,
-  allNutrients,
-}: NutrientValueEditorProps) {
+  substances,
+  allSubstances,
+}: SubstanceValueEditorProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showAdd, setShowAdd] = useState(false);
@@ -30,9 +30,9 @@ export function NutrientValueEditor({
   const [error, setError] = useState<string | null>(null);
 
   // Add form state
-  const existingNutrientIds = new Set(nutrients.map((n) => n.nutrientId));
-  const availableNutrients = allNutrients.filter((n) => !existingNutrientIds.has(n.id));
-  const [newNutrientId, setNewNutrientId] = useState(availableNutrients[0]?.id ?? "");
+  const existingSubstanceIds = new Set(substances.map((n) => n.substanceId));
+  const availableSubstances = allSubstances.filter((n) => !existingSubstanceIds.has(n.id));
+  const [newSubstanceId, setNewSubstanceId] = useState(availableSubstances[0]?.id ?? "");
   const [newValue, setNewValue] = useState("");
   const [newConfidence, setNewConfidence] = useState("50");
 
@@ -43,9 +43,9 @@ export function NutrientValueEditor({
   const handleAdd = () => {
     setError(null);
     startTransition(async () => {
-      const result = await saveNutrientValue({
+      const result = await saveSubstanceValue({
         foodVariantId,
-        nutrientId: newNutrientId,
+        substanceId: newSubstanceId,
         valuePer100g: Number(newValue),
         confidenceScore: Number(newConfidence),
       });
@@ -62,13 +62,13 @@ export function NutrientValueEditor({
 
   const handleEdit = (resolvedId: string) => {
     setError(null);
-    const n = nutrients.find((n) => n.resolvedId === resolvedId);
+    const n = substances.find((n) => n.resolvedId === resolvedId);
     if (!n) return;
 
     startTransition(async () => {
-      const result = await saveNutrientValue({
+      const result = await saveSubstanceValue({
         foodVariantId,
-        nutrientId: n.nutrientId,
+        substanceId: n.substanceId,
         valuePer100g: Number(editValue),
         confidenceScore: Number(editConfidence),
         resolvedId,
@@ -83,15 +83,15 @@ export function NutrientValueEditor({
   };
 
   const handleDelete = (resolvedId: string) => {
-    if (!confirm("Delete this nutrient value?")) return;
+    if (!confirm("Delete this substance value?")) return;
     startTransition(async () => {
-      const result = await deleteNutrientValue({ resolvedId });
+      const result = await deleteSubstanceValue({ resolvedId });
       if ("error" in result) alert(result.error);
       router.refresh();
     });
   };
 
-  const startEdit = (n: AdminNutrientValue) => {
+  const startEdit = (n: AdminSubstanceValue) => {
     setEditingId(n.resolvedId);
     setEditValue(String(n.valuePer100g));
     setEditConfidence(String(n.confidenceScore));
@@ -100,8 +100,8 @@ export function NutrientValueEditor({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-base">Nutrient Values (per 100g)</CardTitle>
-        {availableNutrients.length > 0 && (
+        <CardTitle className="text-base">Substance Values (per 100g)</CardTitle>
+        {availableSubstances.length > 0 && (
           <Button size="sm" variant="outline" onClick={() => setShowAdd(!showAdd)}>
             <Plus className="mr-1 h-3 w-3" />
             Add
@@ -112,13 +112,13 @@ export function NutrientValueEditor({
         {showAdd && (
           <div className="rounded-lg border p-3 space-y-2">
             <div>
-              <label className="mb-1 block text-xs font-medium">Nutrient</label>
+              <label className="mb-1 block text-xs font-medium">Substance</label>
               <select
                 className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
-                value={newNutrientId}
-                onChange={(e) => setNewNutrientId(e.target.value)}
+                value={newSubstanceId}
+                onChange={(e) => setNewSubstanceId(e.target.value)}
               >
-                {availableNutrients.map((n) => (
+                {availableSubstances.map((n) => (
                   <option key={n.id} value={n.id}>
                     {n.displayName} ({n.unit})
                   </option>
@@ -161,16 +161,16 @@ export function NutrientValueEditor({
           </div>
         )}
 
-        {nutrients.length === 0 && !showAdd && (
-          <p className="text-muted-foreground py-2 text-sm">No nutrient values yet.</p>
+        {substances.length === 0 && !showAdd && (
+          <p className="text-muted-foreground py-2 text-sm">No substance values yet.</p>
         )}
 
         <div className="divide-y">
-          {nutrients.map((n) => (
+          {substances.map((n) => (
             <div key={n.resolvedId} className="flex items-center justify-between py-2">
               {editingId === n.resolvedId ? (
                 <div className="flex flex-1 items-center gap-2">
-                  <span className="w-32 text-sm">{n.nutrientDisplayName}</span>
+                  <span className="w-32 text-sm">{n.substanceDisplayName}</span>
                   <Input
                     type="number"
                     step="any"
@@ -179,7 +179,7 @@ export function NutrientValueEditor({
                     onChange={(e) => setEditValue(e.target.value)}
                     className="h-7 w-24 text-sm"
                   />
-                  <span className="text-muted-foreground text-xs">{n.nutrientUnit}</span>
+                  <span className="text-muted-foreground text-xs">{n.substanceUnit}</span>
                   <Input
                     type="number"
                     min="0"
@@ -213,9 +213,9 @@ export function NutrientValueEditor({
                     className="flex flex-1 cursor-pointer items-center gap-3"
                     onClick={() => startEdit(n)}
                   >
-                    <span className="w-32 text-sm">{n.nutrientDisplayName}</span>
+                    <span className="w-32 text-sm">{n.substanceDisplayName}</span>
                     <span className="text-sm font-medium">
-                      {n.valuePer100g} {n.nutrientUnit}
+                      {n.valuePer100g} {n.substanceUnit}
                     </span>
                     <span className="text-muted-foreground text-xs">
                       confidence: {n.confidenceScore}

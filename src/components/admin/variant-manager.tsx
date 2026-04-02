@@ -68,7 +68,7 @@ export function VariantManager({
   };
 
   const handleDelete = (variantId: string) => {
-    if (!confirm("Delete this variant and all its nutrient values?")) return;
+    if (!confirm("Delete this variant and all its substance values?")) return;
     startTransition(async () => {
       const result = await deleteVariant({ variantId });
       if ("error" in result) alert(result.error);
@@ -146,7 +146,7 @@ export function VariantManager({
               </div>
               {v.description && <p className="text-muted-foreground text-xs">{v.description}</p>}
               <p className="text-muted-foreground text-xs">
-                {v.nutrients.length} nutrient{v.nutrients.length !== 1 ? "s" : ""}
+                {v.substances.length} substance{v.substances.length !== 1 ? "s" : ""}
               </p>
             </div>
             <Button

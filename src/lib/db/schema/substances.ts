@@ -2,7 +2,7 @@ import { integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
 
 import { user } from "./auth";
 
-export const nutrients = pgTable("nutrients", {
+export const substances = pgTable("substances", {
   id: uuid().defaultRandom().primaryKey(),
   name: text().notNull(),
   unit: text().notNull(),

@@ -7,7 +7,7 @@ import { getBot } from "@/lib/bot";
 import { db } from "@/lib/db";
 import { accountLinkTokens } from "@/lib/db/schema/account-link-tokens";
 import { platformAccounts } from "@/lib/db/schema/platform-accounts";
-import { consumptionLogs, profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { consumptionLogs, profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export type LinkResult =
@@ -32,7 +32,7 @@ type LinkTokenContext = {
  * 1. Validate the token
  * 2. Get the old bot-only userId from the platform account
  * 3. Reassign platform_accounts.userId → web user
- * 4. Migrate user_nutrient_limits and consumption_logs (skip duplicates)
+ * 4. Migrate user_substance_limits and consumption_logs (skip duplicates)
  * 5. Clean up the old bot-only user + profile if no other platform accounts reference it
  * 6. Mark the token as used and notify the user back on chat
  */
@@ -109,23 +109,23 @@ export async function linkAccountToWeb(token: string): Promise<LinkResult> {
         .where(eq(platformAccounts.id, tokenContext.platformAccountId));
 
       const webLimits = await tx
-        .select({ nutrientId: userNutrientLimits.nutrientId })
-        .from(userNutrientLimits)
-        .where(eq(userNutrientLimits.userId, webUserId));
+        .select({ substanceId: userSubstanceLimits.substanceId })
+        .from(userSubstanceLimits)
+        .where(eq(userSubstanceLimits.userId, webUserId));
 
-      const webNutrientIds = new Set(webLimits.map((limit) => limit.nutrientId));
+      const webSubstanceIds = new Set(webLimits.map((limit) => limit.substanceId));
 
       const botLimits = await tx
         .select()
-        .from(userNutrientLimits)
-        .where(eq(userNutrientLimits.userId, oldBotUserId));
+        .from(userSubstanceLimits)
+        .where(eq(userSubstanceLimits.userId, oldBotUserId));
 
       for (const limit of botLimits) {
-        if (!webNutrientIds.has(limit.nutrientId)) {
+        if (!webSubstanceIds.has(limit.substanceId)) {
           await tx
-            .update(userNutrientLimits)
+            .update(userSubstanceLimits)
             .set({ userId: webUserId })
-            .where(eq(userNutrientLimits.id, limit.id));
+            .where(eq(userSubstanceLimits.id, limit.id));
         }
       }
 
@@ -228,7 +228,7 @@ function buildSuccessMessage(alreadyLinked: boolean): string {
     return "Your account is already linked to this web account. Your data is already synced between the bot and dashboard.";
   }
 
-  return "Your account has been linked. Your nutrient limits, meal logs, and profile are now synced with your web account. You can continue using the bot as usual.";
+  return "Your account has been linked. Your substance limits, meal logs, and profile are now synced with your web account. You can continue using the bot as usual.";
 }
 
 function buildFailureMessage(reason: string): string {

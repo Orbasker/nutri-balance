@@ -2,7 +2,7 @@
 
 ## What It Is
 
-A web app for people who need to monitor daily nutrient intake due to medical, dietary, or medication constraints (e.g., Vitamin K with blood thinners, potassium with kidney disease, sodium with hypertension).
+A web app for people who need to monitor daily substance intake due to medical, dietary, or medication constraints (e.g., Vitamin K with blood thinners, potassium with kidney disease, sodium with hypertension).
 
 ## Core Value Proposition
 
@@ -33,10 +33,10 @@ Answer the question: **"Can I eat this today?"** — with confidence scores, coo
 
 ## Screens
 
-1. **Dashboard** — Today's nutrient progress bars (consumed/remaining/limit), recent food log, quick actions
+1. **Dashboard** — Today's substance progress bars (consumed/remaining/limit), recent food log, quick actions
 2. **Food Search** — Autocomplete search with aliases, prep method badges, nutrient level indicators
 3. **Food Details** — Serving selector, nutrient breakdown, "if you eat this" projection (current + added = total → safe/caution/exceed), confidence badge
-4. **Daily Log** — Foods consumed today grouped by meal/time, edit/delete entries, daily nutrient totals
+4. **Daily Log** — Foods consumed today grouped by meal/time, edit/delete entries, daily substance totals
 5. **Settings** — Personal nutrient limits, strict vs stability mode, medication notes
 6. **Missing Food** — Request enrichment, submit manual data, "under verification" status
 7. **Admin Review** — Approve/reject AI-generated candidates, inspect evidence & confidence
@@ -48,14 +48,14 @@ Answer the question: **"Can I eat this today?"** — with confidence scores, coo
 - **foods** — Canonical food entities (spinach, broccoli, olive oil)
 - **food_aliases** — Alternative names, languages, slang, spelling variants → links to food
 - **food_variants** — Preparation states (raw, boiled, steamed, fried, drained) → links to food
-- **nutrients** — Nutrient definitions (vitamin K, potassium, sodium, iron...)
+- **substances** — Nutrient definitions (vitamin K, potassium, sodium, iron...)
 - **serving_measures** — Per 100g, per cup, per tablespoon, per piece
 
 ### Evidence & Observations
 
 - **sources** — Trusted references (USDA, FoodData Central, scientific papers)
 - **source_records** — Raw imported entries from each source
-- **nutrient_observations** — Core data: nutrient value + food variant + unit + basis + source + derivation + confidence + review status
+- **substance_observations** — Core data: nutrient value + food variant + unit + basis + source + derivation + confidence + review status
 - **evidence_items** — Traceable snippets, page refs, row locators linked to observations
 
 ### Cooking Science
@@ -67,11 +67,11 @@ Answer the question: **"Can I eat this today?"** — with confidence scores, coo
 ### Trust & Review
 
 - **reviews** — Approval workflow for observations, variants, aliases, candidates
-- **resolved_nutrient_values** — Final trusted, app-ready values (materialized/cached for fast lookup)
+- **resolved_substance_values** — Final trusted, app-ready values (materialized/cached for fast lookup)
 
 ### User Domain
 
-- **user_nutrient_limits** — Per-user daily limits with mode (strict/stability) and range
+- **user_substance_limits** — Per-user daily limits with mode (strict/stability) and range
 - **consumption_logs** — What the user ate, when, how much, which variant
 
 ### Enrichment Pipeline (future)
@@ -83,9 +83,9 @@ Answer the question: **"Can I eat this today?"** — with confidence scores, coo
 ## Calculation Logic
 
 ```
-nutrient_amount = (base_per_100g) × (portion_g / 100) × retention_factor
+substance_amount = (base_per_100g) × (portion_g / 100) × retention_factor
 remaining = daily_limit - consumed_today
-post_meal = consumed_today + nutrient_amount
+post_meal = consumed_today + substance_amount
 status = post_meal <= 80% limit → safe
          post_meal <= 100% limit → caution
          post_meal > limit → exceed
@@ -112,7 +112,7 @@ status = post_meal <= 80% limit → safe
 
 ### A. Read Path (user-facing, fast)
 
-User searches → resolved_nutrient_values → apply serving + prep + limits → return status
+User searches → resolved_substance_values → apply serving + prep + limits → return status
 
 ### B. Enrichment Path (background, grows DB)
 

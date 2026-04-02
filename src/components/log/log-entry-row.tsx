@@ -2,18 +2,18 @@
 
 import { useState, useTransition } from "react";
 
-import { deleteLogEntry, getVariantNutrientValues, updateLogEntry } from "@/app/(app)/log/actions";
-import type { LogEntry, LogEntryNutrientInfo } from "@/types";
+import { deleteLogEntry, getVariantSubstanceValues, updateLogEntry } from "@/app/(app)/log/actions";
+import type { LogEntry, LogEntrySubstanceInfo } from "@/types";
 
-import { calculateNutrientAmount } from "@/lib/calculations";
+import { calculateSubstanceAmount } from "@/lib/calculations";
 
 interface LogEntryRowProps {
   entry: LogEntry;
-  nutrientInfo: LogEntryNutrientInfo[];
+  substanceInfo: LogEntrySubstanceInfo[];
   mealColorClass: string;
 }
 
-export function LogEntryRow({ entry, nutrientInfo, mealColorClass }: LogEntryRowProps) {
+export function LogEntryRow({ entry, substanceInfo, mealColorClass }: LogEntryRowProps) {
   const [editing, setEditing] = useState(false);
   const [editGrams, setEditGrams] = useState(String(entry.quantity));
   const [error, setError] = useState<string | null>(null);
@@ -37,16 +37,16 @@ export function LogEntryRow({ entry, nutrientInfo, mealColorClass }: LogEntryRow
     }
 
     startEditTransition(async () => {
-      const valuesPerHundred = await getVariantNutrientValues(entry.foodVariantId);
+      const valuesPerHundred = await getVariantSubstanceValues(entry.foodVariantId);
       const newSnapshot: Record<string, number> = {};
-      for (const [nutrientId, per100g] of Object.entries(valuesPerHundred)) {
-        newSnapshot[nutrientId] = calculateNutrientAmount(per100g, newGrams);
+      for (const [substanceId, per100g] of Object.entries(valuesPerHundred)) {
+        newSnapshot[substanceId] = calculateSubstanceAmount(per100g, newGrams);
       }
 
       const result = await updateLogEntry({
         logId: entry.id,
         quantity: newGrams,
-        nutrientSnapshot: newSnapshot,
+        substanceSnapshot: newSnapshot,
       });
 
       if ("error" in result) {
@@ -57,8 +57,8 @@ export function LogEntryRow({ entry, nutrientInfo, mealColorClass }: LogEntryRow
     });
   };
 
-  const topNutrients = nutrientInfo
-    .filter((n) => entry.nutrientSnapshot[n.nutrientId] != null)
+  const topSubstances = substanceInfo
+    .filter((n) => entry.substanceSnapshot[n.substanceId] != null)
     .slice(0, 3);
 
   const time = new Date(entry.loggedAt).toLocaleTimeString([], {
@@ -117,15 +117,15 @@ export function LogEntryRow({ entry, nutrientInfo, mealColorClass }: LogEntryRow
           </div>
         ) : (
           <div className="flex gap-4 mt-2">
-            {topNutrients.map((n) => (
-              <div key={n.nutrientId} className="text-xs text-md-outline-variant">
+            {topSubstances.map((n) => (
+              <div key={n.substanceId} className="text-xs text-md-outline-variant">
                 <span className="font-bold text-md-on-surface">
-                  {entry.nutrientSnapshot[n.nutrientId]!.toFixed(1)}
+                  {entry.substanceSnapshot[n.substanceId]!.toFixed(1)}
                 </span>{" "}
                 {n.unit}
               </div>
             ))}
-            {topNutrients.length === 0 && (
+            {topSubstances.length === 0 && (
               <div className="text-xs text-md-outline-variant">
                 <span className="font-bold text-md-on-surface">{entry.quantity.toFixed(0)}</span>g
               </div>

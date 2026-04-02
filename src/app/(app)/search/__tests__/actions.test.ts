@@ -21,8 +21,8 @@ vi.mock("@/lib/auth-session", () => ({
 vi.mock("@/lib/ai/food-search-agent", () => ({
   aiResearchFood: vi.fn(),
 }));
-vi.mock("@/lib/ai/nutrient-search-agent", () => ({
-  aiSearchByNutrient: vi.fn(),
+vi.mock("@/lib/ai/substance-search-agent", () => ({
+  aiSearchBySubstance: vi.fn(),
 }));
 vi.mock("@/lib/ai/pdf-food-parser", () => ({
   parsePdfToFoods: vi.fn(),
@@ -35,9 +35,9 @@ vi.mock("@/lib/validators", () => ({
   },
 }));
 
-describe("listNutrients", () => {
-  it("returns nutrients sorted by sortOrder", async () => {
-    const mockNutrients = [
+describe("listSubstances", () => {
+  it("returns substances sorted by sortOrder", async () => {
+    const mockSubstances = [
       { id: "n1", name: "vitamin_c", displayName: "Vitamin C", unit: "mg" },
       { id: "n2", name: "iron", displayName: "Iron", unit: "mg" },
     ];
@@ -45,12 +45,12 @@ describe("listNutrients", () => {
     const { db } = await import("@/lib/db");
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        orderBy: vi.fn().mockResolvedValue(mockNutrients),
+        orderBy: vi.fn().mockResolvedValue(mockSubstances),
       }),
     } as unknown as ReturnType<typeof db.select>);
 
-    const { listNutrients } = await import("../actions");
-    const result = await listNutrients();
+    const { listSubstances } = await import("../actions");
+    const result = await listSubstances();
 
     expect(result).toEqual([
       { id: "n1", name: "vitamin_c", displayName: "Vitamin C", unit: "mg" },
@@ -58,7 +58,7 @@ describe("listNutrients", () => {
     ]);
   });
 
-  it("returns empty array when no nutrients exist", async () => {
+  it("returns empty array when no substances exist", async () => {
     const { db } = await import("@/lib/db");
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -66,16 +66,16 @@ describe("listNutrients", () => {
       }),
     } as unknown as ReturnType<typeof db.select>);
 
-    const { listNutrients } = await import("../actions");
-    const result = await listNutrients();
+    const { listSubstances } = await import("../actions");
+    const result = await listSubstances();
 
     expect(result).toEqual([]);
   });
 });
 
-describe("searchByNutrientId", () => {
+describe("searchBySubstanceId", () => {
   it("is exported as a function", async () => {
     const actions = await import("../actions");
-    expect(typeof actions.searchByNutrientId).toBe("function");
+    expect(typeof actions.searchBySubstanceId).toBe("function");
   });
 });

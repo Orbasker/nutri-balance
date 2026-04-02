@@ -7,14 +7,14 @@ import { z } from "zod";
 import { getModel } from "@/lib/ai-provider";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
 import {
   evidenceItems,
-  nutrientObservations,
   sourceRecords,
   sources,
+  substanceObservations,
 } from "@/lib/db/schema/observations";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { getLangfuse } from "@/lib/langfuse";
 import { flushLangfuse } from "@/lib/langfuse";
 import { recordAiUsageEvent } from "@/lib/ops-monitoring";
@@ -61,7 +61,7 @@ const parsedFoodSchema = z.object({
 });
 
 const pageParseSchema = z.object({
-  nutrient: z.string().describe("The nutrient name from the document"),
+  substance: z.string().describe("The substance name from the document"),
   unit: z.string().describe("The unit (mcg, mg, g, IU)"),
   foods: z.array(parsedFoodSchema).describe("ALL food entries on this page"),
 });
@@ -96,8 +96,8 @@ interface ParsedEntry {
   category: string;
   measureGrams?: number;
   measure?: string;
-  nutrientName: string;
-  nutrientUnit: string;
+  substanceName: string;
+  substanceUnit: string;
 }
 
 /**
@@ -179,8 +179,8 @@ Rules:
       category: f.c,
       measureGrams: f.g,
       measure: f.m,
-      nutrientName: object.nutrient,
-      nutrientUnit: object.unit,
+      substanceName: object.substance,
+      substanceUnit: object.unit,
     }));
   } catch (error) {
     console.warn(`Failed to parse page ${pageNumber}:`, error);
@@ -190,7 +190,7 @@ Rules:
 }
 
 /**
- * Parse a PDF file containing nutrient data for foods.
+ * Parse a PDF file containing substance data for foods.
  * Processes page by page to handle large documents.
  * Sends PDF natively to AI model (Gemini supports PDF input).
  */
@@ -224,7 +224,7 @@ export async function parsePdfToFoods(
       schema: z.object({
         totalPages: z.number().describe("Total number of pages in the PDF"),
         title: z.string().describe("Document title"),
-        nutrient: z.string().describe("Primary nutrient this document covers"),
+        substance: z.string().describe("Primary substance this document covers"),
       }),
       messages: [
         {
@@ -233,7 +233,7 @@ export async function parsePdfToFoods(
             { type: "file", data: pdfBase64, mediaType: "application/pdf" },
             {
               type: "text",
-              text: "Extract the total page count, document title, and primary nutrient from this PDF. Return JSON only.",
+              text: "Extract the total page count, document title, and primary substance from this PDF. Return JSON only.",
             },
           ],
         },
@@ -284,19 +284,19 @@ export async function parsePdfToFoods(
       return { error: "No food entries could be extracted from this document." };
     }
 
-    // Step 3: Match nutrients and insert
-    const allNutrients = await db.select().from(nutrients);
-    const nutrientLookup = new Map<string, (typeof allNutrients)[0]>();
-    for (const n of allNutrients) {
-      nutrientLookup.set(n.displayName.toLowerCase(), n);
-      nutrientLookup.set(n.name.toLowerCase(), n);
+    // Step 3: Match substances and insert
+    const allSubstances = await db.select().from(substances);
+    const substanceLookup = new Map<string, (typeof allSubstances)[0]>();
+    for (const n of allSubstances) {
+      substanceLookup.set(n.displayName.toLowerCase(), n);
+      substanceLookup.set(n.name.toLowerCase(), n);
     }
 
-    const findNutrient = (name: string) => {
+    const findSubstance = (name: string) => {
       const lower = name.toLowerCase();
       return (
-        nutrientLookup.get(lower) ??
-        allNutrients.find(
+        substanceLookup.get(lower) ??
+        allSubstances.find(
           (n) =>
             lower.includes(n.displayName.toLowerCase()) || lower.includes(n.name.toLowerCase()),
         )
@@ -309,8 +309,8 @@ export async function parsePdfToFoods(
     let skipped = 0;
 
     for (const entry of allEntries) {
-      const entryNutrient = findNutrient(entry.nutrientName);
-      if (!entryNutrient) {
+      const entrySubstance = findSubstance(entry.substanceName);
+      if (!entrySubstance) {
         skipped++;
         continue;
       }
@@ -371,12 +371,12 @@ export async function parsePdfToFoods(
         .returning({ id: sourceRecords.id });
 
       const [observation] = await db
-        .insert(nutrientObservations)
+        .insert(substanceObservations)
         .values({
           foodVariantId: fv.id,
-          nutrientId: entryNutrient.id,
+          substanceId: entrySubstance.id,
           value: String(entry.valuePer100g),
-          unit: entryNutrient.unit,
+          unit: entrySubstance.unit,
           basisAmount: "100",
           basisUnit: "g",
           sourceRecordId: record.id,
@@ -384,17 +384,17 @@ export async function parsePdfToFoods(
           confidenceScore: 90,
           reviewStatus: "pending",
         })
-        .returning({ id: nutrientObservations.id });
+        .returning({ id: substanceObservations.id });
 
       await db.insert(evidenceItems).values({
         observationId: observation.id,
-        snippet: `${meta.title}: ${entry.name} — ${entry.valuePer100g} ${entryNutrient.unit}/100g`,
+        snippet: `${meta.title}: ${entry.name} — ${entry.valuePer100g} ${entrySubstance.unit}/100g`,
         url: sourceUrl ?? null,
       });
 
-      await db.insert(resolvedNutrientValues).values({
+      await db.insert(resolvedSubstanceValues).values({
         foodVariantId: fv.id,
-        nutrientId: entryNutrient.id,
+        substanceId: entrySubstance.id,
         valuePer100g: String(entry.valuePer100g),
         confidenceScore: 90,
         confidenceLabel: "High confidence",

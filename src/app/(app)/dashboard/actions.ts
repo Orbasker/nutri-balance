@@ -1,17 +1,17 @@
 "use server";
 
-import type { NutrientProgress, RecentLogEntry } from "@/types";
+import type { RecentLogEntry, SubstanceProgress } from "@/types";
 import { and, desc, eq, gte } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
-import { getNutrientStatus } from "@/lib/calculations";
+import { getSubstanceStatus } from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { consumptionLogs, profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { substances } from "@/lib/db/schema/substances";
+import { consumptionLogs, profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 
 export async function fetchDashboardData(): Promise<{
-  nutrientProgress: NutrientProgress[];
+  substanceProgress: SubstanceProgress[];
   recentLogs: RecentLogEntry[];
   displayName: string | null;
   healthGoal: string | null;
@@ -23,7 +23,7 @@ export async function fetchDashboardData(): Promise<{
 
   if (!session) {
     return {
-      nutrientProgress: [],
+      substanceProgress: [],
       recentLogs: [],
       displayName: null,
       healthGoal: null,
@@ -44,18 +44,18 @@ export async function fetchDashboardData(): Promise<{
   const [limits, logs, recentLogs, profile, streakLogs] = await Promise.all([
     db
       .select({
-        nutrientId: userNutrientLimits.nutrientId,
-        dailyLimit: userNutrientLimits.dailyLimit,
-        nutrientName: nutrients.name,
-        nutrientUnit: nutrients.unit,
-        nutrientDisplayName: nutrients.displayName,
-        nutrientSortOrder: nutrients.sortOrder,
+        substanceId: userSubstanceLimits.substanceId,
+        dailyLimit: userSubstanceLimits.dailyLimit,
+        substanceName: substances.name,
+        substanceUnit: substances.unit,
+        substanceDisplayName: substances.displayName,
+        substanceSortOrder: substances.sortOrder,
       })
-      .from(userNutrientLimits)
-      .innerJoin(nutrients, eq(nutrients.id, userNutrientLimits.nutrientId))
-      .where(eq(userNutrientLimits.userId, userId)),
+      .from(userSubstanceLimits)
+      .innerJoin(substances, eq(substances.id, userSubstanceLimits.substanceId))
+      .where(eq(userSubstanceLimits.userId, userId)),
     db
-      .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+      .select({ substanceSnapshot: consumptionLogs.substanceSnapshot })
       .from(consumptionLogs)
       .where(and(eq(consumptionLogs.userId, userId), gte(consumptionLogs.loggedAt, todayStart))),
     db
@@ -105,39 +105,49 @@ export async function fetchDashboardData(): Promise<{
     }
   }
 
-  // Aggregate consumed amounts per nutrient from snapshots
-  const consumedByNutrient: Record<string, number> = {};
+  // Aggregate consumed amounts per substance from snapshots
+  const consumedBySubstance: Record<string, number> = {};
   for (const log of logs) {
-    const snapshot = log.nutrientSnapshot as Record<string, number> | null;
+    const snapshot = log.substanceSnapshot as Record<string, number> | null;
     if (!snapshot || typeof snapshot !== "object") continue;
-    for (const [nutrientId, amount] of Object.entries(snapshot)) {
-      consumedByNutrient[nutrientId] = (consumedByNutrient[nutrientId] ?? 0) + amount;
+    for (const [substanceId, amount] of Object.entries(snapshot)) {
+      consumedBySubstance[substanceId] = (consumedBySubstance[substanceId] ?? 0) + amount;
     }
   }
 
-  // Build progress for each tracked nutrient
-  const nutrientProgress: NutrientProgress[] = limits
+  // Build progress for each tracked substance
+  const substanceProgress: SubstanceProgress[] = limits
     .map((limit) => {
       const dailyLimit = Number(limit.dailyLimit);
-      const consumed = consumedByNutrient[limit.nutrientId] ?? 0;
+      const consumed = consumedBySubstance[limit.substanceId] ?? 0;
       const remaining = Math.max(0, dailyLimit - consumed);
       const percentage = dailyLimit > 0 ? (consumed / dailyLimit) * 100 : 0;
 
       return {
-        nutrientId: limit.nutrientId,
-        name: limit.nutrientName,
-        displayName: limit.nutrientDisplayName,
-        unit: limit.nutrientUnit,
+        substanceId: limit.substanceId,
+        name: limit.substanceName,
+        displayName: limit.substanceDisplayName,
+        unit: limit.substanceUnit,
         dailyLimit,
         consumed,
         remaining,
         percentage,
-        status: getNutrientStatus(consumed, dailyLimit),
-        sortOrder: limit.nutrientSortOrder ?? 0,
+        status: getSubstanceStatus(consumed, dailyLimit),
+        sortOrder: limit.substanceSortOrder ?? 0,
       };
     })
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map(({ sortOrder: _sortOrder, ...rest }) => rest);
+    .map((item) => ({
+      substanceId: item.substanceId,
+      name: item.name,
+      displayName: item.displayName,
+      unit: item.unit,
+      dailyLimit: item.dailyLimit,
+      consumed: item.consumed,
+      remaining: item.remaining,
+      percentage: item.percentage,
+      status: item.status,
+    }));
 
   // Map recent logs
   const mappedRecent: RecentLogEntry[] = recentLogs.map((log) => ({
@@ -151,7 +161,7 @@ export async function fetchDashboardData(): Promise<{
   }));
 
   return {
-    nutrientProgress,
+    substanceProgress,
     recentLogs: mappedRecent,
     displayName: profile?.firstName ?? profile?.displayName ?? session.user.name ?? null,
     healthGoal: profile?.healthGoal ?? null,

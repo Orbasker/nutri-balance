@@ -9,7 +9,7 @@ DO $$ BEGIN
     'new',
     'awaiting_name',
     'awaiting_goals',
-    'awaiting_nutrients',
+    'awaiting_substances',
     'awaiting_limits',
     'complete'
   );

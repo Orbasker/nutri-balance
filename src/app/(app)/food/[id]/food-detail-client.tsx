@@ -4,15 +4,15 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import type { FoodDetail, FoodVariantDetail, NutrientImpact } from "@/types";
+import type { FoodDetail, FoodVariantDetail, SubstanceImpact } from "@/types";
 
 import { ConfidenceBadge } from "@/components/food/confidence-badge";
-import { NutrientBreakdown } from "@/components/food/nutrient-breakdown";
-import { NutrientImpactPanel } from "@/components/food/nutrient-impact-panel";
 import { ServingSelector } from "@/components/food/serving-selector";
+import { SubstanceBreakdown } from "@/components/food/substance-breakdown";
+import { SubstanceImpactPanel } from "@/components/food/substance-impact-panel";
 import { VariantSelector } from "@/components/food/variant-selector";
 
-import { calculateNutrientAmount, getNutrientStatus } from "@/lib/calculations";
+import { calculateSubstanceAmount, getSubstanceStatus } from "@/lib/calculations";
 
 import { addToToday } from "./actions";
 
@@ -20,7 +20,7 @@ interface FoodDetailClientProps {
   food: FoodDetail;
   todaysConsumption: Record<string, number>;
   userLimits: Array<{
-    nutrientId: string;
+    substanceId: string;
     dailyLimit: number;
     mode: "strict" | "stability";
     rangeMin: number | null;
@@ -49,18 +49,18 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
     return (measure?.gramsEquivalent ?? 100) * quantity;
   }, [customGrams, quantity, selectedVariant, servingMeasureId]);
 
-  const impacts: NutrientImpact[] = useMemo(() => {
+  const impacts: SubstanceImpact[] = useMemo(() => {
     if (!selectedVariant) return [];
-    const limitsMap = new Map(userLimits.map((l) => [l.nutrientId, l]));
+    const limitsMap = new Map(userLimits.map((l) => [l.substanceId, l]));
 
-    return selectedVariant.nutrients.map((n) => {
-      const addedAmount = calculateNutrientAmount(n.valuePer100g, portionGrams);
-      const consumedToday = todaysConsumption[n.nutrientId] ?? 0;
+    return selectedVariant.substances.map((n) => {
+      const addedAmount = calculateSubstanceAmount(n.valuePer100g, portionGrams);
+      const consumedToday = todaysConsumption[n.substanceId] ?? 0;
       const newTotal = consumedToday + addedAmount;
-      const limit = limitsMap.get(n.nutrientId);
+      const limit = limitsMap.get(n.substanceId);
 
       return {
-        nutrientId: n.nutrientId,
+        substanceId: n.substanceId,
         displayName: n.displayName,
         unit: n.unit,
         consumedToday,
@@ -70,15 +70,15 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
         mode: limit?.mode ?? null,
         rangeMin: limit?.rangeMin ?? null,
         rangeMax: limit?.rangeMax ?? null,
-        status: getNutrientStatus(newTotal, limit?.dailyLimit ?? null),
+        status: getSubstanceStatus(newTotal, limit?.dailyLimit ?? null),
       };
     });
   }, [selectedVariant, portionGrams, todaysConsumption, userLimits]);
 
-  const nutrientSnapshot = useMemo(() => {
+  const substanceSnapshot = useMemo(() => {
     const snap: Record<string, number> = {};
     for (const impact of impacts) {
-      snap[impact.nutrientId] = impact.addedAmount;
+      snap[impact.substanceId] = impact.addedAmount;
     }
     return snap;
   }, [impacts]);
@@ -105,7 +105,7 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
         servingMeasureId: customGrams !== null ? null : servingMeasureId,
         quantity: portionGrams,
         gramsAmount: portionGrams,
-        nutrientSnapshot,
+        substanceSnapshot,
         mealLabel: mealLabel || undefined,
       });
       if ("error" in result) {
@@ -121,11 +121,11 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
     return <p className="text-md-on-surface-variant">No variants available for this food.</p>;
   }
 
-  // Get average confidence from nutrients
+  // Get average confidence from substances
   const avgConfidence =
-    selectedVariant.nutrients.length > 0
-      ? selectedVariant.nutrients.reduce((s, n) => s + n.confidenceScore, 0) /
-        selectedVariant.nutrients.length
+    selectedVariant.substances.length > 0
+      ? selectedVariant.substances.reduce((s, n) => s + n.confidenceScore, 0) /
+        selectedVariant.substances.length
       : 0;
   const confidenceLabel =
     avgConfidence >= 90
@@ -170,11 +170,11 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
         }}
       />
 
-      {/* Nutrient Breakdown */}
-      <NutrientBreakdown nutrients={selectedVariant.nutrients} portionGrams={portionGrams} />
+      {/* Substance Breakdown */}
+      <SubstanceBreakdown substances={selectedVariant.substances} portionGrams={portionGrams} />
 
       {/* Impact Panel */}
-      <NutrientImpactPanel
+      <SubstanceImpactPanel
         impacts={impacts}
         portionGrams={portionGrams}
         mealLabel={mealLabel}

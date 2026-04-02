@@ -5,7 +5,7 @@ import {
   aiResearchFood,
   checkCanIEat,
   getDailySummary,
-  getFoodNutrients,
+  getFoodSubstances,
   recordMeal,
   searchFood,
 } from "@/lib/bot/tools";
@@ -15,8 +15,8 @@ describe("shared tool exports", () => {
     expect(typeof searchFood).toBe("function");
   });
 
-  it("exports getFoodNutrients as a function", () => {
-    expect(typeof getFoodNutrients).toBe("function");
+  it("exports getFoodSubstances as a function", () => {
+    expect(typeof getFoodSubstances).toBe("function");
   });
 
   it("exports checkCanIEat as a function", () => {

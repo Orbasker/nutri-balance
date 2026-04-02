@@ -1,4 +1,4 @@
-import type { FoodSearchResult, FoodVariantSummary, NutrientSummary } from "@/types";
+import type { FoodSearchResult, FoodVariantSummary, SubstanceSummary } from "@/types";
 
 import { getConfidenceLabel } from "@/lib/calculations";
 
@@ -9,22 +9,22 @@ export interface SearchRow {
   variantId: string | null;
   preparationMethod: string | null;
   isDefault: boolean | null;
-  nutrientName: string | null;
-  nutrientDisplayName: string | null;
-  nutrientUnit: string | null;
+  substanceName: string | null;
+  substanceDisplayName: string | null;
+  substanceUnit: string | null;
   valuePer100g: string | null;
   confidenceScore: number | null;
   sourceSummary: string | null;
 }
 
 /**
- * Transform flat DB rows (food x variant x nutrient join) into grouped FoodSearchResult[].
- * Picks the highest-value nutrient per variant as the topNutrient.
+ * Transform flat DB rows (food x variant x substance join) into grouped FoodSearchResult[].
+ * Picks the highest-value substance per variant as the topSubstance.
  */
 export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
   if (rows.length === 0) return [];
 
-  // Group by food, then by variant, collecting nutrients per variant
+  // Group by food, then by variant, collecting substances per variant
   const foodMap = new Map<
     string,
     {
@@ -38,7 +38,7 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
           id: string;
           preparationMethod: string;
           isDefault: boolean;
-          nutrients: NutrientSummary[];
+          substances: SubstanceSummary[];
         }
       >;
     }
@@ -64,7 +64,7 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
           id: row.variantId,
           preparationMethod: row.preparationMethod ?? "raw",
           isDefault: row.isDefault ?? false,
-          nutrients: [],
+          substances: [],
         };
         food.variants.set(row.variantId, variant);
       }
@@ -73,12 +73,12 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
         food.isAiGenerated = true;
       }
 
-      if (row.nutrientName && row.valuePer100g !== null) {
-        variant.nutrients.push({
-          name: row.nutrientName,
-          displayName: row.nutrientDisplayName ?? row.nutrientName,
+      if (row.substanceName && row.valuePer100g !== null) {
+        variant.substances.push({
+          name: row.substanceName,
+          displayName: row.substanceDisplayName ?? row.substanceName,
           valuePer100g: parseFloat(row.valuePer100g),
-          unit: row.nutrientUnit ?? "",
+          unit: row.substanceUnit ?? "",
           confidenceScore: row.confidenceScore ?? 0,
           confidenceLabel: getConfidenceLabel(row.confidenceScore ?? 0),
         });
@@ -92,17 +92,17 @@ export function mapSearchRows(rows: SearchRow[]): FoodSearchResult[] {
     const variants: FoodVariantSummary[] = [];
 
     for (const variant of food.variants.values()) {
-      // Pick the nutrient with the highest value as the "top nutrient"
-      const topNutrient =
-        variant.nutrients.length > 0
-          ? variant.nutrients.reduce((best, n) => (n.valuePer100g > best.valuePer100g ? n : best))
+      // Pick the substance with the highest value as the "top substance"
+      const topSubstance =
+        variant.substances.length > 0
+          ? variant.substances.reduce((best, n) => (n.valuePer100g > best.valuePer100g ? n : best))
           : null;
 
       variants.push({
         id: variant.id,
         preparationMethod: variant.preparationMethod,
         isDefault: variant.isDefault,
-        topNutrient,
+        topSubstance,
       });
     }
 

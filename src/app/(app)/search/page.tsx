@@ -26,7 +26,7 @@ export default async function SearchPage() {
           {firstName ? `What are you eating, ${firstName}?` : "What are you eating?"}
         </h2>
         <p className="text-md-on-surface-variant font-medium">
-          Search any food to check its nutrients against your limits.
+          Search any food to check its substances against your limits.
         </p>
         <div className="mt-8">
           <SearchInput />

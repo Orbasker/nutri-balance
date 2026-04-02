@@ -14,8 +14,8 @@ interface FeedbackFormProps {
   variants: Array<{
     id: string;
     preparationMethod: string;
-    nutrients: Array<{
-      nutrientId: string;
+    substances: Array<{
+      substanceId: string;
       displayName: string;
       unit: string;
     }>;
@@ -27,21 +27,21 @@ export function FeedbackForm({ foodId, variants }: FeedbackFormProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState<"flag" | "correction">("flag");
   const [selectedVariantId, setSelectedVariantId] = useState("");
-  const [selectedNutrientId, setSelectedNutrientId] = useState("");
+  const [selectedSubstanceId, setSelectedSubstanceId] = useState("");
   const [message, setMessage] = useState("");
   const [suggestedValue, setSuggestedValue] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [result, setResult] = useState<{ ok?: boolean; error?: string } | null>(null);
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId);
-  const selectedNutrient = selectedVariant?.nutrients.find(
-    (n) => n.nutrientId === selectedNutrientId,
+  const selectedSubstance = selectedVariant?.substances.find(
+    (n) => n.substanceId === selectedSubstanceId,
   );
 
   function resetForm() {
     setType("flag");
     setSelectedVariantId("");
-    setSelectedNutrientId("");
+    setSelectedSubstanceId("");
     setMessage("");
     setSuggestedValue("");
     setSourceUrl("");
@@ -57,16 +57,16 @@ export function FeedbackForm({ foodId, variants }: FeedbackFormProps) {
         message,
       };
 
-      if (selectedNutrientId) {
-        data.nutrientId = selectedNutrientId;
+      if (selectedSubstanceId) {
+        data.substanceId = selectedSubstanceId;
       }
       if (selectedVariantId) {
         data.foodVariantId = selectedVariantId;
       }
       if (type === "correction" && suggestedValue) {
         data.suggestedValue = Number(suggestedValue);
-        if (selectedNutrient) {
-          data.suggestedUnit = selectedNutrient.unit;
+        if (selectedSubstance) {
+          data.suggestedUnit = selectedSubstance.unit;
         }
       }
       if (sourceUrl) {
@@ -125,7 +125,7 @@ export function FeedbackForm({ foodId, variants }: FeedbackFormProps) {
               value={selectedVariantId}
               onChange={(e) => {
                 setSelectedVariantId(e.target.value);
-                setSelectedNutrientId("");
+                setSelectedSubstanceId("");
               }}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             >
@@ -139,20 +139,20 @@ export function FeedbackForm({ foodId, variants }: FeedbackFormProps) {
           </div>
         )}
 
-        {/* Nutrient selection */}
+        {/* Substance selection */}
         <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="fb-nutrient">
-            Nutrient
+          <label className="text-xs font-medium text-muted-foreground" htmlFor="fb-substance">
+            Substance
           </label>
           <select
-            id="fb-nutrient"
-            value={selectedNutrientId}
-            onChange={(e) => setSelectedNutrientId(e.target.value)}
+            id="fb-substance"
+            value={selectedSubstanceId}
+            onChange={(e) => setSelectedSubstanceId(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="">General feedback</option>
-            {(selectedVariant?.nutrients ?? variants[0]?.nutrients ?? []).map((n) => (
-              <option key={n.nutrientId} value={n.nutrientId}>
+            {(selectedVariant?.substances ?? variants[0]?.substances ?? []).map((n) => (
+              <option key={n.substanceId} value={n.substanceId}>
                 {n.displayName} ({n.unit})
               </option>
             ))}
@@ -192,7 +192,7 @@ export function FeedbackForm({ foodId, variants }: FeedbackFormProps) {
         {type === "correction" && (
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground" htmlFor="fb-value">
-              Suggested value{selectedNutrient ? ` (${selectedNutrient.unit})` : ""}
+              Suggested value{selectedSubstance ? ` (${selectedSubstance.unit})` : ""}
             </label>
             <Input
               id="fb-value"

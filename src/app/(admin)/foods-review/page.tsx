@@ -10,7 +10,7 @@ export default async function FoodsReviewPage() {
       <div>
         <h2 className="text-lg font-semibold">Food Review</h2>
         <p className="text-sm text-muted-foreground">
-          Review, approve, or delete foods and their nutrient data.
+          Review, approve, or delete foods and their substance data.
         </p>
       </div>
       <FoodReviewGrid foods={foods} />

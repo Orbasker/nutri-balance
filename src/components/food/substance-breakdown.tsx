@@ -1,25 +1,25 @@
 "use client";
 
-import type { NutrientDetail } from "@/types";
+import type { SubstanceDetail } from "@/types";
 
-import { calculateNutrientAmount } from "@/lib/calculations";
+import { calculateSubstanceAmount } from "@/lib/calculations";
 
-interface NutrientBreakdownProps {
-  nutrients: NutrientDetail[];
+interface SubstanceBreakdownProps {
+  substances: SubstanceDetail[];
   portionGrams: number;
 }
 
-export function NutrientBreakdown({ nutrients, portionGrams }: NutrientBreakdownProps) {
-  // Calculate calories (first nutrient or find one with 'calorie' in name)
-  const calorieNutrient = nutrients.find(
+export function SubstanceBreakdown({ substances, portionGrams }: SubstanceBreakdownProps) {
+  // Calculate calories (first substance or find one with 'calorie' in name)
+  const calorieSubstance = substances.find(
     (n) => n.name.toLowerCase().includes("calorie") || n.name.toLowerCase().includes("energy"),
   );
-  const calories = calorieNutrient
-    ? calculateNutrientAmount(calorieNutrient.valuePer100g, portionGrams)
+  const calories = calorieSubstance
+    ? calculateSubstanceAmount(calorieSubstance.valuePer100g, portionGrams)
     : null;
 
-  const proteinNutrient = nutrients.find((n) => n.name.toLowerCase().includes("protein"));
-  const carbNutrient = nutrients.find(
+  const proteinSubstance = substances.find((n) => n.name.toLowerCase().includes("protein"));
+  const carbSubstance = substances.find(
     (n) => n.name.toLowerCase().includes("carb") || n.name.toLowerCase().includes("carbohydrate"),
   );
 
@@ -40,20 +40,20 @@ export function NutrientBreakdown({ nutrients, portionGrams }: NutrientBreakdown
             </span>
           </div>
         )}
-        {proteinNutrient && (
+        {proteinSubstance && (
           <div className="bg-md-surface-container-lowest p-6 rounded-2xl space-y-2">
             <span className="text-md-on-surface font-bold text-xl block">
-              {calculateNutrientAmount(proteinNutrient.valuePer100g, portionGrams).toFixed(1)}g
+              {calculateSubstanceAmount(proteinSubstance.valuePer100g, portionGrams).toFixed(1)}g
             </span>
             <span className="text-md-outline font-medium text-xs uppercase tracking-wider">
               Protein
             </span>
           </div>
         )}
-        {carbNutrient && (
+        {carbSubstance && (
           <div className="bg-md-surface-container-lowest p-6 rounded-2xl space-y-2">
             <span className="text-md-on-surface font-bold text-xl block">
-              {calculateNutrientAmount(carbNutrient.valuePer100g, portionGrams).toFixed(1)}g
+              {calculateSubstanceAmount(carbSubstance.valuePer100g, portionGrams).toFixed(1)}g
             </span>
             <span className="text-md-outline font-medium text-xs uppercase tracking-wider">
               Carbs
@@ -62,15 +62,15 @@ export function NutrientBreakdown({ nutrients, portionGrams }: NutrientBreakdown
         )}
       </div>
 
-      {/* Nutrient Impact Bars */}
+      {/* Substance Impact Bars */}
       <div className="bg-md-surface-container-low p-8 rounded-3xl space-y-6">
-        {nutrients.map((n) => {
-          const amount = calculateNutrientAmount(n.valuePer100g, portionGrams);
+        {substances.map((n) => {
+          const amount = calculateSubstanceAmount(n.valuePer100g, portionGrams);
           // Use a rough scale where 100% of bar = 2x the per-100g value
           const barPct = Math.min((n.valuePer100g / (n.valuePer100g * 2 || 100)) * 100, 100);
 
           return (
-            <div key={n.nutrientId} className="space-y-3">
+            <div key={n.substanceId} className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-md-on-surface">{n.displayName}</span>
                 <span className="text-md-on-surface-variant text-sm font-medium">

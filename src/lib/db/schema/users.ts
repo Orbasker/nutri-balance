@@ -3,7 +3,7 @@ import { date, jsonb, numeric, pgEnum, pgTable, text, timestamp, uuid } from "dr
 
 import { user } from "./auth";
 import { foodVariants, servingMeasures } from "./foods";
-import { nutrients } from "./nutrients";
+import { substances } from "./substances";
 
 export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
@@ -25,14 +25,14 @@ export const profiles = pgTable("profiles", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const userNutrientLimits = pgTable("user_nutrient_limits", {
+export const userSubstanceLimits = pgTable("user_substance_limits", {
   id: uuid().defaultRandom().primaryKey(),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  nutrientId: uuid("nutrient_id")
+  substanceId: uuid("substance_id")
     .notNull()
-    .references(() => nutrients.id, { onDelete: "cascade" }),
+    .references(() => substances.id, { onDelete: "cascade" }),
   dailyLimit: numeric("daily_limit").notNull(),
   mode: limitModeEnum().default("strict").notNull(),
   rangeMin: numeric("range_min"),
@@ -51,7 +51,7 @@ export const consumptionLogs = pgTable("consumption_logs", {
     onDelete: "set null",
   }),
   quantity: numeric().notNull(),
-  nutrientSnapshot: jsonb("nutrient_snapshot"),
+  substanceSnapshot: jsonb("substance_snapshot"),
   loggedAt: timestamp("logged_at", { withTimezone: true }).defaultNow().notNull(),
   mealLabel: text("meal_label"),
 });
@@ -59,18 +59,18 @@ export const consumptionLogs = pgTable("consumption_logs", {
 // Relations
 
 export const profilesRelations = relations(profiles, ({ many }) => ({
-  nutrientLimits: many(userNutrientLimits),
+  substanceLimits: many(userSubstanceLimits),
   consumptionLogs: many(consumptionLogs),
 }));
 
-export const userNutrientLimitsRelations = relations(userNutrientLimits, ({ one }) => ({
+export const userSubstanceLimitsRelations = relations(userSubstanceLimits, ({ one }) => ({
   profile: one(profiles, {
-    fields: [userNutrientLimits.userId],
+    fields: [userSubstanceLimits.userId],
     references: [profiles.id],
   }),
-  nutrient: one(nutrients, {
-    fields: [userNutrientLimits.nutrientId],
-    references: [nutrients.id],
+  substance: one(substances, {
+    fields: [userSubstanceLimits.substanceId],
+    references: [substances.id],
   }),
 }));
 

@@ -27,8 +27,8 @@ vi.mock("@/lib/db/schema/users", () => ({
   profiles: { id: "id", displayName: "display_name", clinicalNotes: "clinical_notes" },
 }));
 
-vi.mock("@/lib/db/schema/nutrients", () => ({
-  nutrients: { id: "id", displayName: "display_name", unit: "unit", sortOrder: "sort_order" },
+vi.mock("@/lib/db/schema/substances", () => ({
+  substances: { id: "id", displayName: "display_name", unit: "unit", sortOrder: "sort_order" },
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({

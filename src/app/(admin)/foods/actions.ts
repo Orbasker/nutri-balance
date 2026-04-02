@@ -2,21 +2,26 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { AdminFoodDetail, AdminFoodListItem, AdminFoodVariant, NutrientOption } from "@/types";
+import type {
+  AdminFoodDetail,
+  AdminFoodListItem,
+  AdminFoodVariant,
+  SubstanceOption,
+} from "@/types";
 import { count, eq } from "drizzle-orm";
 
 import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import {
   addVariantSchema,
   createFoodSchema,
   deleteFoodSchema,
-  deleteNutrientValueSchema,
+  deleteSubstanceValueSchema,
   deleteVariantSchema,
-  saveNutrientValueSchema,
+  saveSubstanceValueSchema,
   updateFoodSchema,
 } from "@/lib/validators";
 
@@ -72,20 +77,20 @@ export async function getAdminFoodDetail(foodId: string): Promise<AdminFoodDetai
       preparationMethod: foodVariants.preparationMethod,
       variantDescription: foodVariants.description,
       isDefault: foodVariants.isDefault,
-      resolvedId: resolvedNutrientValues.id,
-      nutrientId: nutrients.id,
-      nutrientName: nutrients.name,
-      nutrientDisplayName: nutrients.displayName,
-      nutrientUnit: nutrients.unit,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
-      confidenceScore: resolvedNutrientValues.confidenceScore,
+      resolvedId: resolvedSubstanceValues.id,
+      substanceId: substances.id,
+      substanceName: substances.name,
+      substanceDisplayName: substances.displayName,
+      substanceUnit: substances.unit,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
+      confidenceScore: resolvedSubstanceValues.confidenceScore,
     })
     .from(foods)
     .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-    .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
-    .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
+    .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
     .where(eq(foods.id, foodId))
-    .orderBy(foodVariants.preparationMethod, nutrients.sortOrder);
+    .orderBy(foodVariants.preparationMethod, substances.sortOrder);
 
   if (rows.length === 0) return null;
 
@@ -102,22 +107,22 @@ export async function getAdminFoodDetail(foodId: string): Promise<AdminFoodDetai
         preparationMethod: row.preparationMethod!,
         description: row.variantDescription ?? null,
         isDefault: row.isDefault ?? false,
-        nutrients: [],
+        substances: [],
       };
       variantMap.set(row.variantId, variant);
     }
 
     if (
       row.resolvedId &&
-      row.nutrientId &&
-      !variant.nutrients.some((n) => n.resolvedId === row.resolvedId)
+      row.substanceId &&
+      !variant.substances.some((n) => n.resolvedId === row.resolvedId)
     ) {
-      variant.nutrients.push({
+      variant.substances.push({
         resolvedId: row.resolvedId,
-        nutrientId: row.nutrientId,
-        nutrientName: row.nutrientName!,
-        nutrientDisplayName: row.nutrientDisplayName!,
-        nutrientUnit: row.nutrientUnit!,
+        substanceId: row.substanceId,
+        substanceName: row.substanceName!,
+        substanceDisplayName: row.substanceDisplayName!,
+        substanceUnit: row.substanceUnit!,
         valuePer100g: Number(row.valuePer100g),
         confidenceScore: row.confidenceScore ?? 50,
       });
@@ -133,16 +138,16 @@ export async function getAdminFoodDetail(foodId: string): Promise<AdminFoodDetai
   };
 }
 
-export async function getAllNutrients(): Promise<NutrientOption[]> {
+export async function getAllSubstances(): Promise<SubstanceOption[]> {
   const rows = await db
     .select({
-      id: nutrients.id,
-      name: nutrients.name,
-      displayName: nutrients.displayName,
-      unit: nutrients.unit,
+      id: substances.id,
+      name: substances.name,
+      displayName: substances.displayName,
+      unit: substances.unit,
     })
-    .from(nutrients)
-    .orderBy(nutrients.sortOrder);
+    .from(substances)
+    .orderBy(substances.sortOrder);
 
   return rows.map((r) => ({
     id: r.id,
@@ -248,26 +253,26 @@ export async function deleteVariant(raw: unknown): Promise<AdminActionResult> {
   return { ok: true };
 }
 
-export async function saveNutrientValue(raw: unknown): Promise<AdminActionResult> {
+export async function saveSubstanceValue(raw: unknown): Promise<AdminActionResult> {
   const adminId = await requireAdmin();
   if (!adminId) return { error: "Unauthorized." };
 
-  const parsed = saveNutrientValueSchema.safeParse(raw);
+  const parsed = saveSubstanceValueSchema.safeParse(raw);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
 
   if (parsed.data.resolvedId) {
     await db
-      .update(resolvedNutrientValues)
+      .update(resolvedSubstanceValues)
       .set({
         valuePer100g: String(parsed.data.valuePer100g),
         confidenceScore: parsed.data.confidenceScore,
         resolvedAt: new Date(),
       })
-      .where(eq(resolvedNutrientValues.id, parsed.data.resolvedId));
+      .where(eq(resolvedSubstanceValues.id, parsed.data.resolvedId));
   } else {
-    await db.insert(resolvedNutrientValues).values({
+    await db.insert(resolvedSubstanceValues).values({
       foodVariantId: parsed.data.foodVariantId,
-      nutrientId: parsed.data.nutrientId,
+      substanceId: parsed.data.substanceId,
       valuePer100g: String(parsed.data.valuePer100g),
       confidenceScore: parsed.data.confidenceScore,
     });
@@ -277,16 +282,16 @@ export async function saveNutrientValue(raw: unknown): Promise<AdminActionResult
   return { ok: true };
 }
 
-export async function deleteNutrientValue(raw: unknown): Promise<AdminActionResult> {
+export async function deleteSubstanceValue(raw: unknown): Promise<AdminActionResult> {
   const adminId = await requireAdmin();
   if (!adminId) return { error: "Unauthorized." };
 
-  const parsed = deleteNutrientValueSchema.safeParse(raw);
+  const parsed = deleteSubstanceValueSchema.safeParse(raw);
   if (!parsed.success) return { error: "Invalid ID." };
 
   await db
-    .delete(resolvedNutrientValues)
-    .where(eq(resolvedNutrientValues.id, parsed.data.resolvedId));
+    .delete(resolvedSubstanceValues)
+    .where(eq(resolvedSubstanceValues.id, parsed.data.resolvedId));
 
   revalidatePath("/review");
   return { ok: true };

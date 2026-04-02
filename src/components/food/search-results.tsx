@@ -17,7 +17,7 @@ export function SearchResults({
   onFiltersChange,
   onPageChange,
 }: SearchResultsProps) {
-  const { results, totalCount, page, pageSize, totalPages, nutrientName, availableCategories } =
+  const { results, totalCount, page, pageSize, totalPages, substanceName, availableCategories } =
     searchResult;
 
   if (totalCount === 0 && Object.values(filters).every((v) => !v)) {
@@ -35,15 +35,15 @@ export function SearchResults({
     <section className="space-y-6">
       <div className="flex justify-between items-end">
         <h3 className="text-sm font-bold uppercase tracking-widest text-md-outline">
-          {nutrientName ? `Foods with ${nutrientName}` : "Search Results"}
+          {substanceName ? `Foods with ${substanceName}` : "Search Results"}
         </h3>
         <span className="text-xs font-semibold text-md-primary">
           {totalCount} item{totalCount !== 1 ? "s" : ""} found
         </span>
       </div>
-      {nutrientName && (
+      {substanceName && (
         <p className="text-sm text-md-on-surface-variant -mt-3">
-          Sorted by highest {nutrientName} content per 100g
+          Sorted by highest {substanceName} content per 100g
         </p>
       )}
 

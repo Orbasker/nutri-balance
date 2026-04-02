@@ -16,7 +16,7 @@ import { foods } from "./foods";
 
 export const aiRunTypeEnum = pgEnum("ai_run_type", [
   "food_generation",
-  "nutrient_research_task",
+  "substance_research_task",
   "ai_review",
 ]);
 

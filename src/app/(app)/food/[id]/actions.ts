@@ -2,16 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { FoodDetail, FoodVariantDetail, NutrientDetail, NutrientImpact } from "@/types";
+import type { FoodDetail, FoodVariantDetail, SubstanceDetail, SubstanceImpact } from "@/types";
 import { and, eq, gte } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
-import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
+import {
+  calculateSubstanceAmount,
+  getConfidenceLabel,
+  getSubstanceStatus,
+} from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { consumptionLogs, userNutrientLimits } from "@/lib/db/schema/users";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
+import { consumptionLogs, userSubstanceLimits } from "@/lib/db/schema/users";
 import { addConsumptionLogSchema } from "@/lib/validators";
 
 export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> {
@@ -28,22 +32,22 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
       servingId: servingMeasures.id,
       servingLabel: servingMeasures.label,
       gramsEquivalent: servingMeasures.gramsEquivalent,
-      nutrientId: nutrients.id,
-      nutrientName: nutrients.name,
-      nutrientDisplayName: nutrients.displayName,
-      nutrientUnit: nutrients.unit,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
-      confidenceScore: resolvedNutrientValues.confidenceScore,
-      sourceSummary: resolvedNutrientValues.sourceSummary,
-      nutrientSortOrder: nutrients.sortOrder,
+      substanceId: substances.id,
+      substanceName: substances.name,
+      substanceDisplayName: substances.displayName,
+      substanceUnit: substances.unit,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
+      confidenceScore: resolvedSubstanceValues.confidenceScore,
+      sourceSummary: resolvedSubstanceValues.sourceSummary,
+      substanceSortOrder: substances.sortOrder,
     })
     .from(foods)
     .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
     .leftJoin(servingMeasures, eq(servingMeasures.foodVariantId, foodVariants.id))
-    .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
-    .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
+    .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
     .where(eq(foods.id, foodId))
-    .orderBy(nutrients.sortOrder);
+    .orderBy(substances.sortOrder);
 
   if (rows.length === 0) return null;
 
@@ -61,7 +65,7 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
         description: row.variantDescription ?? null,
         isDefault: row.isDefault ?? false,
         servingMeasures: [],
-        nutrients: [],
+        substances: [],
       };
       variantMap.set(row.variantId, variant);
     }
@@ -74,13 +78,13 @@ export async function getFoodDetail(foodId: string): Promise<FoodDetail | null> 
       });
     }
 
-    if (row.nutrientId && !variant.nutrients.some((n) => n.nutrientId === row.nutrientId)) {
+    if (row.substanceId && !variant.substances.some((n) => n.substanceId === row.substanceId)) {
       const score = row.confidenceScore ?? 50;
-      variant.nutrients.push({
-        nutrientId: row.nutrientId,
-        name: row.nutrientName!,
-        displayName: row.nutrientDisplayName!,
-        unit: row.nutrientUnit!,
+      variant.substances.push({
+        substanceId: row.substanceId,
+        name: row.substanceName!,
+        displayName: row.substanceDisplayName!,
+        unit: row.substanceUnit!,
         valuePer100g: Number(row.valuePer100g),
         confidenceScore: score,
         confidenceLabel: getConfidenceLabel(score),
@@ -106,24 +110,24 @@ export async function getTodaysConsumption(): Promise<Record<string, number>> {
   today.setHours(0, 0, 0, 0);
 
   const logs = await db
-    .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+    .select({ substanceSnapshot: consumptionLogs.substanceSnapshot })
     .from(consumptionLogs)
     .where(and(eq(consumptionLogs.userId, session.user.id), gte(consumptionLogs.loggedAt, today)));
 
   const totals: Record<string, number> = {};
   for (const log of logs) {
-    const snapshot = log.nutrientSnapshot as Record<string, number> | null;
+    const snapshot = log.substanceSnapshot as Record<string, number> | null;
     if (!snapshot) continue;
-    for (const [nutrientId, amount] of Object.entries(snapshot)) {
-      totals[nutrientId] = (totals[nutrientId] ?? 0) + amount;
+    for (const [substanceId, amount] of Object.entries(snapshot)) {
+      totals[substanceId] = (totals[substanceId] ?? 0) + amount;
     }
   }
   return totals;
 }
 
-export async function getUserNutrientLimits(): Promise<
+export async function getUserSubstanceLimits(): Promise<
   Array<{
-    nutrientId: string;
+    substanceId: string;
     dailyLimit: number;
     mode: "strict" | "stability";
     rangeMin: number | null;
@@ -135,17 +139,17 @@ export async function getUserNutrientLimits(): Promise<
 
   const data = await db
     .select({
-      nutrientId: userNutrientLimits.nutrientId,
-      dailyLimit: userNutrientLimits.dailyLimit,
-      mode: userNutrientLimits.mode,
-      rangeMin: userNutrientLimits.rangeMin,
-      rangeMax: userNutrientLimits.rangeMax,
+      substanceId: userSubstanceLimits.substanceId,
+      dailyLimit: userSubstanceLimits.dailyLimit,
+      mode: userSubstanceLimits.mode,
+      rangeMin: userSubstanceLimits.rangeMin,
+      rangeMax: userSubstanceLimits.rangeMax,
     })
-    .from(userNutrientLimits)
-    .where(eq(userNutrientLimits.userId, session.user.id));
+    .from(userSubstanceLimits)
+    .where(eq(userSubstanceLimits.userId, session.user.id));
 
   return data.map((row) => ({
-    nutrientId: row.nutrientId,
+    substanceId: row.substanceId,
     dailyLimit: Number(row.dailyLimit),
     mode: row.mode as "strict" | "stability",
     rangeMin: row.rangeMin ? Number(row.rangeMin) : null,
@@ -154,27 +158,27 @@ export async function getUserNutrientLimits(): Promise<
 }
 
 export async function calculateImpact(
-  nutrientDetails: NutrientDetail[],
+  substanceDetails: SubstanceDetail[],
   portionGrams: number,
   todaysConsumption: Record<string, number>,
   userLimits: Array<{
-    nutrientId: string;
+    substanceId: string;
     dailyLimit: number;
     mode: "strict" | "stability";
     rangeMin: number | null;
     rangeMax: number | null;
   }>,
-): Promise<NutrientImpact[]> {
-  const limitsMap = new Map(userLimits.map((l) => [l.nutrientId, l]));
+): Promise<SubstanceImpact[]> {
+  const limitsMap = new Map(userLimits.map((l) => [l.substanceId, l]));
 
-  return nutrientDetails.map((n) => {
-    const addedAmount = calculateNutrientAmount(n.valuePer100g, portionGrams);
-    const consumedToday = todaysConsumption[n.nutrientId] ?? 0;
+  return substanceDetails.map((n) => {
+    const addedAmount = calculateSubstanceAmount(n.valuePer100g, portionGrams);
+    const consumedToday = todaysConsumption[n.substanceId] ?? 0;
     const newTotal = consumedToday + addedAmount;
-    const limit = limitsMap.get(n.nutrientId);
+    const limit = limitsMap.get(n.substanceId);
 
     return {
-      nutrientId: n.nutrientId,
+      substanceId: n.substanceId,
       displayName: n.displayName,
       unit: n.unit,
       consumedToday,
@@ -184,7 +188,7 @@ export async function calculateImpact(
       mode: limit?.mode ?? null,
       rangeMin: limit?.rangeMin ?? null,
       rangeMax: limit?.rangeMax ?? null,
-      status: getNutrientStatus(newTotal, limit?.dailyLimit ?? null),
+      status: getSubstanceStatus(newTotal, limit?.dailyLimit ?? null),
     };
   });
 }
@@ -205,7 +209,7 @@ export async function addToToday(raw: unknown): Promise<AddToTodayResult> {
     foodVariantId: parsed.data.foodVariantId,
     servingMeasureId: parsed.data.servingMeasureId,
     quantity: String(parsed.data.quantity),
-    nutrientSnapshot: parsed.data.nutrientSnapshot,
+    substanceSnapshot: parsed.data.substanceSnapshot,
     mealLabel: parsed.data.mealLabel ?? null,
   });
 

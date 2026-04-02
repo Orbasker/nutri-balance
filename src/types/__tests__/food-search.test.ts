@@ -9,7 +9,7 @@ describe("FoodSearchResult type", () => {
       id: "variant-1",
       preparationMethod: "raw",
       isDefault: true,
-      topNutrient: {
+      topSubstance: {
         name: "Vitamin K",
         displayName: "Vitamin K",
         valuePer100g: 482.9,
@@ -29,7 +29,7 @@ describe("FoodSearchResult type", () => {
     expect(result.id).toBe("food-1");
     expect(result.name).toBe("Spinach");
     expect(result.variants).toHaveLength(1);
-    expect(result.variants[0].topNutrient?.confidenceLabel).toBe("high");
+    expect(result.variants[0].topSubstance?.confidenceLabel).toBe("high");
   });
 
   it("supports food with no variants", () => {
@@ -43,15 +43,15 @@ describe("FoodSearchResult type", () => {
     expect(result.variants).toHaveLength(0);
   });
 
-  it("supports variant with no top nutrient", () => {
+  it("supports variant with no top substance", () => {
     const variant: FoodVariantSummary = {
       id: "variant-2",
       preparationMethod: "boiled",
       isDefault: false,
-      topNutrient: null,
+      topSubstance: null,
     };
 
-    expect(variant.topNutrient).toBeNull();
+    expect(variant.topSubstance).toBeNull();
   });
 });
 

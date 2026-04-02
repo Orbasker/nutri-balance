@@ -8,15 +8,15 @@ import {
 } from "../cards";
 
 describe("formatCanIEatCard", () => {
-  it("returns a card with verdict and nutrient rows for a safe food", () => {
+  it("returns a card with verdict and substance rows for a safe food", () => {
     const result = {
       food: "Banana",
       preparationMethod: "raw",
       portionGrams: 120,
       overallVerdict: "safe" as const,
-      trackedNutrients: [
+      trackedSubstances: [
         {
-          nutrient: "Potassium",
+          substance: "Potassium",
           unit: "mg",
           consumedToday: 500,
           adding: 422,
@@ -26,7 +26,7 @@ describe("formatCanIEatCard", () => {
           status: "safe" as const,
         },
         {
-          nutrient: "Sodium",
+          substance: "Sodium",
           unit: "mg",
           consumedToday: 800,
           adding: 1,
@@ -54,9 +54,9 @@ describe("formatCanIEatCard", () => {
       preparationMethod: "fried",
       portionGrams: 150,
       overallVerdict: "caution" as const,
-      trackedNutrients: [
+      trackedSubstances: [
         {
-          nutrient: "Sodium",
+          substance: "Sodium",
           unit: "mg",
           consumedToday: 1500,
           adding: 400,
@@ -79,9 +79,9 @@ describe("formatCanIEatCard", () => {
       preparationMethod: "brined",
       portionGrams: 100,
       overallVerdict: "exceed" as const,
-      trackedNutrients: [
+      trackedSubstances: [
         {
-          nutrient: "Sodium",
+          substance: "Sodium",
           unit: "mg",
           consumedToday: 1900,
           adding: 500,
@@ -100,11 +100,11 @@ describe("formatCanIEatCard", () => {
 });
 
 describe("formatDailySummaryCard", () => {
-  it("returns a card with daily nutrient progress", () => {
+  it("returns a card with daily substance progress", () => {
     const summary = {
-      nutrients: [
+      substances: [
         {
-          nutrient: "Potassium",
+          substance: "Potassium",
           unit: "mg",
           consumed: 1500,
           dailyLimit: 3500,
@@ -112,7 +112,7 @@ describe("formatDailySummaryCard", () => {
           status: "safe" as const,
         },
         {
-          nutrient: "Sodium",
+          substance: "Sodium",
           unit: "mg",
           consumed: 1800,
           dailyLimit: 2000,
@@ -157,14 +157,14 @@ describe("formatFoodSearchCard", () => {
 });
 
 describe("formatMealLoggedCard", () => {
-  it("returns a confirmation card with nutrient impact", () => {
+  it("returns a confirmation card with substance impact", () => {
     const result = {
       food: "Banana",
       portionGrams: 120,
       mealLabel: "snack",
-      nutrients: [
-        { nutrient: "Potassium", unit: "mg", amount: 422 },
-        { nutrient: "Sodium", unit: "mg", amount: 1 },
+      substances: [
+        { substance: "Potassium", unit: "mg", amount: 422 },
+        { substance: "Sodium", unit: "mg", amount: 1 },
       ],
     };
 

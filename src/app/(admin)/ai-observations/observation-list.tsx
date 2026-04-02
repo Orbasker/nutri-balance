@@ -75,7 +75,7 @@ export function AiObservationList({ observations }: { observations: AiObservatio
                   </div>
 
                   <p className="mt-1 text-sm">
-                    <span className="text-muted-foreground">{obs.nutrientDisplayName}:</span>{" "}
+                    <span className="text-muted-foreground">{obs.substanceDisplayName}:</span>{" "}
                     <span className="font-medium">
                       {obs.value} {obs.unit}
                     </span>

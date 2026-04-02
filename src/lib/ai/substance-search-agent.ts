@@ -2,30 +2,30 @@
 
 import { flushLangfuse, getLangfuse } from "@/lib/langfuse";
 
-import { exploreNutrientSources } from "./explorer-agent";
+import { exploreSubstanceSources } from "./explorer-agent";
 import { parseDiscoveredSources } from "./parser-agent";
 
 /**
- * Nutrient Search Agent — orchestrates Explorer + Parser.
+ * Substance Search Agent — orchestrates Explorer + Parser.
  *
  * 1. Explorer finds data sources (USDA API, web pages, research notes)
  * 2. Parser extracts food entries from each source into the DB
  *
  * Returns the count of new foods created.
  */
-export async function aiSearchByNutrient(
-  nutrientId: string,
+export async function aiSearchBySubstance(
+  substanceId: string,
   userId: string,
 ): Promise<{ foodIds: string[]; summary: string } | { error: string }> {
   const langfuse = getLangfuse();
   const trace = langfuse.trace({
-    name: "nutrient-search-orchestrator",
+    name: "substance-search-orchestrator",
     userId,
-    metadata: { nutrientId },
+    metadata: { substanceId },
   });
 
   // Step 1: Explorer finds sources
-  const exploreResult = await exploreNutrientSources(nutrientId, userId);
+  const exploreResult = await exploreSubstanceSources(substanceId, userId);
 
   if ("error" in exploreResult) {
     trace.update({ output: { error: exploreResult.error } });
@@ -36,11 +36,11 @@ export async function aiSearchByNutrient(
   if (exploreResult.sources.length === 0) {
     trace.update({ output: { error: "No data sources found" } });
     await flushLangfuse();
-    return { error: "Could not find any data sources for this nutrient. Try uploading a PDF." };
+    return { error: "Could not find any data sources for this substance. Try uploading a PDF." };
   }
 
   // Step 2: Parser consumes discovered sources
-  const parseResult = await parseDiscoveredSources(exploreResult.sources, nutrientId, userId);
+  const parseResult = await parseDiscoveredSources(exploreResult.sources, substanceId, userId);
 
   if ("error" in parseResult) {
     trace.update({ output: { error: parseResult.error } });

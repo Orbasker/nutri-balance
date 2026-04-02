@@ -7,9 +7,9 @@ import { z } from "zod";
 import { getModel } from "@/lib/ai-provider";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { evidenceItems, nutrientObservations } from "@/lib/db/schema/observations";
-import { resolvedNutrientValues, reviews } from "@/lib/db/schema/reviews";
+import { evidenceItems, substanceObservations } from "@/lib/db/schema/observations";
+import { resolvedSubstanceValues, reviews } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { flushLangfuse, getLangfuse } from "@/lib/langfuse";
 import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
@@ -32,9 +32,9 @@ interface PendingItem {
   id: string;
   foodName: string;
   preparationMethod: string;
-  nutrientDisplayName: string;
-  nutrientName: string;
-  nutrientUnit: string;
+  substanceDisplayName: string;
+  substanceName: string;
+  substanceUnit: string;
   value: string;
   unit: string;
   confidenceScore: number | null;
@@ -47,27 +47,27 @@ interface PendingItem {
 async function fetchPendingObservations(): Promise<PendingItem[]> {
   const rows = await db
     .select({
-      id: nutrientObservations.id,
+      id: substanceObservations.id,
       foodName: foods.name,
       preparationMethod: foodVariants.preparationMethod,
-      nutrientDisplayName: nutrients.displayName,
-      nutrientName: nutrients.name,
-      nutrientUnit: nutrients.unit,
-      value: nutrientObservations.value,
-      unit: nutrientObservations.unit,
-      confidenceScore: nutrientObservations.confidenceScore,
+      substanceDisplayName: substances.displayName,
+      substanceName: substances.name,
+      substanceUnit: substances.unit,
+      value: substanceObservations.value,
+      unit: substanceObservations.unit,
+      confidenceScore: substanceObservations.confidenceScore,
     })
-    .from(nutrientObservations)
-    .innerJoin(foodVariants, eq(foodVariants.id, nutrientObservations.foodVariantId))
+    .from(substanceObservations)
+    .innerJoin(foodVariants, eq(foodVariants.id, substanceObservations.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .innerJoin(nutrients, eq(nutrients.id, nutrientObservations.nutrientId))
+    .innerJoin(substances, eq(substances.id, substanceObservations.substanceId))
     .where(
       and(
-        eq(nutrientObservations.reviewStatus, "pending"),
-        eq(nutrientObservations.derivationType, "ai_extracted"),
+        eq(substanceObservations.reviewStatus, "pending"),
+        eq(substanceObservations.derivationType, "ai_extracted"),
       ),
     )
-    .orderBy(foods.name, nutrients.sortOrder);
+    .orderBy(foods.name, substances.sortOrder);
 
   if (rows.length === 0) return [];
 
@@ -92,9 +92,9 @@ async function fetchPendingObservations(): Promise<PendingItem[]> {
     id: r.id,
     foodName: r.foodName,
     preparationMethod: r.preparationMethod,
-    nutrientDisplayName: r.nutrientDisplayName,
-    nutrientName: r.nutrientName,
-    nutrientUnit: r.nutrientUnit,
+    substanceDisplayName: r.substanceDisplayName,
+    substanceName: r.substanceName,
+    substanceUnit: r.substanceUnit,
     value: r.value,
     unit: r.unit,
     confidenceScore: r.confidenceScore,
@@ -118,7 +118,7 @@ async function reviewBatch(
       const evidence = item.evidenceSnippets.length
         ? `Evidence: ${item.evidenceSnippets.join("; ")}`
         : "No evidence provided";
-      return `${i + 1}. [ID: ${item.id}] ${item.foodName} (${item.preparationMethod}) — ${item.nutrientDisplayName}: ${item.value} ${item.unit} per 100g (confidence: ${item.confidenceScore ?? "unknown"}) | ${evidence}`;
+      return `${i + 1}. [ID: ${item.id}] ${item.foodName} (${item.preparationMethod}) — ${item.substanceDisplayName}: ${item.value} ${item.unit} per 100g (confidence: ${item.confidenceScore ?? "unknown"}) | ${evidence}`;
     })
     .join("\n");
 
@@ -134,12 +134,12 @@ async function reviewBatch(
   const { object, usage } = await generateObject({
     model,
     schema: batchVerdictSchema,
-    prompt: `You are a nutrition data quality reviewer. Your job is to verify AI-generated nutrient values for foods.
+    prompt: `You are a nutrition data quality reviewer. Your job is to verify AI-generated substance values for foods.
 
 For each observation below, decide whether to APPROVE or REJECT it.
 
 APPROVE if:
-- The value is within a plausible range for that food and nutrient (based on USDA FoodData Central or established nutrition databases)
+- The value is within a plausible range for that food and substance (based on USDA FoodData Central or established nutrition databases)
 - The evidence reasoning is coherent and references legitimate sources
 - The value correctly accounts for the preparation method (e.g., boiling reduces water-soluble vitamins)
 
@@ -147,7 +147,7 @@ REJECT if:
 - The value is clearly wrong (e.g., 500mg vitamin C per 100g of chicken, or 0g protein per 100g of beef)
 - The value is off by more than 2x from established reference ranges
 - The confidence score is very low (<30) and the evidence is weak or nonsensical
-- The unit doesn't match the nutrient type
+- The unit doesn't match the substance type
 - The value appears to be for a different food or preparation method
 
 Be strict but fair. When in doubt about borderline cases, APPROVE with a note. Only REJECT values that are clearly incorrect.
@@ -195,38 +195,38 @@ async function applyVerdict(verdict: z.infer<typeof verdictSchema>) {
 
   // Update observation review status
   await db
-    .update(nutrientObservations)
+    .update(substanceObservations)
     .set({ reviewStatus: status })
-    .where(eq(nutrientObservations.id, verdict.observationId));
+    .where(eq(substanceObservations.id, verdict.observationId));
 
   // Create audit trail
   await db.insert(reviews).values({
-    entityType: "nutrient_observation",
+    entityType: "substance_observation",
     entityId: verdict.observationId,
     reviewerId: AI_REVIEWER_ID,
     status,
     notes: `[AI Review] ${verdict.reason}`,
   });
 
-  // For rejected observations, remove the resolved nutrient value
+  // For rejected observations, remove the resolved substance value
   if (verdict.decision === "reject") {
-    // Look up the observation to find foodVariantId + nutrientId
+    // Look up the observation to find foodVariantId + substanceId
     const [obs] = await db
       .select({
-        foodVariantId: nutrientObservations.foodVariantId,
-        nutrientId: nutrientObservations.nutrientId,
+        foodVariantId: substanceObservations.foodVariantId,
+        substanceId: substanceObservations.substanceId,
       })
-      .from(nutrientObservations)
-      .where(eq(nutrientObservations.id, verdict.observationId))
+      .from(substanceObservations)
+      .where(eq(substanceObservations.id, verdict.observationId))
       .limit(1);
 
     if (obs) {
       await db
-        .delete(resolvedNutrientValues)
+        .delete(resolvedSubstanceValues)
         .where(
           and(
-            eq(resolvedNutrientValues.foodVariantId, obs.foodVariantId),
-            eq(resolvedNutrientValues.nutrientId, obs.nutrientId),
+            eq(resolvedSubstanceValues.foodVariantId, obs.foodVariantId),
+            eq(resolvedSubstanceValues.substanceId, obs.substanceId),
           ),
         );
     }
