@@ -23,6 +23,17 @@ import { nutrients } from "@/lib/db/schema/nutrients";
 import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 
 import { generateLinkUrl } from "./account-link";
+import {
+  buildClarifyResearchReply,
+  buildRequestFailureReply,
+  buildResearchOutcomeReply,
+  buildToolOnlyReply,
+  containsHebrew,
+  extractFoodResearchRequest,
+  findMostRecentResearchFood,
+  hasRecentResearchContext,
+  isResearchConfirmation,
+} from "./message-recovery";
 import { findOrCreatePlatformAccount } from "./user-linking";
 import { getWebLinksBlock } from "./web-links";
 
@@ -173,7 +184,7 @@ YOUR CAPABILITIES:
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
 - Record meals / log food consumption
 - Provide the user's current daily nutrient summary
-- Research foods not in the database using AI (triggers background research)
+- Research foods not in the database using AI and return usable nutrient data in the same reply
 - Update the user's profile (name, health goal) and nutrient limits
 - Link this bot account to a NutriBalance web account (use linkWebAccount)
 
@@ -261,7 +272,7 @@ function buildTools(toolCtx: ToolContext) {
     },
     aiResearchFood: {
       description:
-        "Research a food not found in the database using AI. This triggers a background research process that creates the food with AI-generated nutrient estimates.",
+        "Research a food not found in the database using AI. Returns the researched food and default-variant nutrient data so you can answer immediately in the same turn.",
       inputSchema: z.object({
         foodName: z.string().describe("The name of the food to research"),
       }),
@@ -384,6 +395,7 @@ async function handleAiMessage(
 ) {
   const toolCtx: ToolContext = { userId };
   const { isLinked } = await getAccountLinkStatus(userId);
+  const userText = typeof message.text === "string" ? message.text : "";
   const systemPrompt = await buildSystemPrompt(userId, isLinked);
 
   // Build conversation history from thread
@@ -391,7 +403,14 @@ async function handleAiMessage(
   for await (const msg of thread.allMessages) {
     messages.push(msg);
   }
+
+  if (await tryHandleDeterministicResearch(thread, message, messages, toolCtx)) {
+    return;
+  }
+
   const history = await toAiMessages(messages);
+  let lastToolCall: unknown = null;
+  let lastToolResult: unknown = null;
 
   const result = streamText({
     model: getModel(),
@@ -401,6 +420,9 @@ async function handleAiMessage(
     tools: buildTools(toolCtx),
     onStepFinish: ({ toolCalls, toolResults }) => {
       if (toolCalls && toolCalls.length > 0) {
+        lastToolCall = toolCalls[toolCalls.length - 1];
+        lastToolResult = toolResults?.[toolResults.length - 1] ?? null;
+
         for (let i = 0; i < toolCalls.length; i++) {
           const call = toolCalls[i];
           const res = toolResults?.[i];
@@ -419,11 +441,87 @@ async function handleAiMessage(
 
   if (thread.id.startsWith("telegram:")) {
     const finalText = (await result.text).trim();
-    await thread.post(finalText || "Sorry, I couldn't generate a response. Please try again.");
+    const fallbackText =
+      buildToolOnlyReply({
+        userText,
+        toolCall: lastToolCall,
+        toolResult: lastToolResult,
+      }) ?? buildRequestFailureReply(userText);
+
+    await thread.post(finalText || fallbackText);
     return;
   }
 
   await thread.post(result.fullStream);
+}
+
+async function tryHandleDeterministicResearch(
+  thread: Parameters<Parameters<Chat["onNewMention"]>[0]>[0],
+  message: Parameters<Parameters<Chat["onNewMention"]>[0]>[1],
+  messages: unknown[],
+  toolCtx: ToolContext,
+): Promise<boolean> {
+  const userText = typeof message.text === "string" ? message.text : "";
+  if (!userText.trim()) {
+    return false;
+  }
+
+  const prefersHebrew = containsHebrew(userText);
+  let foodName = extractFoodResearchRequest(userText);
+
+  if (!foodName && isResearchConfirmation(userText)) {
+    const previousMessages = messages.slice(0, -1);
+    if (!hasRecentResearchContext(previousMessages)) {
+      return false;
+    }
+
+    foodName = findMostRecentResearchFood(previousMessages);
+    if (!foodName) {
+      await thread.post(buildClarifyResearchReply(prefersHebrew));
+      return true;
+    }
+  }
+
+  if (!foodName) {
+    return false;
+  }
+
+  const existing = await searchFood({ query: foodName }, toolCtx);
+  if (
+    "found" in existing &&
+    existing.found &&
+    Array.isArray(existing.foods) &&
+    existing.foods.length > 0
+  ) {
+    const matchingFood = existing.foods[0];
+    const defaultVariant =
+      matchingFood.variants.find((variant) => variant.isDefault) ?? matchingFood.variants[0];
+
+    if (!defaultVariant) {
+      await thread.post(buildRequestFailureReply(userText));
+      return true;
+    }
+
+    const nutrientsResult = await getFoodNutrients({ foodVariantId: defaultVariant.id }, toolCtx);
+    await thread.post(
+      buildResearchOutcomeReply(
+        matchingFood.name,
+        {
+          success: true,
+          defaultVariant: {
+            preparationMethod: defaultVariant.preparationMethod,
+            nutrients: nutrientsResult.nutrients,
+          },
+        },
+        prefersHebrew,
+      ),
+    );
+    return true;
+  }
+
+  const researchResult = await aiResearchFood({ foodName }, toolCtx);
+  await thread.post(buildResearchOutcomeReply(foodName, researchResult, prefersHebrew));
+  return true;
 }
 
 /**
@@ -456,7 +554,9 @@ function registerHandlers(bot: Chat) {
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling message:", error);
       try {
-        await thread.post("Sorry, something went wrong. Please try again.");
+        await thread.post(
+          buildRequestFailureReply(typeof message.text === "string" ? message.text : ""),
+        );
       } catch {
         console.error("[NutriBalance Bot] Failed to send error message");
       }
@@ -474,7 +574,9 @@ function registerHandlers(bot: Chat) {
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling message:", error);
       try {
-        await thread.post("Sorry, something went wrong. Please try again.");
+        await thread.post(
+          buildRequestFailureReply(typeof message.text === "string" ? message.text : ""),
+        );
       } catch {
         console.error("[NutriBalance Bot] Failed to send error message");
       }

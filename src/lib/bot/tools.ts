@@ -406,7 +406,10 @@ export async function aiResearchFood(params: { foodName: string }, ctx: ToolCont
     return {
       success: true,
       foodId: result.foodId,
-      message: `Successfully researched and added "${params.foodName}" to the database. You can now search for it.`,
+      foodName: result.foodName,
+      variantsCount: result.variantsCount,
+      defaultVariant: result.defaultVariant,
+      message: `Successfully researched "${result.foodName}" and saved nutrient data for immediate use.`,
     };
   } catch (err) {
     console.error("[aiResearchFood] Exception:", err);
