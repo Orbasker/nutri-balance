@@ -3,7 +3,7 @@ import { jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-o
 
 import { profiles } from "./users";
 
-export const platformEnum = pgEnum("platform", ["telegram", "discord"]);
+export const platformEnum = pgEnum("platform", ["telegram", "discord", "whatsapp"]);
 
 export const onboardingStateEnum = pgEnum("onboarding_state", [
   "new",
