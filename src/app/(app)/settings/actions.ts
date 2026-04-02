@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
@@ -186,9 +186,10 @@ export async function createCustomSubstance(raw: unknown): Promise<SubstanceLimi
     .replace(/^_|_$/g, "");
 
   await db.insert(substances).values({
-    name: `custom_${slug}_${session.user.id.slice(0, 8)}`,
+    name: `community_${slug}`,
     displayName: parsed.data.displayName,
     unit: parsed.data.unit,
+    category: parsed.data.category ?? "other",
     sortOrder: 999,
     createdBy: session.user.id,
   });
@@ -240,5 +241,50 @@ export async function removeSubstanceLimit(raw: unknown): Promise<SubstanceLimit
     );
 
   revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function bulkEnableSubstances(
+  items: Array<{ substanceName: string; dailyLimit: number; mode: "strict" | "stability" }>,
+): Promise<SubstanceLimitActionResult> {
+  const session = await getSession();
+  if (!session) return { error: "You must be signed in." };
+
+  const names = items.map((i) => i.substanceName);
+  const matchedSubstances = await db
+    .select({ id: substances.id, name: substances.name })
+    .from(substances)
+    .where(inArray(substances.name, names));
+
+  const nameToId = new Map(matchedSubstances.map((s) => [s.name, s.id]));
+
+  // Get existing limits to avoid duplicates
+  const existingLimits = await db
+    .select({ substanceId: userSubstanceLimits.substanceId })
+    .from(userSubstanceLimits)
+    .where(eq(userSubstanceLimits.userId, session.user.id));
+  const existingSet = new Set(existingLimits.map((l) => l.substanceId));
+
+  const toInsert = items
+    .map((item) => {
+      const substanceId = nameToId.get(item.substanceName);
+      if (!substanceId || existingSet.has(substanceId)) return null;
+      return {
+        userId: session.user.id,
+        substanceId,
+        dailyLimit: String(item.dailyLimit),
+        mode: item.mode as "strict" | "stability",
+        rangeMin: null,
+        rangeMax: null,
+      };
+    })
+    .filter((v): v is NonNullable<typeof v> => v !== null);
+
+  if (toInsert.length > 0) {
+    await db.insert(userSubstanceLimits).values(toInsert);
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
