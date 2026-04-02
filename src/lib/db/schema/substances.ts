@@ -7,6 +7,7 @@ export const substances = pgTable("substances", {
   name: text().notNull(),
   unit: text().notNull(),
   displayName: text("display_name").notNull(),
+  category: text().default("other"),
   sortOrder: integer("sort_order").default(0),
   createdBy: text("created_by").references(() => user.id, { onDelete: "cascade" }),
 });

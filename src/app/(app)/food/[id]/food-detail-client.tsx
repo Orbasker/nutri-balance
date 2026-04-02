@@ -14,10 +14,11 @@ import { VariantSelector } from "@/components/food/variant-selector";
 
 import { calculateSubstanceAmount, getSubstanceStatus } from "@/lib/calculations";
 
-import { addToToday } from "./actions";
+import { addToToday, enrichFoodWithAi } from "./actions";
 
 interface FoodDetailClientProps {
   food: FoodDetail;
+  totalSubstanceCount: number;
   todaysConsumption: Record<string, number>;
   userLimits: Array<{
     substanceId: string;
@@ -28,9 +29,15 @@ interface FoodDetailClientProps {
   }>;
 }
 
-export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDetailClientProps) {
+export function FoodDetailClient({
+  food,
+  totalSubstanceCount,
+  todaysConsumption,
+  userLimits,
+}: FoodDetailClientProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [enrichPending, startEnrichTransition] = useTransition();
 
   const defaultVariant = food.variants.find((v) => v.isDefault) ?? food.variants[0];
   const [selectedVariant, setSelectedVariant] = useState<FoodVariantDetail>(defaultVariant);
@@ -171,7 +178,18 @@ export function FoodDetailClient({ food, todaysConsumption, userLimits }: FoodDe
       />
 
       {/* Substance Breakdown */}
-      <SubstanceBreakdown substances={selectedVariant.substances} portionGrams={portionGrams} />
+      <SubstanceBreakdown
+        substances={selectedVariant.substances}
+        portionGrams={portionGrams}
+        totalSubstanceCount={totalSubstanceCount}
+        enrichPending={enrichPending}
+        onEnrichRequest={() => {
+          startEnrichTransition(async () => {
+            await enrichFoodWithAi(food.id, selectedVariant.id);
+            router.refresh();
+          });
+        }}
+      />
 
       {/* Impact Panel */}
       <SubstanceImpactPanel

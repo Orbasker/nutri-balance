@@ -32,11 +32,14 @@ export interface ServingMeasure {
   gramsEquivalent: number;
 }
 
+export type SubstanceCategory = "macronutrient" | "lipid" | "vitamin" | "mineral" | "other";
+
 export interface SubstanceDetail {
   substanceId: string;
   name: string;
   displayName: string;
   unit: string;
+  category: SubstanceCategory;
   valuePer100g: number;
   confidenceScore: number;
   confidenceLabel: ConfidenceLabel;
