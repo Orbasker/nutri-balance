@@ -1,10 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/lib/auth";
-import { getSession } from "@/lib/auth-session";
+import { createClient } from "@/lib/supabase/server";
 
 export type AuthState = {
   error?: string;
@@ -18,11 +16,10 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
     return { error: "Email and password are required." };
   }
 
-  try {
-    await auth.api.signInEmail({
-      body: { email, password },
-    });
-  } catch {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
     return { error: "Invalid email or password." };
   }
 
@@ -44,30 +41,28 @@ export async function register(prevState: AuthState, formData: FormData): Promis
     return { error: "Password must be at least 6 characters." };
   }
 
-  try {
-    await auth.api.signUpEmail({
-      body: {
-        email,
-        password,
-        name: displayName,
-        firstName: firstName ?? null,
-        lastName: lastName ?? null,
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        display_name: displayName,
+        first_name: firstName ?? null,
+        last_name: lastName ?? null,
       },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Registration failed.";
-    return { error: message };
+    },
+  });
+
+  if (error) {
+    return { error: error.message };
   }
 
   redirect("/dashboard");
 }
 
 export async function logout() {
-  const session = await getSession();
-  if (session) {
-    await auth.api.signOut({
-      headers: await headers(),
-    });
-  }
+  const supabase = await createClient();
+  await supabase.auth.signOut();
   redirect("/login");
 }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-import { authClient } from "@/lib/auth-client";
+import { createClient } from "@/lib/supabase/client";
 
 import { GoogleButton } from "../google-button";
 import { linkAccountToWeb } from "./actions";
@@ -60,7 +60,8 @@ export function LinkAccountCard({
     setError(null);
 
     try {
-      await authClient.signOut();
+      const supabase = createClient();
+      await supabase.auth.signOut();
       router.refresh();
     } catch {
       setError("Couldn't switch accounts right now. Please try again.");

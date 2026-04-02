@@ -10,7 +10,7 @@ Nutrient intake tracker for people with medical/dietary constraints. Answers "Ca
 - **Package manager**: Bun
 - **UI**: shadcn/ui (base-nova style) + Tailwind CSS 4
 - **Database**: PostgreSQL + Drizzle ORM
-- **Auth**: Better Auth (`better-auth`) — email/password + Google OAuth, session-based
+- **Auth**: Supabase Auth (`@supabase/ssr`) — email/password + Google OAuth, JWT-based with RLS
 - **Validation**: Zod 4
 - **Path alias**: `@/*` → `./src/*`
 
@@ -49,14 +49,19 @@ src/
     (auth)/          # Login, register pages
     (app)/           # Protected routes: dashboard, search, food/[id], log, settings
     (admin)/         # Admin-only: review
-    api/auth/[...all]/ # Better Auth API route handler
+    api/auth/callback/ # Supabase OAuth callback handler
   components/
     ui/              # shadcn components (do not edit directly)
   lib/
-    auth.ts          # Better Auth server config
-    auth-client.ts   # Better Auth browser client
+    auth.ts          # Session type definition
+    auth-client.ts   # Re-exports Supabase browser client
     auth-session.ts  # getSession() / requireSession() helpers for server components/actions
     auth-admin.ts    # requireAdmin() helper
+    supabase/
+      server.ts      # Supabase server client (cookie-based, RLS-enforced)
+      client.ts      # Supabase browser client
+      admin.ts       # Supabase service-role client (bypasses RLS)
+      middleware.ts   # Session refresh for proxy.ts
     db/
       index.ts       # Drizzle client (DATABASE_URL)
       schema/        # Drizzle table definitions (auth, foods, nutrients, observations, cooking, reviews, users)
@@ -74,29 +79,32 @@ supabase/
 
 - **ORM**: Drizzle. Schema lives in `src/lib/db/schema/`. Migrations output to `supabase/migrations/`.
 - **Config**: `drizzle.config.ts` — dialect: postgresql, schema glob: `./src/lib/db/schema/*`
-- **Auth tables**: `user`, `session`, `account`, `verification` — managed by Better Auth (schema in `src/lib/db/schema/auth.ts`)
+- **Auth tables**: Managed by Supabase Auth in the `auth` schema. `public.user` is a **read-only view** over `auth.users` for Drizzle compatibility — do NOT insert/update via Drizzle.
 - **App tables**: profiles, user_nutrient_limits, consumption_logs, foods, food_variants, nutrients, etc.
-- **Authorization**: Application-layer checks via `getSession()` and `requireAdmin()`. No RLS.
+- **Authorization**: Row Level Security (RLS) enforced at database layer via `auth.uid()`. Application-layer checks via `getSession()` and `requireAdmin()` remain as defense-in-depth.
 
-## Auth (Better Auth)
+## Auth (Supabase Auth)
 
-- **Server config**: `src/lib/auth.ts` — betterAuth instance with Drizzle adapter, email/password, Google OAuth
-- **Client**: `src/lib/auth-client.ts` — `authClient` for browser-side sign-in/up/out
+- **Server client**: `import { createClient } from "@/lib/supabase/server"` — cookie-based, RLS-enforced
+- **Browser client**: `import { createClient } from "@/lib/supabase/client"` — for client components
+- **Admin client**: `import { supabaseAdmin } from "@/lib/supabase/admin"` — service-role, bypasses RLS (server-only)
 - **Server session**: `import { getSession } from "@/lib/auth-session"` — returns session or null
 - **Admin check**: `import { requireAdmin } from "@/lib/auth-admin"` — returns userId or null
-- **API handler**: `src/app/api/auth/[...all]/route.ts`
-- **Proxy**: Cookie-based optimistic check in `src/proxy.ts`, full validation in layouts/actions
+- **OAuth callback**: `src/app/api/auth/callback/route.ts` — handles PKCE code exchange
+- **Proxy**: Supabase session refresh + auth check in `src/proxy.ts`
+- **RLS**: All tables have row-level security policies. User-scoped tables use `auth.uid()::text`. Admin tables use `is_admin()`. See migration `0016_supabase_auth_migration.sql`.
 
 ## Environment Variables
 
 See `.env.local.example`:
 
 ```
-DATABASE_URL=              # Direct Postgres connection for Drizzle + Better Auth
-BETTER_AUTH_SECRET=        # Random secret for session encryption
-BETTER_AUTH_URL=           # App URL (http://localhost:3000 in dev)
-GOOGLE_CLIENT_ID=          # Google OAuth (optional)
-GOOGLE_CLIENT_SECRET=      # Google OAuth (optional)
+DATABASE_URL=                      # Direct Postgres connection for Drizzle ORM (admin/migration use)
+NEXT_PUBLIC_SUPABASE_URL=          # Supabase project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=     # Supabase anon key (safe for browser)
+SUPABASE_SERVICE_ROLE_KEY=         # Supabase service role key (server-only, bypasses RLS)
+GOOGLE_CLIENT_ID=                  # Google OAuth (configured in Supabase Dashboard)
+GOOGLE_CLIENT_SECRET=              # Google OAuth (configured in Supabase Dashboard)
 ```
 
 ## Key Patterns

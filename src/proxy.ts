@@ -1,6 +1,6 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest } from "next/server";
 
-import { getSessionCookie } from "better-auth/cookies";
+import { updateSession } from "@/lib/supabase/middleware";
 
 const protectedPaths = [
   "/dashboard",
@@ -14,25 +14,26 @@ const protectedPaths = [
 ];
 const authPaths = ["/login", "/register"];
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Auth pages are always accessible
   if (authPaths.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next({ request });
+    const { response } = await updateSession(request);
+    return response;
   }
 
-  // Check for session cookie (optimistic check — full validation happens in layouts/actions)
-  const sessionCookie = getSessionCookie(request);
+  // Refresh Supabase session and check auth
+  const { response, user } = await updateSession(request);
 
   // Redirect unauthenticated users away from protected routes
-  if (!sessionCookie && protectedPaths.some((p) => pathname.startsWith(p))) {
+  if (!user && protectedPaths.some((p) => pathname.startsWith(p))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return Response.redirect(url);
   }
 
-  return NextResponse.next({ request });
+  return response;
 }
 
 export const config = {

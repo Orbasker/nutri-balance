@@ -1,44 +1,13 @@
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { nextCookies } from "better-auth/next-js";
-
-import { db } from "@/lib/db";
-import * as authSchema from "@/lib/db/schema/auth";
-
-export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: "pg",
-    schema: authSchema,
-  }),
-  emailAndPassword: {
-    enabled: true,
-    minPasswordLength: 6,
-  },
-  socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    },
-  },
-  session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24, // 1 day
-  },
+/**
+ * Auth type definitions.
+ * Authentication is handled by Supabase Auth — this file exports
+ * the Session type used across the app for type compatibility.
+ */
+export type Session = {
   user: {
-    additionalFields: {
-      firstName: {
-        type: "string",
-        required: false,
-        input: true,
-      },
-      lastName: {
-        type: "string",
-        required: false,
-        input: true,
-      },
-    },
-  },
-  plugins: [nextCookies()],
-});
-
-export type Session = typeof auth.$Infer.Session;
+    id: string;
+    email: string;
+    name: string;
+    image?: string | null;
+  };
+};
