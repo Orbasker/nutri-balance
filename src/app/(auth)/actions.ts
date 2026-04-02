@@ -21,6 +21,7 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
   try {
     await auth.api.signInEmail({
       body: { email, password },
+      headers: await headers(),
     });
   } catch {
     return { error: "Invalid email or password." };
@@ -53,6 +54,7 @@ export async function register(prevState: AuthState, formData: FormData): Promis
         firstName: firstName ?? null,
         lastName: lastName ?? null,
       },
+      headers: await headers(),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Registration failed.";

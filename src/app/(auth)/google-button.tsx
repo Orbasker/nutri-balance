@@ -11,10 +11,14 @@ export function GoogleButton({ callbackURL = "/dashboard" }: { callbackURL?: str
 
   async function handleGoogleSignIn() {
     setLoading(true);
-    await authClient.signIn.social({
-      provider: "google",
-      callbackURL,
-    });
+    try {
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL,
+      });
+    } catch {
+      setLoading(false);
+    }
   }
 
   return (
