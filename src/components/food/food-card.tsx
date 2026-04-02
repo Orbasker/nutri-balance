@@ -2,8 +2,6 @@ import Link from "next/link";
 
 import type { FoodSearchResult } from "@/types";
 
-import { InfoTooltip } from "@/components/ui/info-tooltip";
-
 const tagColors: Record<string, string> = {
   high: "bg-md-tertiary-fixed text-md-on-tertiary-fixed-variant",
   good: "bg-md-secondary-fixed text-md-on-secondary-fixed-variant",
@@ -13,20 +11,6 @@ const tagColors: Record<string, string> = {
 
 const densityBarColors: Record<string, string> = {
   high: "bg-md-primary",
-  good: "bg-md-secondary",
-  moderate: "bg-md-primary",
-  low: "bg-md-outline",
-};
-
-const confidenceDescriptions: Record<string, string> = {
-  high: "High confidence (90-100%) - verified data from trusted sources like USDA.",
-  good: "Good confidence (80-89%) - reliable data, may have minor estimation.",
-  moderate: "Moderate confidence (60-79%) - estimated from similar foods or AI research.",
-  low: "Low confidence (<60%) - rough estimate, treat as approximate.",
-};
-
-const tagAccentColors: Record<string, string> = {
-  high: "bg-md-tertiary",
   good: "bg-md-secondary",
   moderate: "bg-md-primary",
   low: "bg-md-outline",
@@ -59,16 +43,8 @@ export function FoodCard({ food }: FoodCardProps) {
             <h4 className="text-xl font-bold text-md-on-surface">{food.name}</h4>
           </div>
           {topSubstance && (
-            <div className="flex items-center gap-1.5">
-              <InfoTooltip
-                title="Top Substance"
-                description={`This food's most notable substance is ${topSubstance.displayName}. Badge color reflects data confidence: ${confidenceDescriptions[confidenceLevel]}`}
-                accent={tagAccentColors[confidenceLevel] ?? "bg-md-primary"}
-                side="left"
-              />
-              <div className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase`}>
-                {topSubstance.displayName}
-              </div>
+            <div className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase`}>
+              {topSubstance.displayName}
             </div>
           )}
         </div>
@@ -106,16 +82,8 @@ export function FoodCard({ food }: FoodCardProps) {
         </div>
 
         <div className="space-y-2">
-          <div className="flex justify-between items-center text-[11px] font-bold text-md-outline uppercase tracking-tighter">
-            <span className="flex items-center gap-1">
-              Substance Density
-              <InfoTooltip
-                title="Substance Density"
-                description="How confident we are in this food's substance data. Higher % means more reliable values from verified sources. Lower % means estimates that may need review."
-                accent={barColor}
-                side="top"
-              />
-            </span>
+          <div className="flex justify-between text-[11px] font-bold text-md-outline uppercase tracking-tighter">
+            <span>Substance Density</span>
             <span className="text-md-primary">{densityPct}%</span>
           </div>
           <div className="h-2 w-full bg-md-surface-container-high rounded-full overflow-hidden">
