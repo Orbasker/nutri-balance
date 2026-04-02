@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 
+import { AnalyticsProvider } from "@/components/analytics-provider";
+
 import "./globals.css";
 
 const manrope = Manrope({
@@ -40,6 +42,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         {children}
+        <AnalyticsProvider />
       </body>
     </html>
   );
