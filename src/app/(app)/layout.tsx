@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { AppShell } from "@/components/app-shell";
-import { BottomNav } from "@/components/layout/bottom-nav";
+import { AppNav } from "@/components/layout/bottom-nav";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 
 import { isAdminEmail } from "@/lib/auth-admin";
@@ -44,7 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell>
-      <div className="min-h-screen pb-24">
+      <div className="min-h-screen pb-24 md:pb-0 md:pl-20">
         <TopAppBar
           displayName={displayName}
           greeting={getGreeting()}
@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           avatarColor={profile?.avatarColor ?? "blue"}
         />
         <main className="pt-20">{children}</main>
-        <BottomNav />
+        <AppNav />
       </div>
     </AppShell>
   );
