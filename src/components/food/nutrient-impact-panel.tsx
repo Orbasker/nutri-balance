@@ -124,7 +124,7 @@ export function NutrientImpactPanel({
           </div>
         ) : (
           <p className="text-md-on-surface-variant text-sm">
-            No nutrient limits configured.{" "}
+            No tracking limits configured.{" "}
             <a href="/settings" className="text-md-primary font-semibold underline">
               Set up limits
             </a>{" "}

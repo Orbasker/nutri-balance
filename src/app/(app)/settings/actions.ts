@@ -6,8 +6,11 @@ import { and, eq } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
+import { nutrients } from "@/lib/db/schema/nutrients";
 import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
 import {
+  createCustomNutrientSchema,
+  deleteCustomNutrientSchema,
   deleteUserNutrientLimitSchema,
   saveUserNutrientLimitSchema,
   toUserNutrientLimitRow,
@@ -142,6 +145,55 @@ export async function saveMedicalNotes(notes: string): Promise<NutrientLimitActi
   }
 
   await db.update(profiles).set({ clinicalNotes: notes }).where(eq(profiles.id, session.user.id));
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function createCustomNutrient(raw: unknown): Promise<NutrientLimitActionResult> {
+  const parsed = createCustomNutrientSchema.safeParse(raw);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { error: first?.message ?? "Invalid input." };
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return { error: "You must be signed in." };
+  }
+
+  const slug = parsed.data.displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+  await db.insert(nutrients).values({
+    name: `custom_${slug}_${session.user.id.slice(0, 8)}`,
+    displayName: parsed.data.displayName,
+    unit: parsed.data.unit,
+    sortOrder: 999,
+    createdBy: session.user.id,
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function removeCustomNutrient(raw: unknown): Promise<NutrientLimitActionResult> {
+  const parsed = deleteCustomNutrientSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: "Invalid nutrient id." };
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return { error: "You must be signed in." };
+  }
+
+  // Only allow deleting user-created nutrients
+  await db
+    .delete(nutrients)
+    .where(and(eq(nutrients.id, parsed.data.nutrientId), eq(nutrients.createdBy, session.user.id)));
 
   revalidatePath("/settings");
   return { ok: true };
