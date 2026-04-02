@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { ConfidenceLabel } from "@/types";
 
 const confidenceConfig: Record<ConfidenceLabel, { dots: number; label: string }> = {
@@ -31,6 +33,13 @@ export function ConfidenceBadge({ level, score }: ConfidenceBadgeProps) {
           <span className="text-md-outline font-normal"> ({Math.round(score)}%)</span>
         )}
       </span>
+      <Link
+        href="/methodology"
+        className="text-[11px] text-md-outline hover:text-md-primary transition-colors"
+        title="How we source our data"
+      >
+        How?
+      </Link>
     </div>
   );
 }

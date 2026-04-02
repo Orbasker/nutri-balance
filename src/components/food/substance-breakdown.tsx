@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import type { SubstanceCategory, SubstanceDetail } from "@/types";
+import type { ConfidenceLabel, SubstanceCategory, SubstanceDetail } from "@/types";
 
 import { calculateSubstanceAmount } from "@/lib/calculations";
 
@@ -189,6 +189,9 @@ export function SubstanceBreakdown({
                             }}
                           />
                         </div>
+                        {s.sourceSummary && (
+                          <SourceTag summary={s.sourceSummary} confidence={s.confidenceLabel} />
+                        )}
                       </div>
                     );
                   })}
@@ -228,5 +231,43 @@ export function SubstanceBreakdown({
         </div>
       )}
     </section>
+  );
+}
+
+const SOURCE_ICONS: Record<string, string> = {
+  usda: "verified",
+  "government database": "verified",
+  "scientific literature": "science",
+  "ai-researched": "auto_awesome",
+  "ai-researched (pending review)": "auto_awesome",
+  manual: "edit_note",
+};
+
+function getSourceIcon(summary: string): string {
+  const lower = summary.toLowerCase();
+  for (const [key, icon] of Object.entries(SOURCE_ICONS)) {
+    if (lower.includes(key)) return icon;
+  }
+  return "database";
+}
+
+function SourceTag({ summary, confidence }: { summary: string; confidence: ConfidenceLabel }) {
+  const icon = getSourceIcon(summary);
+  const isPending = summary.toLowerCase().includes("pending review");
+
+  return (
+    <div
+      className={`flex items-center gap-1.5 text-[11px] leading-tight ${
+        isPending ? "text-md-tertiary" : "text-md-outline"
+      }`}
+    >
+      <span className="material-symbols-outlined text-[14px]">{icon}</span>
+      <span className="truncate">{summary}</span>
+      {confidence === "low" && (
+        <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
+          Low confidence
+        </span>
+      )}
+    </div>
   );
 }

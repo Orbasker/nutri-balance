@@ -2,17 +2,19 @@ import { eq } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
+import { sources } from "@/lib/db/schema/observations";
 import { substances } from "@/lib/db/schema/substances";
 import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 
 import { LogoutButton } from "./logout-button";
 import { ProfileSettings } from "./profile-settings";
 import { SubstanceLimitsSettings } from "./substance-limits-settings";
+import { TrustedSources } from "./trusted-sources";
 
 export default async function SettingsPage() {
   const session = await getSession();
 
-  const [allSubstances, limits, profile] = await Promise.all([
+  const [allSubstances, limits, profile, allSources] = await Promise.all([
     db
       .select({
         id: substances.id,
@@ -40,6 +42,15 @@ export default async function SettingsPage() {
       .from(profiles)
       .where(eq(profiles.id, session!.user.id))
       .then((rows) => rows[0] ?? null),
+    db
+      .select({
+        name: sources.name,
+        type: sources.type,
+        url: sources.url,
+        trustLevel: sources.trustLevel,
+      })
+      .from(sources)
+      .orderBy(sources.name),
   ]);
 
   // Map limits to the format expected by the component
@@ -78,6 +89,17 @@ export default async function SettingsPage() {
         limits={mappedLimits ?? []}
         medicalNotes={profile?.clinical_notes ?? ""}
       />
+
+      <div className="mt-12 pt-8 border-t border-md-outline-variant/30">
+        <TrustedSources
+          sources={allSources.map((s) => ({
+            name: s.name,
+            type: s.type,
+            url: s.url,
+            trustLevel: s.trustLevel ?? 50,
+          }))}
+        />
+      </div>
 
       <div className="mt-12 pt-8 border-t border-md-outline-variant/30">
         <h3 className="font-bold text-lg text-md-on-surface mb-1">Account</h3>
