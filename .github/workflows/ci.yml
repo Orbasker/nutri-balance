@@ -33,6 +33,19 @@ jobs:
       - name: Build
         run: bun run build
 
+  db-migrations-lint:
+    name: Lint Migrations (Idempotency)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Lint new/changed migrations for idempotency
+        run: bash scripts/lint-migrations.sh --changed-only origin/${{ github.base_ref }}
+
   db-migrations-check:
     name: Validate Migrations
     runs-on: ubuntu-latest
@@ -67,7 +80,7 @@ jobs:
 
   db-migrations-dry-run:
     name: Validate Migrations (Remote Dry Run)
-    needs: [lint-format-build]
+    needs: [lint-format-build, db-migrations-lint]
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
 
@@ -97,6 +110,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: supabase/setup-cli@v1
         with:
@@ -106,6 +121,9 @@ jobs:
         run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Lint migrations before deploy
+        run: bash scripts/lint-migrations.sh --changed-only origin/main~1
 
       - name: Push migrations
         run: supabase db push

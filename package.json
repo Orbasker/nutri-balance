@@ -11,7 +11,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:new": "bash scripts/db-new.sh",
+    "db:revert": "bash scripts/db-revert.sh",
+    "db:lint": "bash scripts/lint-migrations.sh",
+    "db:lint:changed": "bash scripts/lint-migrations.sh --changed-only origin/main",
+    "db:check": "bunx drizzle-kit check",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:push": "bunx drizzle-kit push"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.77",
