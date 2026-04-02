@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { foodVariants } from "./foods";
-import { nutrients } from "./nutrients";
+import { substances } from "./substances";
 
 export const sourceTypeEnum = pgEnum("source_type", [
   "government_db",
@@ -54,14 +54,14 @@ export const sourceRecords = pgTable("source_records", {
   importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const nutrientObservations = pgTable("nutrient_observations", {
+export const substanceObservations = pgTable("substance_observations", {
   id: uuid().defaultRandom().primaryKey(),
   foodVariantId: uuid("food_variant_id")
     .notNull()
     .references(() => foodVariants.id, { onDelete: "cascade" }),
-  nutrientId: uuid("nutrient_id")
+  substanceId: uuid("substance_id")
     .notNull()
-    .references(() => nutrients.id, { onDelete: "cascade" }),
+    .references(() => substances.id, { onDelete: "cascade" }),
   value: numeric().notNull(),
   unit: text().notNull(),
   basisAmount: numeric("basis_amount").default("100"),
@@ -78,7 +78,7 @@ export const evidenceItems = pgTable("evidence_items", {
   id: uuid().defaultRandom().primaryKey(),
   observationId: uuid("observation_id")
     .notNull()
-    .references(() => nutrientObservations.id, { onDelete: "cascade" }),
+    .references(() => substanceObservations.id, { onDelete: "cascade" }),
   snippet: text(),
   pageRef: text("page_ref"),
   rowLocator: text("row_locator"),
@@ -98,25 +98,25 @@ export const sourceRecordsRelations = relations(sourceRecords, ({ one }) => ({
   }),
 }));
 
-export const nutrientObservationsRelations = relations(nutrientObservations, ({ one, many }) => ({
+export const substanceObservationsRelations = relations(substanceObservations, ({ one, many }) => ({
   foodVariant: one(foodVariants, {
-    fields: [nutrientObservations.foodVariantId],
+    fields: [substanceObservations.foodVariantId],
     references: [foodVariants.id],
   }),
-  nutrient: one(nutrients, {
-    fields: [nutrientObservations.nutrientId],
-    references: [nutrients.id],
+  substance: one(substances, {
+    fields: [substanceObservations.substanceId],
+    references: [substances.id],
   }),
   sourceRecord: one(sourceRecords, {
-    fields: [nutrientObservations.sourceRecordId],
+    fields: [substanceObservations.sourceRecordId],
     references: [sourceRecords.id],
   }),
   evidenceItems: many(evidenceItems),
 }));
 
 export const evidenceItemsRelations = relations(evidenceItems, ({ one }) => ({
-  observation: one(nutrientObservations, {
+  observation: one(substanceObservations, {
     fields: [evidenceItems.observationId],
-    references: [nutrientObservations.id],
+    references: [substanceObservations.id],
   }),
 }));

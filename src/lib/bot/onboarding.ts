@@ -1,24 +1,24 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { nutrients as nutrientsTable } from "@/lib/db/schema/nutrients";
 import { platformAccounts } from "@/lib/db/schema/platform-accounts";
-import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { substances as substancesTable } from "@/lib/db/schema/substances";
+import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 
 type PlatformAccount = typeof platformAccounts.$inferSelect;
 
-interface NutrientEntry {
+interface SubstanceEntry {
   name: string;
   key: string;
 }
 
 interface OnboardingData {
-  nutrients?: NutrientEntry[];
+  substances?: SubstanceEntry[];
   currentIndex?: number;
   healthGoal?: string;
 }
 
-const NUTRIENT_PRESETS: Record<string, NutrientEntry[]> = {
+const NUTRIENT_PRESETS: Record<string, SubstanceEntry[]> = {
   "1": [
     { name: "Potassium", key: "potassium" },
     { name: "Sodium", key: "sodium" },
@@ -37,7 +37,7 @@ const NUTRIENT_PRESETS: Record<string, NutrientEntry[]> = {
 /**
  * Handle onboarding state machine for bot users.
  *
- * States: new -> awaiting_name -> awaiting_goals -> awaiting_nutrients -> awaiting_limits -> complete
+ * States: new -> awaiting_name -> awaiting_goals -> awaiting_substances -> awaiting_limits -> complete
  */
 export async function handleOnboarding(
   account: PlatformAccount,
@@ -50,7 +50,7 @@ export async function handleOnboarding(
     await updateOnboardingState(account.id, "new", null);
     await respond(
       "Onboarding reset! Let's start fresh.\n\n" +
-        "Welcome to NutriBalance! I help you track nutrients and answer 'Can I eat this today?'\n\n" +
+        "Welcome to NutriBalance! I help you track substances and answer 'Can I eat this today?'\n\n" +
         "What's your name?",
     );
     return;
@@ -68,8 +68,8 @@ export async function handleOnboarding(
     case "awaiting_goals":
       await handleAwaitingGoals(account, messageText, respond);
       break;
-    case "awaiting_nutrients":
-      await handleAwaitingNutrients(account, messageText, respond);
+    case "awaiting_substances":
+      await handleAwaitingSubstances(account, messageText, respond);
       break;
     case "awaiting_limits":
       await handleAwaitingLimits(account, messageText, respond);
@@ -79,7 +79,7 @@ export async function handleOnboarding(
       await updateOnboardingState(account.id, "new", null);
       await respond(
         "Something went wrong. Let's restart your setup.\n\n" +
-          "Welcome to NutriBalance! I help you track nutrients and answer 'Can I eat this today?'\n\n" +
+          "Welcome to NutriBalance! I help you track substances and answer 'Can I eat this today?'\n\n" +
           "What's your name?",
       );
       break;
@@ -103,7 +103,7 @@ async function updateOnboardingState(
 async function handleNew(account: PlatformAccount, respond: (text: string) => Promise<unknown>) {
   await updateOnboardingState(account.id, "awaiting_name");
   await respond(
-    "Welcome to NutriBalance! I help you track nutrients and answer 'Can I eat this today?'\n\n" +
+    "Welcome to NutriBalance! I help you track substances and answer 'Can I eat this today?'\n\n" +
       "What's your name?",
   );
 }
@@ -155,19 +155,19 @@ async function handleAwaitingGoals(
     .set({ healthGoal: goal, clinicalNotes: goal })
     .where(eq(profiles.id, account.userId));
 
-  await updateOnboardingState(account.id, "awaiting_nutrients", { healthGoal: goal });
+  await updateOnboardingState(account.id, "awaiting_substances", { healthGoal: goal });
   await respond(
-    "Got it! Now let's set up which nutrients to track.\n\n" +
+    "Got it! Now let's set up which substances to track.\n\n" +
       "Pick a preset or choose custom:\n" +
       "1. Kidney health (Potassium, Sodium)\n" +
       "2. Blood thinner (Vitamin K)\n" +
-      "3. General tracking (all available nutrients)\n" +
+      "3. General tracking (all available substances)\n" +
       "4. Custom (pick individually)\n\n" +
       "Reply with a number (1-4):",
   );
 }
 
-async function handleAwaitingNutrients(
+async function handleAwaitingSubstances(
   account: PlatformAccount,
   messageText: string,
   respond: (text: string) => Promise<unknown>,
@@ -176,63 +176,63 @@ async function handleAwaitingNutrients(
   const choice = messageText.trim();
 
   // Handle re-entry after custom selection (option "4")
-  if (data?.currentIndex === -1 && data.nutrients && data.nutrients.length > 0) {
+  if (data?.currentIndex === -1 && data.substances && data.substances.length > 0) {
     const numbers = choice.split(",").map((s) => parseInt(s.trim(), 10));
 
     const allValid =
-      numbers.length > 0 && numbers.every((n) => n >= 1 && n <= data.nutrients!.length);
+      numbers.length > 0 && numbers.every((n) => n >= 1 && n <= data.substances!.length);
 
     if (!allValid) {
-      const nutrientList = data.nutrients.map((n, i) => `${i + 1}. ${n.name}`).join("\n");
+      const substanceList = data.substances.map((n, i) => `${i + 1}. ${n.name}`).join("\n");
       await respond(
-        `Please enter valid numbers between 1 and ${data.nutrients.length}, separated by commas.\n\n` +
-          nutrientList,
+        `Please enter valid numbers between 1 and ${data.substances.length}, separated by commas.\n\n` +
+          substanceList,
       );
       return;
     }
 
-    const selectedNutrients = numbers.map((n) => data.nutrients![n - 1]);
+    const selectedSubstances = numbers.map((n) => data.substances![n - 1]);
 
     await updateOnboardingState(account.id, "awaiting_limits", {
-      nutrients: selectedNutrients,
+      substances: selectedSubstances,
       currentIndex: 0,
     });
 
     await respond(
-      `You selected: ${selectedNutrients.map((n) => n.name).join(", ")}.\n\n` +
-        `Now let's set your daily limits. What's your daily limit for ${selectedNutrients[0].name}? (in mg)`,
+      `You selected: ${selectedSubstances.map((n) => n.name).join(", ")}.\n\n` +
+        `Now let's set your daily limits. What's your daily limit for ${selectedSubstances[0].name}? (in mg)`,
     );
     return;
   }
 
   if (choice === "4") {
-    // Custom selection - fetch available nutrients from DB
-    const availableNutrients = await db
+    // Custom selection - fetch available substances from DB
+    const availableSubstances = await db
       .select({
-        id: nutrientsTable.id,
-        displayName: nutrientsTable.displayName,
-        unit: nutrientsTable.unit,
+        id: substancesTable.id,
+        displayName: substancesTable.displayName,
+        unit: substancesTable.unit,
       })
-      .from(nutrientsTable)
-      .orderBy(nutrientsTable.sortOrder);
+      .from(substancesTable)
+      .orderBy(substancesTable.sortOrder);
 
-    const nutrientList = availableNutrients
+    const substanceList = availableSubstances
       .map((n, i: number) => `${i + 1}. ${n.displayName} (${n.unit})`)
       .join("\n");
 
-    const nutrientEntries = availableNutrients.map((n) => ({
+    const substanceEntries = availableSubstances.map((n) => ({
       name: n.displayName,
       key: n.id,
     }));
 
-    await updateOnboardingState(account.id, "awaiting_nutrients", {
-      nutrients: nutrientEntries,
+    await updateOnboardingState(account.id, "awaiting_substances", {
+      substances: substanceEntries,
       currentIndex: -1, // waiting for custom selection
     });
 
     await respond(
-      "Which nutrients would you like to track? Reply with the numbers separated by commas:\n\n" +
-        nutrientList,
+      "Which substances would you like to track? Reply with the numbers separated by commas:\n\n" +
+        substanceList,
     );
     return;
   }
@@ -244,7 +244,7 @@ async function handleAwaitingNutrients(
   }
 
   await updateOnboardingState(account.id, "awaiting_limits", {
-    nutrients: preset,
+    substances: preset,
     currentIndex: 0,
   });
 
@@ -259,11 +259,11 @@ async function handleAwaitingLimits(
   messageText: string,
   respond: (text: string) => Promise<unknown>,
 ) {
-  const data = (account.onboardingData as OnboardingData) ?? { nutrients: [], currentIndex: 0 };
-  const nutrients = data.nutrients ?? [];
+  const data = (account.onboardingData as OnboardingData) ?? { substances: [], currentIndex: 0 };
+  const substances = data.substances ?? [];
   const currentIndex = data.currentIndex ?? 0;
 
-  if (nutrients.length === 0) {
+  if (substances.length === 0) {
     await updateOnboardingState(account.id, "complete", null);
     await respond("Onboarding is complete! You can now ask me about foods and nutrition.");
     return;
@@ -272,33 +272,33 @@ async function handleAwaitingLimits(
   const limitValue = parseFloat(messageText.trim());
   if (isNaN(limitValue) || limitValue <= 0) {
     await respond(
-      `Please enter a valid number for your ${nutrients[currentIndex].name} daily limit (in mg).`,
+      `Please enter a valid number for your ${substances[currentIndex].name} daily limit (in mg).`,
     );
     return;
   }
 
-  // Look up the nutrient in the database
-  const currentNutrient = nutrients[currentIndex];
-  const nutrientRows = await db
+  // Look up the substance in the database
+  const currentSubstance = substances[currentIndex];
+  const substanceRows = await db
     .select({
-      id: nutrientsTable.id,
-      displayName: nutrientsTable.displayName,
-      unit: nutrientsTable.unit,
+      id: substancesTable.id,
+      displayName: substancesTable.displayName,
+      unit: substancesTable.unit,
     })
-    .from(nutrientsTable)
-    .orderBy(nutrientsTable.sortOrder);
+    .from(substancesTable)
+    .orderBy(substancesTable.sortOrder);
 
-  const matchedNutrient = nutrientRows.find(
+  const matchedSubstance = substanceRows.find(
     (n) =>
-      n.displayName.toLowerCase() === currentNutrient.name.toLowerCase() ||
-      n.id === currentNutrient.key,
+      n.displayName.toLowerCase() === currentSubstance.name.toLowerCase() ||
+      n.id === currentSubstance.key,
   );
 
-  if (matchedNutrient) {
-    // Save the nutrient limit
-    await db.insert(userNutrientLimits).values({
+  if (matchedSubstance) {
+    // Save the substance limit
+    await db.insert(userSubstanceLimits).values({
       userId: account.userId,
-      nutrientId: matchedNutrient.id,
+      substanceId: matchedSubstance.id,
       dailyLimit: String(limitValue),
       mode: "strict",
     });
@@ -306,7 +306,7 @@ async function handleAwaitingLimits(
 
   const nextIndex = currentIndex + 1;
 
-  if (nextIndex >= nutrients.length) {
+  if (nextIndex >= substances.length) {
     // All limits configured
     await updateOnboardingState(account.id, "complete", null);
     await respond(
@@ -314,11 +314,11 @@ async function handleAwaitingLimits(
         "Try asking me: 'Can I eat pizza today?' or 'What's my daily summary?'",
     );
   } else {
-    // Ask for next nutrient limit
+    // Ask for next substance limit
     await updateOnboardingState(account.id, "awaiting_limits", {
       ...data,
       currentIndex: nextIndex,
     });
-    await respond(`Got it! What's your daily limit for ${nutrients[nextIndex].name}? (in mg)`);
+    await respond(`Got it! What's your daily limit for ${substances[nextIndex].name}? (in mg)`);
   }
 }

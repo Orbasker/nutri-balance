@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-import { nutrients } from "./nutrients";
+import { substances } from "./substances";
 
 export const aiTaskStatusEnum = pgEnum("ai_task_status", [
   "pending",
@@ -10,16 +10,16 @@ export const aiTaskStatusEnum = pgEnum("ai_task_status", [
   "failed",
 ]);
 
-export const aiTaskTypeEnum = pgEnum("ai_task_type", ["nutrient_research"]);
+export const aiTaskTypeEnum = pgEnum("ai_task_type", ["substance_research"]);
 
 export const aiTaskCreatorEnum = pgEnum("ai_task_creator", ["user", "scheduler"]);
 
 export const aiTasks = pgTable("ai_tasks", {
   id: uuid().defaultRandom().primaryKey(),
   type: aiTaskTypeEnum().notNull(),
-  targetNutrientId: uuid("target_nutrient_id")
+  targetSubstanceId: uuid("target_substance_id")
     .notNull()
-    .references(() => nutrients.id, { onDelete: "cascade" }),
+    .references(() => substances.id, { onDelete: "cascade" }),
   status: aiTaskStatusEnum().default("pending").notNull(),
   createdBy: aiTaskCreatorEnum("created_by").notNull(),
   userId: text("user_id"),
@@ -32,8 +32,8 @@ export const aiTasks = pgTable("ai_tasks", {
 });
 
 export const aiTasksRelations = relations(aiTasks, ({ one }) => ({
-  nutrient: one(nutrients, {
-    fields: [aiTasks.targetNutrientId],
-    references: [nutrients.id],
+  substance: one(substances, {
+    fields: [aiTasks.targetSubstanceId],
+    references: [substances.id],
   }),
 }));

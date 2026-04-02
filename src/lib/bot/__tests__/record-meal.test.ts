@@ -28,11 +28,11 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/lib/calculations", () => ({
-  calculateNutrientAmount: vi.fn(
+  calculateSubstanceAmount: vi.fn(
     (_valuePer100g: number, portionGrams: number) => portionGrams / 10,
   ),
   getConfidenceLabel: vi.fn(),
-  getNutrientStatus: vi.fn(),
+  getSubstanceStatus: vi.fn(),
 }));
 
 vi.mock("@/lib/db/schema/foods", () => ({
@@ -42,13 +42,13 @@ vi.mock("@/lib/db/schema/foods", () => ({
   servingMeasures: {},
 }));
 
-vi.mock("@/lib/db/schema/nutrients", () => ({
-  nutrients: {},
+vi.mock("@/lib/db/schema/substances", () => ({
+  substances: {},
 }));
 
 vi.mock("@/lib/db/schema/reviews", () => ({
-  resolvedNutrientValues: {
-    nutrientId: "nutrient_id",
+  resolvedSubstanceValues: {
+    substanceId: "substance_id",
     valuePer100g: "value_per_100g",
     foodVariantId: "food_variant_id",
   },
@@ -61,11 +61,11 @@ vi.mock("@/lib/db/schema/users", () => ({
     foodVariantId: "food_variant_id",
     servingMeasureId: "serving_measure_id",
     quantity: "quantity",
-    nutrientSnapshot: "nutrient_snapshot",
+    substanceSnapshot: "substance_snapshot",
     mealLabel: "meal_label",
     loggedAt: "logged_at",
   },
-  userNutrientLimits: {},
+  userSubstanceLimits: {},
 }));
 
 describe("recordMeal", () => {
@@ -78,7 +78,7 @@ describe("recordMeal", () => {
 
     mockDbWhere
       .mockResolvedValueOnce([{ foodName: "Banana", method: "raw" }])
-      .mockResolvedValueOnce([{ nutrientId: "nutrient-1", valuePer100g: "12.5" }]);
+      .mockResolvedValueOnce([{ substanceId: "substance-1", valuePer100g: "12.5" }]);
     mockInsertValues.mockResolvedValueOnce(undefined);
 
     const result = await recordMeal(
@@ -100,7 +100,7 @@ describe("recordMeal", () => {
         foodVariantId: "variant-1",
         servingMeasureId: null,
         quantity: "1",
-        nutrientSnapshot: { "nutrient-1": 11.8 },
+        substanceSnapshot: { "substance-1": 11.8 },
         mealLabel: "snack",
       }),
     );
@@ -112,7 +112,7 @@ describe("recordMeal", () => {
         quantity: 1,
         portionGrams: 118,
         mealLabel: "snack",
-        nutrientCount: 1,
+        substanceCount: 1,
       },
     });
   });

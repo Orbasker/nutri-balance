@@ -1,12 +1,12 @@
 "use client";
 
-import type { LogEntry, LogEntryNutrientInfo } from "@/types";
+import type { LogEntry, LogEntrySubstanceInfo } from "@/types";
 
 import { LogEntryRow } from "./log-entry-row";
 
 interface LogEntryListProps {
   entries: LogEntry[];
-  nutrientInfo: LogEntryNutrientInfo[];
+  substanceInfo: LogEntrySubstanceInfo[];
 }
 
 type MealGroup = {
@@ -40,7 +40,7 @@ function groupByMeal(entries: LogEntry[]): MealGroup[] {
   }));
 }
 
-export function LogEntryList({ entries, nutrientInfo }: LogEntryListProps) {
+export function LogEntryList({ entries, substanceInfo }: LogEntryListProps) {
   if (entries.length === 0) {
     return (
       <div className="py-12 text-center">
@@ -68,7 +68,7 @@ export function LogEntryList({ entries, nutrientInfo }: LogEntryListProps) {
             <LogEntryRow
               key={entry.id}
               entry={entry}
-              nutrientInfo={nutrientInfo}
+              substanceInfo={substanceInfo}
               mealColorClass={
                 mealColors[group.label.toLowerCase()] ?? "bg-md-surface-container text-md-outline"
               }

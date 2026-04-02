@@ -23,7 +23,7 @@ const statusFilters: Array<{
 const typeFilters: Array<{ value: AiRunTypeFilter; label: string }> = [
   { value: "all", label: "All Types" },
   { value: "food_generation", label: "Food Generation" },
-  { value: "nutrient_research_task", label: "Research Tasks" },
+  { value: "substance_research_task", label: "Research Tasks" },
   { value: "ai_review", label: "AI Review" },
 ];
 
@@ -42,7 +42,7 @@ function normalizeStatus(status?: string): AiRunStatusFilter {
 }
 
 function normalizeType(type?: string): AiRunTypeFilter {
-  if (type === "food_generation" || type === "nutrient_research_task" || type === "ai_review") {
+  if (type === "food_generation" || type === "substance_research_task" || type === "ai_review") {
     return type;
   }
 

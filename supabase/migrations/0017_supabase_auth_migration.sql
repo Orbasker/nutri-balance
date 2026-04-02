@@ -43,8 +43,8 @@ ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_user_id_fk;
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
 ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_user_id_fk;
 ALTER TABLE consumption_logs DROP CONSTRAINT IF EXISTS consumption_logs_user_id_fkey;
-ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_user_id_fk;
-ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_user_id_fkey;
+ALTER TABLE user_substance_limits DROP CONSTRAINT IF EXISTS user_substance_limits_user_id_user_id_fk;
+ALTER TABLE user_substance_limits DROP CONSTRAINT IF EXISTS user_substance_limits_user_id_fkey;
 ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
 ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_fkey;
 ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
@@ -112,8 +112,8 @@ FROM user_id_map m WHERE profiles.id = m.old_id;
 UPDATE consumption_logs SET user_id = m.new_id::text
 FROM user_id_map m WHERE consumption_logs.user_id = m.old_id;
 
-UPDATE user_nutrient_limits SET user_id = m.new_id::text
-FROM user_id_map m WHERE user_nutrient_limits.user_id = m.old_id;
+UPDATE user_substance_limits SET user_id = m.new_id::text
+FROM user_id_map m WHERE user_substance_limits.user_id = m.old_id;
 
 UPDATE chat_conversations SET user_id = m.new_id::text
 FROM user_id_map m WHERE chat_conversations.user_id = m.old_id;
@@ -220,7 +220,7 @@ AS $$
 BEGIN
   DELETE FROM public.profiles WHERE id = OLD.id::text;
   DELETE FROM public.consumption_logs WHERE user_id = OLD.id::text;
-  DELETE FROM public.user_nutrient_limits WHERE user_id = OLD.id::text;
+  DELETE FROM public.user_substance_limits WHERE user_id = OLD.id::text;
   DELETE FROM public.chat_conversations WHERE user_id = OLD.id::text;
   DELETE FROM public.food_feedback WHERE user_id = OLD.id::text;
   DELETE FROM public.platform_accounts WHERE user_id = OLD.id::text;
@@ -314,11 +314,11 @@ CREATE POLICY "food_variants_insert" ON food_variants FOR INSERT TO authenticate
 CREATE POLICY "food_variants_update" ON food_variants FOR UPDATE TO authenticated USING (public.is_admin());
 CREATE POLICY "food_variants_delete" ON food_variants FOR DELETE TO authenticated USING (public.is_admin());
 
-ALTER TABLE nutrients ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "nutrients_select" ON nutrients FOR SELECT TO authenticated USING (true);
-CREATE POLICY "nutrients_insert" ON nutrients FOR INSERT TO authenticated WITH CHECK (public.is_admin());
-CREATE POLICY "nutrients_update" ON nutrients FOR UPDATE TO authenticated USING (public.is_admin());
-CREATE POLICY "nutrients_delete" ON nutrients FOR DELETE TO authenticated USING (public.is_admin());
+ALTER TABLE substances ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "substances_select" ON substances FOR SELECT TO authenticated USING (true);
+CREATE POLICY "substances_insert" ON substances FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "substances_update" ON substances FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "substances_delete" ON substances FOR DELETE TO authenticated USING (public.is_admin());
 
 ALTER TABLE serving_measures ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "serving_measures_select" ON serving_measures FOR SELECT TO authenticated USING (true);
@@ -326,11 +326,11 @@ CREATE POLICY "serving_measures_insert" ON serving_measures FOR INSERT TO authen
 CREATE POLICY "serving_measures_update" ON serving_measures FOR UPDATE TO authenticated USING (public.is_admin());
 CREATE POLICY "serving_measures_delete" ON serving_measures FOR DELETE TO authenticated USING (public.is_admin());
 
-ALTER TABLE resolved_nutrient_values ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "resolved_nutrient_values_select" ON resolved_nutrient_values FOR SELECT TO authenticated USING (true);
-CREATE POLICY "resolved_nutrient_values_insert" ON resolved_nutrient_values FOR INSERT TO authenticated WITH CHECK (public.is_admin());
-CREATE POLICY "resolved_nutrient_values_update" ON resolved_nutrient_values FOR UPDATE TO authenticated USING (public.is_admin());
-CREATE POLICY "resolved_nutrient_values_delete" ON resolved_nutrient_values FOR DELETE TO authenticated USING (public.is_admin());
+ALTER TABLE resolved_substance_values ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "resolved_substance_values_select" ON resolved_substance_values FOR SELECT TO authenticated USING (true);
+CREATE POLICY "resolved_substance_values_insert" ON resolved_substance_values FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "resolved_substance_values_update" ON resolved_substance_values FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "resolved_substance_values_delete" ON resolved_substance_values FOR DELETE TO authenticated USING (public.is_admin());
 
 ALTER TABLE retention_profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "retention_profiles_select" ON retention_profiles FOR SELECT TO authenticated USING (true);
@@ -358,11 +358,11 @@ CREATE POLICY "source_records_insert" ON source_records FOR INSERT TO authentica
 CREATE POLICY "source_records_update" ON source_records FOR UPDATE TO authenticated USING (public.is_admin());
 CREATE POLICY "source_records_delete" ON source_records FOR DELETE TO authenticated USING (public.is_admin());
 
-ALTER TABLE nutrient_observations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "nutrient_observations_select" ON nutrient_observations FOR SELECT TO authenticated USING (true);
-CREATE POLICY "nutrient_observations_insert" ON nutrient_observations FOR INSERT TO authenticated WITH CHECK (public.is_admin());
-CREATE POLICY "nutrient_observations_update" ON nutrient_observations FOR UPDATE TO authenticated USING (public.is_admin());
-CREATE POLICY "nutrient_observations_delete" ON nutrient_observations FOR DELETE TO authenticated USING (public.is_admin());
+ALTER TABLE substance_observations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "substance_observations_select" ON substance_observations FOR SELECT TO authenticated USING (true);
+CREATE POLICY "substance_observations_insert" ON substance_observations FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "substance_observations_update" ON substance_observations FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "substance_observations_delete" ON substance_observations FOR DELETE TO authenticated USING (public.is_admin());
 
 ALTER TABLE evidence_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "evidence_items_select" ON evidence_items FOR SELECT TO authenticated USING (true);
@@ -384,11 +384,11 @@ CREATE POLICY "variant_calculation_rules_delete" ON variant_calculation_rules FO
 
 -- ---- USER-SCOPED TABLES (users access only own rows) ----
 
-ALTER TABLE user_nutrient_limits ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "user_nutrient_limits_select" ON user_nutrient_limits FOR SELECT TO authenticated USING (user_id = auth.uid()::text);
-CREATE POLICY "user_nutrient_limits_insert" ON user_nutrient_limits FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid()::text);
-CREATE POLICY "user_nutrient_limits_update" ON user_nutrient_limits FOR UPDATE TO authenticated USING (user_id = auth.uid()::text);
-CREATE POLICY "user_nutrient_limits_delete" ON user_nutrient_limits FOR DELETE TO authenticated USING (user_id = auth.uid()::text);
+ALTER TABLE user_substance_limits ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_substance_limits_select" ON user_substance_limits FOR SELECT TO authenticated USING (user_id = auth.uid()::text);
+CREATE POLICY "user_substance_limits_insert" ON user_substance_limits FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid()::text);
+CREATE POLICY "user_substance_limits_update" ON user_substance_limits FOR UPDATE TO authenticated USING (user_id = auth.uid()::text);
+CREATE POLICY "user_substance_limits_delete" ON user_substance_limits FOR DELETE TO authenticated USING (user_id = auth.uid()::text);
 
 ALTER TABLE consumption_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "consumption_logs_select" ON consumption_logs FOR SELECT TO authenticated USING (user_id = auth.uid()::text);

@@ -31,10 +31,10 @@ function parsePositiveNumber(val: unknown): number | null {
   return n;
 }
 
-/** Payload for creating or updating a row in `user_nutrient_limits` (validated server-side). */
-export const saveUserNutrientLimitSchema = z
+/** Payload for creating or updating a row in `user_substance_limits` (validated server-side). */
+export const saveUserSubstanceLimitSchema = z
   .object({
-    nutrientId: uuidSchema,
+    substanceId: uuidSchema,
     limitId: uuidSchema.optional(),
     mode: limitModeSchema,
     dailyLimit: z.union([z.string(), z.number()]).optional(),
@@ -78,20 +78,20 @@ export const saveUserNutrientLimitSchema = z
     }
   });
 
-export type SaveUserNutrientLimitInput = z.infer<typeof saveUserNutrientLimitSchema>;
+export type SaveUserSubstanceLimitInput = z.infer<typeof saveUserSubstanceLimitSchema>;
 
-export const deleteUserNutrientLimitSchema = z.object({
+export const deleteUserSubstanceLimitSchema = z.object({
   limitId: uuidSchema,
 });
 
-export type DeleteUserNutrientLimitInput = z.infer<typeof deleteUserNutrientLimitSchema>;
+export type DeleteUserSubstanceLimitInput = z.infer<typeof deleteUserSubstanceLimitSchema>;
 
 export const addConsumptionLogSchema = z.object({
   foodVariantId: uuidSchema,
   servingMeasureId: uuidSchema.nullable(),
   quantity: z.number().positive("Quantity must be positive"),
   gramsAmount: z.number().positive("Grams must be positive"),
-  nutrientSnapshot: z.record(z.string(), z.number()),
+  substanceSnapshot: z.record(z.string(), z.number()),
   mealLabel: z.string().optional(),
 });
 
@@ -106,12 +106,12 @@ export type DeleteConsumptionLogInput = z.infer<typeof deleteConsumptionLogSchem
 export const updateConsumptionLogSchema = z.object({
   logId: uuidSchema,
   quantity: z.number().positive("Quantity must be positive"),
-  nutrientSnapshot: z.record(z.string(), z.number()),
+  substanceSnapshot: z.record(z.string(), z.number()),
 });
 
-// Custom nutrient validators
+// Custom substance validators
 
-export const createCustomNutrientSchema = z.object({
+export const createCustomSubstanceSchema = z.object({
   displayName: z
     .string()
     .trim()
@@ -120,13 +120,13 @@ export const createCustomNutrientSchema = z.object({
   unit: z.string().trim().min(1, "Unit is required").max(20, "Unit must be under 20 characters"),
 });
 
-export type CreateCustomNutrientInput = z.infer<typeof createCustomNutrientSchema>;
+export type CreateCustomSubstanceInput = z.infer<typeof createCustomSubstanceSchema>;
 
-export const deleteCustomNutrientSchema = z.object({
-  nutrientId: uuidSchema,
+export const deleteCustomSubstanceSchema = z.object({
+  substanceId: uuidSchema,
 });
 
-export type DeleteCustomNutrientInput = z.infer<typeof deleteCustomNutrientSchema>;
+export type DeleteCustomSubstanceInput = z.infer<typeof deleteCustomSubstanceSchema>;
 
 // Admin validators
 
@@ -158,15 +158,15 @@ export const deleteVariantSchema = z.object({
   variantId: uuidSchema,
 });
 
-export const saveNutrientValueSchema = z.object({
+export const saveSubstanceValueSchema = z.object({
   foodVariantId: uuidSchema,
-  nutrientId: uuidSchema,
+  substanceId: uuidSchema,
   valuePer100g: z.number().nonnegative("Value must be non-negative"),
   confidenceScore: z.number().int().min(0).max(100).default(50),
   resolvedId: uuidSchema.optional(),
 });
 
-export const deleteNutrientValueSchema = z.object({
+export const deleteSubstanceValueSchema = z.object({
   resolvedId: uuidSchema,
 });
 
@@ -180,7 +180,7 @@ export const reviewObservationSchema = z.object({
 
 export const submitFeedbackSchema = z.object({
   foodId: uuidSchema,
-  nutrientId: uuidSchema.optional(),
+  substanceId: uuidSchema.optional(),
   foodVariantId: uuidSchema.optional(),
   type: z.enum(["flag", "correction"]),
   message: z.string().min(10, "Message must be at least 10 characters").max(1000),
@@ -210,7 +210,7 @@ export type DismissFeedbackInput = z.infer<typeof dismissFeedbackSchema>;
  * Turns validated input into DB-ready numeric strings.
  * For stability mode, `daily_limit` is set to `range_max` so existing strict-style consumers stay consistent until the app reads ranges.
  */
-export function toUserNutrientLimitRow(input: SaveUserNutrientLimitInput): {
+export function toUserSubstanceLimitRow(input: SaveUserSubstanceLimitInput): {
   daily_limit: string;
   mode: LimitMode;
   range_min: string | null;

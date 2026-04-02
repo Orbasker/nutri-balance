@@ -25,7 +25,7 @@ interface AiTask {
   createdAt: Date;
   startedAt: Date | null;
   completedAt: Date | null;
-  nutrientName: string | null;
+  substanceName: string | null;
 }
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -46,7 +46,7 @@ function TaskCard({ task }: { task: AiTask }) {
     <Card size="sm">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Research {task.nutrientName ?? "Unknown Nutrient"}</CardTitle>
+          <CardTitle>Research {task.substanceName ?? "Unknown Substance"}</CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant={statusVariant[task.status] ?? "outline"}>{task.status}</Badge>
             <Badge variant="secondary">{task.createdBy}</Badge>
@@ -89,7 +89,7 @@ export function AiTaskList({ tasks }: { tasks: AiTask[] }) {
   if (tasks.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No tasks yet. Create one above to start researching nutrient data.
+        No tasks yet. Create one above to start researching substance data.
       </p>
     );
   }

@@ -64,11 +64,11 @@ DROP POLICY IF EXISTS "consumption_logs_insert" ON "consumption_logs";--> statem
 DROP POLICY IF EXISTS "consumption_logs_update" ON "consumption_logs";--> statement-breakpoint
 DROP POLICY IF EXISTS "consumption_logs_delete" ON "consumption_logs";--> statement-breakpoint
 ALTER TABLE "consumption_logs" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
-DROP POLICY IF EXISTS "user_nutrient_limits_select" ON "user_nutrient_limits";--> statement-breakpoint
-DROP POLICY IF EXISTS "user_nutrient_limits_insert" ON "user_nutrient_limits";--> statement-breakpoint
-DROP POLICY IF EXISTS "user_nutrient_limits_update" ON "user_nutrient_limits";--> statement-breakpoint
-DROP POLICY IF EXISTS "user_nutrient_limits_delete" ON "user_nutrient_limits";--> statement-breakpoint
-ALTER TABLE "user_nutrient_limits" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
+DROP POLICY IF EXISTS "user_substance_limits_select" ON "user_substance_limits";--> statement-breakpoint
+DROP POLICY IF EXISTS "user_substance_limits_insert" ON "user_substance_limits";--> statement-breakpoint
+DROP POLICY IF EXISTS "user_substance_limits_update" ON "user_substance_limits";--> statement-breakpoint
+DROP POLICY IF EXISTS "user_substance_limits_delete" ON "user_substance_limits";--> statement-breakpoint
+ALTER TABLE "user_substance_limits" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
 DROP POLICY IF EXISTS "profiles_select" ON "profiles";--> statement-breakpoint
 DROP POLICY IF EXISTS "profiles_insert" ON "profiles";--> statement-breakpoint
 DROP POLICY IF EXISTS "profiles_update" ON "profiles";--> statement-breakpoint
@@ -81,7 +81,7 @@ ALTER TABLE "foods" ALTER COLUMN "created_by" SET DATA TYPE text;--> statement-b
 ALTER TABLE "reviews" ALTER COLUMN "reviewer_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "consumption_logs" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "profiles" ALTER COLUMN "id" SET DATA TYPE text;--> statement-breakpoint
-ALTER TABLE "user_nutrient_limits" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
+ALTER TABLE "user_substance_limits" ALTER COLUMN "user_id" SET DATA TYPE text;--> statement-breakpoint
 -- Add FK constraints to new user table (idempotent: skip if constraint already exists)
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'account_user_id_user_id_fk') THEN
@@ -103,7 +103,7 @@ DELETE FROM "chat_messages" WHERE "conversation_id" IN (
 DELETE FROM "chat_conversations" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
 DELETE FROM "consumption_logs" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
 DELETE FROM "profiles" WHERE "id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
-DELETE FROM "user_nutrient_limits" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
+DELETE FROM "user_substance_limits" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
 DELETE FROM "food_feedback" WHERE "user_id" NOT IN (SELECT "id" FROM "user");--> statement-breakpoint
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chat_conversations_user_id_user_id_fk') THEN
@@ -121,8 +121,8 @@ DO $$ BEGIN
   END IF;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_nutrient_limits_user_id_user_id_fk') THEN
-    ALTER TABLE "user_nutrient_limits" ADD CONSTRAINT "user_nutrient_limits_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_substance_limits_user_id_user_id_fk') THEN
+    ALTER TABLE "user_substance_limits" ADD CONSTRAINT "user_substance_limits_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
   END IF;
 END $$;--> statement-breakpoint
 DO $$ BEGIN

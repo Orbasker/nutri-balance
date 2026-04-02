@@ -2,7 +2,9 @@
  * USDA FoodData Central API client.
  * Free API — works with DEMO_KEY or a registered key from https://fdc.nal.usda.gov/api-key-signup
  *
- * This fetches REAL measured nutrient data, not LLM-generated estimates.
+ * This fetches real measured USDA nutrient data, not LLM-generated estimates.
+ * Keep these response shapes aligned with the USDA API and map to the app's
+ * internal "substance" terminology in higher layers.
  */
 
 const USDA_BASE = "https://api.nal.usda.gov/fdc/v1";
@@ -33,17 +35,17 @@ export interface USDASearchResponse {
 }
 
 /**
- * Search USDA FoodData Central for foods containing a specific nutrient.
- * Returns up to `pageSize` foods sorted by the nutrient's value descending.
+ * Search USDA FoodData Central for foods containing a specific substance.
+ * Returns up to `pageSize` foods sorted by the substance's value descending.
  */
-export async function searchFoodsByNutrient(
-  nutrientName: string,
+export async function searchFoodsBySubstance(
+  substanceName: string,
   opts: { pageSize?: number; pageNumber?: number } = {},
 ): Promise<USDASearchResponse> {
   const { pageSize = 50, pageNumber = 1 } = opts;
   const apiKey = getApiKey();
 
-  // Search for common foods, sorted by the nutrient
+  // Search for common foods, sorted by the substance
   const params = new URLSearchParams({
     api_key: apiKey,
     query: "*",
@@ -54,8 +56,8 @@ export async function searchFoodsByNutrient(
     sortOrder: "asc",
   });
 
-  // USDA nutrient numbers for common nutrients we track
-  const nutrientNumber = mapNutrientNameToUSDANumber(nutrientName);
+  // USDA nutrient numbers for common substances we track
+  const nutrientNumber = mapSubstanceNameToUSDANumber(substanceName);
   if (nutrientNumber) {
     params.set("sortBy", `nutrientNumber_${nutrientNumber}`);
     params.set("sortOrder", "desc");
@@ -123,10 +125,10 @@ async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
 }
 
 /**
- * Map our internal nutrient display names to USDA nutrient numbers.
+ * Map our internal substance display names to USDA nutrient numbers.
  * See: https://fdc.nal.usda.gov/api-guide
  */
-function mapNutrientNameToUSDANumber(name: string): string | null {
+function mapSubstanceNameToUSDANumber(name: string): string | null {
   const lower = name.toLowerCase().trim();
   const map: Record<string, string> = {
     // Vitamins

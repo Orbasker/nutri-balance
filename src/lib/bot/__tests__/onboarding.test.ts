@@ -12,8 +12,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-vi.mock("@/lib/db/schema/nutrients", () => ({
-  nutrients: {
+vi.mock("@/lib/db/schema/substances", () => ({
+  substances: {
     id: "id",
     displayName: "display_name",
     unit: "unit",
@@ -41,10 +41,10 @@ vi.mock("@/lib/db/schema/users", () => ({
     clinicalNotes: "clinical_notes",
     healthGoal: "health_goal",
   },
-  userNutrientLimits: {
+  userSubstanceLimits: {
     id: "id",
     userId: "user_id",
-    nutrientId: "nutrient_id",
+    substanceId: "substance_id",
     dailyLimit: "daily_limit",
     mode: "mode",
   },
@@ -114,7 +114,7 @@ describe("handleOnboarding", () => {
     expect(message).toContain("goal");
   });
 
-  it("presents nutrient presets after saving goals", async () => {
+  it("presents substance presets after saving goals", async () => {
     const account = makeAccount({ onboardingState: "awaiting_goals" });
 
     await handleOnboarding(account, "Managing kidney disease", mockRespond);
@@ -128,7 +128,7 @@ describe("handleOnboarding", () => {
   });
 
   it("selects kidney preset and transitions to awaiting_limits", async () => {
-    const account = makeAccount({ onboardingState: "awaiting_nutrients" });
+    const account = makeAccount({ onboardingState: "awaiting_substances" });
 
     await handleOnboarding(account, "1", mockRespond);
 
@@ -141,7 +141,7 @@ describe("handleOnboarding", () => {
     const account = makeAccount({
       onboardingState: "awaiting_limits",
       onboardingData: {
-        nutrients: [
+        substances: [
           { name: "Potassium", key: "potassium" },
           { name: "Sodium", key: "sodium" },
         ],
@@ -149,7 +149,7 @@ describe("handleOnboarding", () => {
       },
     });
 
-    setupDbSelectMock([{ id: "nutrient-k", displayName: "Potassium", unit: "mg" }]);
+    setupDbSelectMock([{ id: "substance-k", displayName: "Potassium", unit: "mg" }]);
 
     vi.mocked(db.insert).mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),
@@ -162,11 +162,11 @@ describe("handleOnboarding", () => {
     expect(message).toContain("Sodium");
   });
 
-  it("handles custom nutrient selection (option 4 then comma input)", async () => {
+  it("handles custom substance selection (option 4 then comma input)", async () => {
     const account = makeAccount({
-      onboardingState: "awaiting_nutrients",
+      onboardingState: "awaiting_substances",
       onboardingData: {
-        nutrients: [
+        substances: [
           { name: "Potassium", key: "potassium" },
           { name: "Sodium", key: "sodium" },
           { name: "Vitamin K", key: "vitamin_k" },
@@ -184,11 +184,11 @@ describe("handleOnboarding", () => {
     expect(message).not.toContain("Sodium");
   });
 
-  it("re-prompts on invalid custom nutrient selection numbers", async () => {
+  it("re-prompts on invalid custom substance selection numbers", async () => {
     const account = makeAccount({
-      onboardingState: "awaiting_nutrients",
+      onboardingState: "awaiting_substances",
       onboardingData: {
-        nutrients: [
+        substances: [
           { name: "Potassium", key: "potassium" },
           { name: "Sodium", key: "sodium" },
         ],
@@ -215,7 +215,7 @@ describe("handleOnboarding", () => {
   });
 
   it("resets onboarding when user sends restart (no slash)", async () => {
-    const account = makeAccount({ onboardingState: "awaiting_nutrients" });
+    const account = makeAccount({ onboardingState: "awaiting_substances" });
 
     await handleOnboarding(account, "restart", mockRespond);
 
@@ -239,12 +239,12 @@ describe("handleOnboarding", () => {
     const account = makeAccount({
       onboardingState: "awaiting_limits",
       onboardingData: {
-        nutrients: [{ name: "Potassium", key: "potassium" }],
+        substances: [{ name: "Potassium", key: "potassium" }],
         currentIndex: 0,
       },
     });
 
-    setupDbSelectMock([{ id: "nutrient-k", displayName: "Potassium", unit: "mg" }]);
+    setupDbSelectMock([{ id: "substance-k", displayName: "Potassium", unit: "mg" }]);
 
     vi.mocked(db.insert).mockReturnValue({
       values: vi.fn().mockResolvedValue(undefined),

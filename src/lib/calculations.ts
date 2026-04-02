@@ -1,4 +1,4 @@
-import type { ConfidenceLabel, NutrientStatus } from "@/types";
+import type { ConfidenceLabel, SubstanceStatus } from "@/types";
 
 /**
  * Map a numeric confidence score (0-100) to a human-readable label.
@@ -13,18 +13,18 @@ export function getConfidenceLabel(score: number): ConfidenceLabel {
 }
 
 /**
- * Calculate the nutrient amount for a given serving.
+ * Calculate the substance amount for a given serving.
  * Formula: (value_per_100g) × (portion_g / 100)
  */
-export function calculateNutrientAmount(valuePer100g: number, portionGrams: number): number {
+export function calculateSubstanceAmount(valuePer100g: number, portionGrams: number): number {
   return (valuePer100g * portionGrams) / 100;
 }
 
 /**
- * Determine the status of a nutrient relative to its daily limit.
+ * Determine the status of a substance relative to its daily limit.
  * safe: <80%, caution: 80-100%, exceed: >100%
  */
-export function getNutrientStatus(total: number, dailyLimit: number | null): NutrientStatus {
+export function getSubstanceStatus(total: number, dailyLimit: number | null): SubstanceStatus {
   if (dailyLimit === null || dailyLimit <= 0) return "safe";
   const pct = (total / dailyLimit) * 100;
   if (pct > 100) return "exceed";

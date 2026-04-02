@@ -2,10 +2,10 @@
 
 import type {
   FoodSearchResult,
-  NutrientOption,
   PaginatedSearchResult,
   PaginationParams,
   SearchFilters,
+  SubstanceOption,
 } from "@/types";
 import {
   and,
@@ -23,26 +23,26 @@ import {
 } from "drizzle-orm";
 
 import { aiResearchFood } from "@/lib/ai/food-search-agent";
-import { aiSearchByNutrient } from "@/lib/ai/nutrient-search-agent";
+import { aiSearchBySubstance } from "@/lib/ai/substance-search-agent";
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { foodAliases, foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { searchInputSchema } from "@/lib/validators";
 
 import { type SearchRow, mapSearchRows } from "./search-utils";
 
 const DEFAULT_PAGE_SIZE = 20;
 
-function createNutrientSlug(value: string) {
+function createSubstanceSlug(value: string) {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "");
 }
 
-function inferUnitForCustomNutrient(name: string) {
+function inferUnitForCustomSubstance(name: string) {
   const normalized = name.trim().toLowerCase();
 
   const explicitUnits: Record<string, string> = {
@@ -102,14 +102,14 @@ function inferUnitForCustomNutrient(name: string) {
 }
 
 /**
- * Check if query matches a nutrient name/display_name.
- * Returns the nutrient if found, null otherwise.
+ * Check if query matches a substance name/display_name.
+ * Returns the substance if found, null otherwise.
  */
-async function findMatchingNutrient(query: string) {
+async function findMatchingSubstance(query: string) {
   const term = query.trim().toLowerCase();
-  const allNutrients = await db.select().from(nutrients);
+  const allSubstances = await db.select().from(substances);
   return (
-    allNutrients.find(
+    allSubstances.find(
       (n) =>
         n.name.toLowerCase() === term ||
         n.displayName.toLowerCase() === term ||
@@ -136,13 +136,13 @@ function buildFilterConditions(filters: SearchFilters) {
     conditions.push(eq(foods.category, filters.category));
   }
   if (filters.aiGeneratedOnly) {
-    conditions.push(sql`${resolvedNutrientValues.sourceSummary} LIKE 'AI-generated%'`);
+    conditions.push(sql`${resolvedSubstanceValues.sourceSummary} LIKE 'AI-generated%'`);
   }
   if (filters.confidenceLevel) {
     const range = confidenceRanges[filters.confidenceLevel];
     if (range) {
-      conditions.push(gte(resolvedNutrientValues.confidenceScore, range.min));
-      conditions.push(lte(resolvedNutrientValues.confidenceScore, range.max));
+      conditions.push(gte(resolvedSubstanceValues.confidenceScore, range.min));
+      conditions.push(lte(resolvedSubstanceValues.confidenceScore, range.max));
     }
   }
   return conditions;
@@ -164,16 +164,16 @@ async function getCategoriesForIds(foodIds: string[]): Promise<string[]> {
 }
 
 /**
- * Get distinct categories for foods that have data for a specific nutrient.
+ * Get distinct categories for foods that have data for a specific substance.
  */
-async function getCategoriesForNutrient(nutrientId: string): Promise<string[]> {
+async function getCategoriesForSubstance(substanceId: string): Promise<string[]> {
   const rows = await db
     .selectDistinct({ category: foods.category })
-    .from(resolvedNutrientValues)
-    .innerJoin(foodVariants, eq(foodVariants.id, resolvedNutrientValues.foodVariantId))
+    .from(resolvedSubstanceValues)
+    .innerJoin(foodVariants, eq(foodVariants.id, resolvedSubstanceValues.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
     .where(
-      and(sql`${foods.category} IS NOT NULL`, eq(resolvedNutrientValues.nutrientId, nutrientId)),
+      and(sql`${foods.category} IS NOT NULL`, eq(resolvedSubstanceValues.substanceId, substanceId)),
     );
   return rows
     .map((r) => r.category)
@@ -182,43 +182,43 @@ async function getCategoriesForNutrient(nutrientId: string): Promise<string[]> {
 }
 
 /**
- * Search foods by nutrient - paginated, with filters.
+ * Search foods by substance - paginated, with filters.
  */
-async function searchByNutrient(
-  nutrientId: string,
+async function searchBySubstance(
+  substanceId: string,
   filters: SearchFilters,
   pagination: PaginationParams,
 ): Promise<{ results: FoodSearchResult[]; totalCount: number; categories: string[] }> {
   const filterConditions = buildFilterConditions(filters);
-  const baseWhere = and(eq(resolvedNutrientValues.nutrientId, nutrientId), ...filterConditions);
+  const baseWhere = and(eq(resolvedSubstanceValues.substanceId, substanceId), ...filterConditions);
 
-  // Count distinct foods matching the nutrient + filters
+  // Count distinct foods matching the substance + filters
   const [countResult] = await db
     .select({ total: countDistinct(foods.id) })
-    .from(resolvedNutrientValues)
-    .innerJoin(foodVariants, eq(foodVariants.id, resolvedNutrientValues.foodVariantId))
+    .from(resolvedSubstanceValues)
+    .innerJoin(foodVariants, eq(foodVariants.id, resolvedSubstanceValues.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .innerJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
     .where(baseWhere);
 
   const totalCount = Number(countResult?.total ?? 0);
 
-  // Get the paginated set of food IDs (ordered by highest nutrient value)
+  // Get the paginated set of food IDs (ordered by highest substance value)
   const paginatedFoodIdRows = await db
     .select({ id: foods.id })
-    .from(resolvedNutrientValues)
-    .innerJoin(foodVariants, eq(foodVariants.id, resolvedNutrientValues.foodVariantId))
+    .from(resolvedSubstanceValues)
+    .innerJoin(foodVariants, eq(foodVariants.id, resolvedSubstanceValues.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .innerJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
     .where(baseWhere)
     .groupBy(foods.id)
-    .orderBy(desc(sql`MAX(${resolvedNutrientValues.valuePer100g})`))
+    .orderBy(desc(sql`MAX(${resolvedSubstanceValues.valuePer100g})`))
     .limit(pagination.pageSize)
     .offset((pagination.page - 1) * pagination.pageSize);
 
   const foodIds = paginatedFoodIdRows.map((r) => r.id);
   if (foodIds.length === 0) {
-    const categories = await getCategoriesForNutrient(nutrientId);
+    const categories = await getCategoriesForSubstance(substanceId);
     return { results: [], totalCount, categories };
   }
 
@@ -231,22 +231,22 @@ async function searchByNutrient(
       variantId: foodVariants.id,
       preparationMethod: foodVariants.preparationMethod,
       isDefault: foodVariants.isDefault,
-      nutrientName: nutrients.name,
-      nutrientDisplayName: nutrients.displayName,
-      nutrientUnit: nutrients.unit,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
-      confidenceScore: resolvedNutrientValues.confidenceScore,
-      sourceSummary: resolvedNutrientValues.sourceSummary,
+      substanceName: substances.name,
+      substanceDisplayName: substances.displayName,
+      substanceUnit: substances.unit,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
+      confidenceScore: resolvedSubstanceValues.confidenceScore,
+      sourceSummary: resolvedSubstanceValues.sourceSummary,
     })
-    .from(resolvedNutrientValues)
-    .innerJoin(foodVariants, eq(foodVariants.id, resolvedNutrientValues.foodVariantId))
+    .from(resolvedSubstanceValues)
+    .innerJoin(foodVariants, eq(foodVariants.id, resolvedSubstanceValues.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .innerJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
     .where(inArray(foods.id, foodIds))
-    .orderBy(desc(resolvedNutrientValues.valuePer100g));
+    .orderBy(desc(resolvedSubstanceValues.valuePer100g));
 
   // Get available categories for filters (unfiltered by category to show all options)
-  const categories = await getCategoriesForNutrient(nutrientId);
+  const categories = await getCategoriesForSubstance(substanceId);
 
   return {
     results: mapSearchRows(rows as SearchRow[]),
@@ -286,16 +286,16 @@ async function searchByName(
   const baseConditions = [inArray(foods.id, allMatchingIds), ...filterConditions];
 
   // For filters that need joins (confidence, AI), we need the full join
-  const needsNutrientJoin = filters.confidenceLevel || filters.aiGeneratedOnly;
+  const needsSubstanceJoin = filters.confidenceLevel || filters.aiGeneratedOnly;
 
   let totalCount: number;
-  if (needsNutrientJoin) {
+  if (needsSubstanceJoin) {
     const [countResult] = await db
       .select({ total: countDistinct(foods.id) })
       .from(foods)
       .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-      .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
-      .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+      .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
+      .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
       .where(and(...baseConditions));
     totalCount = Number(countResult?.total ?? 0);
   } else {
@@ -312,13 +312,13 @@ async function searchByName(
 
   // Get paginated food IDs
   let paginatedIdRows;
-  if (needsNutrientJoin) {
+  if (needsSubstanceJoin) {
     paginatedIdRows = await db
       .select({ id: foods.id })
       .from(foods)
       .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-      .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
-      .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+      .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
+      .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
       .where(and(...baseConditions))
       .groupBy(foods.id)
       .orderBy(foods.name)
@@ -352,17 +352,17 @@ async function searchByName(
       variantId: foodVariants.id,
       preparationMethod: foodVariants.preparationMethod,
       isDefault: foodVariants.isDefault,
-      nutrientName: nutrients.name,
-      nutrientDisplayName: nutrients.displayName,
-      nutrientUnit: nutrients.unit,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
-      confidenceScore: resolvedNutrientValues.confidenceScore,
-      sourceSummary: resolvedNutrientValues.sourceSummary,
+      substanceName: substances.name,
+      substanceDisplayName: substances.displayName,
+      substanceUnit: substances.unit,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
+      confidenceScore: resolvedSubstanceValues.confidenceScore,
+      sourceSummary: resolvedSubstanceValues.sourceSummary,
     })
     .from(foods)
     .leftJoin(foodVariants, eq(foodVariants.foodId, foods.id))
-    .leftJoin(resolvedNutrientValues, eq(resolvedNutrientValues.foodVariantId, foodVariants.id))
-    .leftJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
+    .leftJoin(resolvedSubstanceValues, eq(resolvedSubstanceValues.foodVariantId, foodVariants.id))
+    .leftJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
     .where(inArray(foods.id, foodIds))
     .orderBy(foods.name);
 
@@ -374,28 +374,28 @@ async function searchByName(
 }
 
 /**
- * List all nutrients sorted by sortOrder.
- * Used by the nutrient search mode to populate the autocomplete picker.
+ * List all substances sorted by sortOrder.
+ * Used by the substance search mode to populate the autocomplete picker.
  */
-export async function listNutrients(): Promise<NutrientOption[]> {
+export async function listSubstances(): Promise<SubstanceOption[]> {
   const rows = await db
     .select({
-      id: nutrients.id,
-      name: nutrients.name,
-      displayName: nutrients.displayName,
-      unit: nutrients.unit,
+      id: substances.id,
+      name: substances.name,
+      displayName: substances.displayName,
+      unit: substances.unit,
     })
-    .from(nutrients)
-    .orderBy(asc(nutrients.sortOrder));
+    .from(substances)
+    .orderBy(asc(substances.sortOrder));
 
   return rows;
 }
 
-export async function resolveNutrientSearchTerm(
+export async function resolveSubstanceSearchTerm(
   query: string,
 ): Promise<
-  | { status: "matched"; nutrient: NutrientOption }
-  | { status: "created"; nutrient: NutrientOption; message: string }
+  | { status: "matched"; substance: SubstanceOption }
+  | { status: "created"; substance: SubstanceOption; message: string }
   | { status: "error"; message: string }
 > {
   const parsed = searchInputSchema.safeParse({ query });
@@ -403,11 +403,11 @@ export async function resolveNutrientSearchTerm(
     return { status: "error", message: "Enter at least 2 characters." };
   }
 
-  const existing = await findMatchingNutrient(parsed.data.query);
+  const existing = await findMatchingSubstance(parsed.data.query);
   if (existing) {
     return {
       status: "matched",
-      nutrient: {
+      substance: {
         id: existing.id,
         name: existing.name,
         displayName: existing.displayName,
@@ -422,11 +422,11 @@ export async function resolveNutrientSearchTerm(
   }
 
   const displayName = parsed.data.query;
-  const slug = createNutrientSlug(displayName);
-  const unit = inferUnitForCustomNutrient(displayName);
+  const slug = createSubstanceSlug(displayName);
+  const unit = inferUnitForCustomSubstance(displayName);
 
   const [created] = await db
-    .insert(nutrients)
+    .insert(substances)
     .values({
       name: `custom_${slug}_${session.user.id.slice(0, 8)}`,
       displayName,
@@ -435,60 +435,60 @@ export async function resolveNutrientSearchTerm(
       createdBy: session.user.id,
     })
     .returning({
-      id: nutrients.id,
-      name: nutrients.name,
-      displayName: nutrients.displayName,
-      unit: nutrients.unit,
+      id: substances.id,
+      name: substances.name,
+      displayName: substances.displayName,
+      unit: substances.unit,
     });
 
   return {
     status: "created",
-    nutrient: created,
-    message: `Added "${created.displayName}" to your nutrient list.`,
+    substance: created,
+    message: `Added "${created.displayName}" to your substance list.`,
   };
 }
 
 /**
- * Search foods by nutrient ID - public server action wrapping the internal searchByNutrient.
- * Accepts a nutrientId directly (no query matching needed).
+ * Search foods by substance ID - public server action wrapping the internal searchBySubstance.
+ * Accepts a substanceId directly (no query matching needed).
  */
-export async function searchByNutrientId(
-  nutrientId: string,
+export async function searchBySubstanceId(
+  substanceId: string,
   filters: SearchFilters = {},
   pagination: PaginationParams = { page: 1, pageSize: DEFAULT_PAGE_SIZE },
 ): Promise<PaginatedSearchResult> {
-  if (!nutrientId?.trim()) {
+  if (!substanceId?.trim()) {
     return {
       results: [],
       totalCount: 0,
       page: 1,
       pageSize: pagination.pageSize,
       totalPages: 0,
-      searchType: "nutrient",
+      searchType: "substance",
       availableCategories: [],
     };
   }
 
-  // Look up the nutrient to get its display name
-  const [nutrient] = await db
-    .select({ id: nutrients.id, displayName: nutrients.displayName })
-    .from(nutrients)
-    .where(eq(nutrients.id, nutrientId));
+  // Look up the substance to get its display name
+  const [substance] = await db
+    .select({ id: substances.id, displayName: substances.displayName })
+    .from(substances)
+    .where(eq(substances.id, substanceId));
 
-  if (!nutrient) {
+  if (!substance) {
     return {
       results: [],
       totalCount: 0,
       page: 1,
       pageSize: pagination.pageSize,
       totalPages: 0,
-      searchType: "nutrient",
+      searchType: "substance",
       availableCategories: [],
     };
   }
 
-  const { results, totalCount, categories } = await searchByNutrient(
-    nutrientId,
+  const { results, totalCount, categories } = await searchBySubstance(
+    substanceId,
     filters,
     pagination,
   );
@@ -499,9 +499,9 @@ export async function searchByNutrientId(
     page: pagination.page,
     pageSize: pagination.pageSize,
     totalPages: Math.ceil(totalCount / pagination.pageSize),
-    searchType: "nutrient",
-    nutrientName: nutrient.displayName,
-    nutrientId,
+    searchType: "substance",
+    substanceName: substance.displayName,
+    substanceId,
     availableCategories: categories,
   };
 }
@@ -526,11 +526,11 @@ export async function searchFoods(
     };
   }
 
-  // Check if the query matches a nutrient name
-  const matchedNutrient = await findMatchingNutrient(parsed.data.query);
-  if (matchedNutrient) {
-    const { results, totalCount, categories } = await searchByNutrient(
-      matchedNutrient.id,
+  // Check if the query matches a substance name
+  const matchedSubstance = await findMatchingSubstance(parsed.data.query);
+  if (matchedSubstance) {
+    const { results, totalCount, categories } = await searchBySubstance(
+      matchedSubstance.id,
       filters,
       pagination,
     );
@@ -540,9 +540,9 @@ export async function searchFoods(
       page: pagination.page,
       pageSize: pagination.pageSize,
       totalPages: Math.ceil(totalCount / pagination.pageSize),
-      searchType: "nutrient",
-      nutrientName: matchedNutrient.displayName,
-      nutrientId: matchedNutrient.id,
+      searchType: "substance",
+      substanceName: matchedSubstance.displayName,
+      substanceId: matchedSubstance.id,
       availableCategories: categories,
     };
   }
@@ -570,7 +570,7 @@ export type AiSearchResult =
 
 /**
  * AI-powered food search: researches a food not in the database,
- * persists it with AI-generated nutrient data, and returns its ID.
+ * persists it with AI-generated substance data, and returns its ID.
  */
 export async function aiSearchFood(query: string): Promise<AiSearchResult> {
   const parsed = searchInputSchema.safeParse({ query });
@@ -595,24 +595,24 @@ export async function aiSearchFood(query: string): Promise<AiSearchResult> {
   return { status: "found", foodId: result.foodId };
 }
 
-export type AiNutrientSearchResult =
+export type AiSubstanceSearchResult =
   | { status: "found"; count: number; summary: string }
   | { status: "error"; message: string };
 
 /**
- * AI-powered nutrient search: Explorer agent finds data sources (USDA API, web),
+ * AI-powered substance search: Explorer agent finds data sources (USDA API, web),
  * Parser agent extracts food entries into the DB.
  */
-export async function aiDiscoverFoodsByNutrient(
-  nutrientId: string,
-): Promise<AiNutrientSearchResult> {
+export async function aiDiscoverFoodsBySubstance(
+  substanceId: string,
+): Promise<AiSubstanceSearchResult> {
   const session = await getSession();
 
   if (!session) {
     return { status: "error", message: "You must be signed in." };
   }
 
-  const result = await aiSearchByNutrient(nutrientId, session.user.id);
+  const result = await aiSearchBySubstance(substanceId, session.user.id);
 
   if ("error" in result) {
     return { status: "error", message: result.error };
@@ -630,10 +630,10 @@ export type PdfUploadResult =
   | { status: "error"; message: string };
 
 /**
- * Upload and parse a PDF containing nutrient data (e.g., USDA reports).
+ * Upload and parse a PDF containing substance data (e.g., USDA reports).
  * Extracts all food entries and adds them to the database.
  */
-export async function uploadNutrientPdf(formData: FormData): Promise<PdfUploadResult> {
+export async function uploadSubstancePdf(formData: FormData): Promise<PdfUploadResult> {
   const session = await getSession();
 
   if (!session) {

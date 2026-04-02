@@ -2,18 +2,18 @@
 
 import { useState } from "react";
 
-import type { AdminFoodDetail, NutrientOption } from "@/types";
+import type { AdminFoodDetail, SubstanceOption } from "@/types";
 
 import { FoodForm } from "@/components/admin/food-form";
-import { NutrientValueEditor } from "@/components/admin/nutrient-value-editor";
+import { SubstanceValueEditor } from "@/components/admin/substance-value-editor";
 import { VariantManager } from "@/components/admin/variant-manager";
 
 interface FoodEditorProps {
   food: AdminFoodDetail;
-  allNutrients: NutrientOption[];
+  allSubstances: SubstanceOption[];
 }
 
-export function FoodEditor({ food, allNutrients }: FoodEditorProps) {
+export function FoodEditor({ food, allSubstances }: FoodEditorProps) {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     food.variants[0]?.id ?? null,
   );
@@ -41,15 +41,15 @@ export function FoodEditor({ food, allNutrients }: FoodEditorProps) {
         />
 
         {selectedVariant ? (
-          <NutrientValueEditor
+          <SubstanceValueEditor
             foodVariantId={selectedVariant.id}
-            nutrients={selectedVariant.nutrients}
-            allNutrients={allNutrients}
+            substances={selectedVariant.substances}
+            allSubstances={allSubstances}
           />
         ) : (
           <div className="flex items-center justify-center rounded-lg border p-8">
             <p className="text-muted-foreground text-sm">
-              Select a variant to edit nutrient values
+              Select a variant to edit substance values
             </p>
           </div>
         )}

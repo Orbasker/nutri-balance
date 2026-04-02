@@ -22,8 +22,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "target_nutrient_id": {
-          "name": "target_nutrient_id",
+        "target_substance_id": {
+          "name": "target_substance_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -89,12 +89,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "ai_tasks_target_nutrient_id_nutrients_id_fk": {
-          "name": "ai_tasks_target_nutrient_id_nutrients_id_fk",
+        "ai_tasks_target_substance_id_substances_id_fk": {
+          "name": "ai_tasks_target_substance_id_substances_id_fk",
           "tableFrom": "ai_tasks",
-          "tableTo": "nutrients",
+          "tableTo": "substances",
           "columnsFrom": [
-            "target_nutrient_id"
+            "target_substance_id"
           ],
           "columnsTo": [
             "id"
@@ -226,8 +226,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "nutrient_id": {
-          "name": "nutrient_id",
+        "substance_id": {
+          "name": "substance_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -254,12 +254,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "retention_profiles_nutrient_id_nutrients_id_fk": {
-          "name": "retention_profiles_nutrient_id_nutrients_id_fk",
+        "retention_profiles_substance_id_substances_id_fk": {
+          "name": "retention_profiles_substance_id_substances_id_fk",
           "tableFrom": "retention_profiles",
-          "tableTo": "nutrients",
+          "tableTo": "substances",
           "columnsFrom": [
-            "nutrient_id"
+            "substance_id"
           ],
           "columnsTo": [
             "id"
@@ -454,8 +454,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "nutrient_id": {
-          "name": "nutrient_id",
+        "substance_id": {
+          "name": "substance_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -540,12 +540,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "food_feedback_nutrient_id_nutrients_id_fk": {
-          "name": "food_feedback_nutrient_id_nutrients_id_fk",
+        "food_feedback_substance_id_substances_id_fk": {
+          "name": "food_feedback_substance_id_substances_id_fk",
           "tableFrom": "food_feedback",
-          "tableTo": "nutrients",
+          "tableTo": "substances",
           "columnsFrom": [
-            "nutrient_id"
+            "substance_id"
           ],
           "columnsTo": [
             "id"
@@ -802,8 +802,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.nutrients": {
-      "name": "nutrients",
+    "public.substances": {
+      "name": "substances",
       "schema": "",
       "columns": {
         "id": {
@@ -843,8 +843,8 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "nutrients_name_unique": {
-          "name": "nutrients_name_unique",
+        "substances_name_unique": {
+          "name": "substances_name_unique",
           "nullsNotDistinct": false,
           "columns": [
             "name"
@@ -899,10 +899,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "evidence_items_observation_id_nutrient_observations_id_fk": {
-          "name": "evidence_items_observation_id_nutrient_observations_id_fk",
+        "evidence_items_observation_id_substance_observations_id_fk": {
+          "name": "evidence_items_observation_id_substance_observations_id_fk",
           "tableFrom": "evidence_items",
-          "tableTo": "nutrient_observations",
+          "tableTo": "substance_observations",
           "columnsFrom": [
             "observation_id"
           ],
@@ -919,8 +919,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.nutrient_observations": {
-      "name": "nutrient_observations",
+    "public.substance_observations": {
+      "name": "substance_observations",
       "schema": "",
       "columns": {
         "id": {
@@ -936,8 +936,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "nutrient_id": {
-          "name": "nutrient_id",
+        "substance_id": {
+          "name": "substance_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -999,9 +999,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "nutrient_observations_food_variant_id_food_variants_id_fk": {
-          "name": "nutrient_observations_food_variant_id_food_variants_id_fk",
-          "tableFrom": "nutrient_observations",
+        "substance_observations_food_variant_id_food_variants_id_fk": {
+          "name": "substance_observations_food_variant_id_food_variants_id_fk",
+          "tableFrom": "substance_observations",
           "tableTo": "food_variants",
           "columnsFrom": [
             "food_variant_id"
@@ -1012,12 +1012,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "nutrient_observations_nutrient_id_nutrients_id_fk": {
-          "name": "nutrient_observations_nutrient_id_nutrients_id_fk",
-          "tableFrom": "nutrient_observations",
-          "tableTo": "nutrients",
+        "substance_observations_substance_id_substances_id_fk": {
+          "name": "substance_observations_substance_id_substances_id_fk",
+          "tableFrom": "substance_observations",
+          "tableTo": "substances",
           "columnsFrom": [
-            "nutrient_id"
+            "substance_id"
           ],
           "columnsTo": [
             "id"
@@ -1025,9 +1025,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "nutrient_observations_source_record_id_source_records_id_fk": {
-          "name": "nutrient_observations_source_record_id_source_records_id_fk",
-          "tableFrom": "nutrient_observations",
+        "substance_observations_source_record_id_source_records_id_fk": {
+          "name": "substance_observations_source_record_id_source_records_id_fk",
+          "tableFrom": "substance_observations",
           "tableTo": "source_records",
           "columnsFrom": [
             "source_record_id"
@@ -1150,8 +1150,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.resolved_nutrient_values": {
-      "name": "resolved_nutrient_values",
+    "public.resolved_substance_values": {
+      "name": "resolved_substance_values",
       "schema": "",
       "columns": {
         "id": {
@@ -1167,8 +1167,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "nutrient_id": {
-          "name": "nutrient_id",
+        "substance_id": {
+          "name": "substance_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1208,9 +1208,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "resolved_nutrient_values_food_variant_id_food_variants_id_fk": {
-          "name": "resolved_nutrient_values_food_variant_id_food_variants_id_fk",
-          "tableFrom": "resolved_nutrient_values",
+        "resolved_substance_values_food_variant_id_food_variants_id_fk": {
+          "name": "resolved_substance_values_food_variant_id_food_variants_id_fk",
+          "tableFrom": "resolved_substance_values",
           "tableTo": "food_variants",
           "columnsFrom": [
             "food_variant_id"
@@ -1221,12 +1221,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "resolved_nutrient_values_nutrient_id_nutrients_id_fk": {
-          "name": "resolved_nutrient_values_nutrient_id_nutrients_id_fk",
-          "tableFrom": "resolved_nutrient_values",
-          "tableTo": "nutrients",
+        "resolved_substance_values_substance_id_substances_id_fk": {
+          "name": "resolved_substance_values_substance_id_substances_id_fk",
+          "tableFrom": "resolved_substance_values",
+          "tableTo": "substances",
           "columnsFrom": [
-            "nutrient_id"
+            "substance_id"
           ],
           "columnsTo": [
             "id"
@@ -1334,8 +1334,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "nutrient_snapshot": {
-          "name": "nutrient_snapshot",
+        "substance_snapshot": {
+          "name": "substance_snapshot",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -1435,8 +1435,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.user_nutrient_limits": {
-      "name": "user_nutrient_limits",
+    "public.user_substance_limits": {
+      "name": "user_substance_limits",
       "schema": "",
       "columns": {
         "id": {
@@ -1452,8 +1452,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "nutrient_id": {
-          "name": "nutrient_id",
+        "substance_id": {
+          "name": "substance_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1487,12 +1487,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "user_nutrient_limits_nutrient_id_nutrients_id_fk": {
-          "name": "user_nutrient_limits_nutrient_id_nutrients_id_fk",
-          "tableFrom": "user_nutrient_limits",
-          "tableTo": "nutrients",
+        "user_substance_limits_substance_id_substances_id_fk": {
+          "name": "user_substance_limits_substance_id_substances_id_fk",
+          "tableFrom": "user_substance_limits",
+          "tableTo": "substances",
           "columnsFrom": [
-            "nutrient_id"
+            "substance_id"
           ],
           "columnsTo": [
             "id"
@@ -1531,7 +1531,7 @@
       "name": "ai_task_type",
       "schema": "public",
       "values": [
-        "nutrient_research"
+        "substance_research"
       ]
     },
     "public.feedback_status": {

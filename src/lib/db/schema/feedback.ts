@@ -3,7 +3,7 @@ import { numeric, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-
 
 import { user } from "./auth";
 import { foodVariants, foods } from "./foods";
-import { nutrients } from "./nutrients";
+import { substances } from "./substances";
 
 export const feedbackTypeEnum = pgEnum("feedback_type", ["flag", "correction"]);
 
@@ -14,7 +14,7 @@ export const foodFeedback = pgTable("food_feedback", {
   foodId: uuid("food_id")
     .notNull()
     .references(() => foods.id, { onDelete: "cascade" }),
-  nutrientId: uuid("nutrient_id").references(() => nutrients.id, {
+  substanceId: uuid("substance_id").references(() => substances.id, {
     onDelete: "cascade",
   }),
   foodVariantId: uuid("food_variant_id").references(() => foodVariants.id, {
@@ -41,9 +41,9 @@ export const foodFeedbackRelations = relations(foodFeedback, ({ one }) => ({
     fields: [foodFeedback.foodId],
     references: [foods.id],
   }),
-  nutrient: one(nutrients, {
-    fields: [foodFeedback.nutrientId],
-    references: [nutrients.id],
+  substance: one(substances, {
+    fields: [foodFeedback.substanceId],
+    references: [substances.id],
   }),
   foodVariant: one(foodVariants, {
     fields: [foodFeedback.foodVariantId],

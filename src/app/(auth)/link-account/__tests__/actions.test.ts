@@ -68,7 +68,7 @@ vi.mock("@/lib/db/schema/auth", () => ({
 vi.mock("@/lib/db/schema/users", () => ({
   consumptionLogs: {},
   profiles: {},
-  userNutrientLimits: {},
+  userSubstanceLimits: {},
 }));
 
 describe("linkAccountToWeb notifications", () => {

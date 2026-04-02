@@ -49,7 +49,7 @@
         index.ts       ← drizzle client
         schema/
           foods.ts
-          nutrients.ts
+          substances.ts
           observations.ts
           cooking.ts
           reviews.ts
@@ -90,32 +90,32 @@
 - [x] `foods` — id (uuid), name, category, description, created_at, updated_at
 - [x] `food_aliases` — id, food_id (FK), alias, language, source
 - [x] `food_variants` — id, food_id (FK), preparation_method (enum), description, is_default
-- [x] `nutrients` — id, name, unit, display_name, sort_order
+- [x] `substances` — id, name, unit, display_name, sort_order
 - [x] `serving_measures` — id, food_variant_id (FK), label, grams_equivalent
 - [x] `sources` — id, name, url, type (enum), trust_level
 - [x] `source_records` — id, source_id (FK), external_id, raw_data (jsonb), imported_at
-- [x] `nutrient_observations` — id, food_variant_id (FK), nutrient_id (FK), value, unit, basis_amount, basis_unit, source_record_id (FK), derivation_type (enum), confidence_score, review_status (enum)
+- [x] `substance_observations` — id, food_variant_id (FK), nutrient_id (FK), value, unit, basis_amount, basis_unit, source_record_id (FK), derivation_type (enum), confidence_score, review_status (enum)
 - [x] `evidence_items` — id, observation_id (FK), snippet, page_ref, row_locator, url
 - [x] `retention_profiles` — id, nutrient_id (FK), preparation_method (enum), retention_factor, source_id (FK)
 - [x] `yield_profiles` — id, food_id (FK), preparation_method (enum), yield_factor
 - [x] `variant_calculation_rules` — id, food_variant_id (FK), base_variant_id (FK), retention_profile_id (FK), yield_profile_id (FK)
 - [x] `reviews` — id, entity_type, entity_id, reviewer_id (references auth.users), status (enum), notes, reviewed_at
-- [x] `resolved_nutrient_values` — id, food_variant_id (FK), nutrient_id (FK), value_per_100g, confidence_score, confidence_label, source_summary, resolved_at
-- [x] `user_nutrient_limits` — id, user_id (references auth.users), nutrient_id (FK), daily_limit, mode (strict/stability), range_min, range_max
-- [x] `consumption_logs` — id, user_id (references auth.users), food_variant_id (FK), serving_measure_id (FK), quantity, nutrient_snapshot (jsonb), logged_at, meal_label
+- [x] `resolved_substance_values` — id, food_variant_id (FK), nutrient_id (FK), value_per_100g, confidence_score, confidence_label, source_summary, resolved_at
+- [x] `user_substance_limits` — id, user_id (references auth.users), nutrient_id (FK), daily_limit, mode (strict/stability), range_min, range_max
+- [x] `consumption_logs` — id, user_id (references auth.users), food_variant_id (FK), serving_measure_id (FK), quantity, substance_snapshot (jsonb), logged_at, meal_label
 - [x] `profiles` — id (references auth.users), display_name, role (user/admin), created_at
 
 ### RLS Policies (SQL migration)
 
 - [x] Enable RLS on all tables
-- [x] **Public read tables** (foods, food_aliases, food_variants, nutrients, serving_measures, resolved_nutrient_values, retention_profiles, yield_profiles):
+- [x] **Public read tables** (foods, food_aliases, food_variants, substances, serving_measures, resolved_substance_values, retention_profiles, yield_profiles):
   - `SELECT` for authenticated users (or anon if desired)
-- [x] **User-scoped tables** (user_nutrient_limits, consumption_logs):
+- [x] **User-scoped tables** (user_substance_limits, consumption_logs):
   - `SELECT` where `user_id = auth.uid()`
   - `INSERT` where `user_id = auth.uid()`
   - `UPDATE` where `user_id = auth.uid()`
   - `DELETE` where `user_id = auth.uid()`
-- [x] **Admin-only tables** (sources, source_records, nutrient_observations, evidence_items, reviews, variant_calculation_rules):
+- [x] **Admin-only tables** (sources, source_records, substance_observations, evidence_items, reviews, variant_calculation_rules):
   - `SELECT` for authenticated
   - `INSERT/UPDATE/DELETE` where user role = 'admin' (via profiles table or Supabase custom claims)
 - [x] **Profiles**:
@@ -126,8 +126,8 @@
 
 - [x] Seed ~10 common foods (spinach, broccoli, banana, chicken breast, salmon, rice, potato, tomato, egg, milk)
 - [x] Seed variants (raw, boiled, steamed for vegetables; raw, grilled, baked for proteins)
-- [x] Seed 6 core nutrients (Vitamin K, Vitamin A, Vitamin C, Potassium, Sodium, Iron)
-- [x] Seed resolved_nutrient_values for all food+variant+nutrient combos
+- [x] Seed 6 core substances (Vitamin K, Vitamin A, Vitamin C, Potassium, Sodium, Iron)
+- [x] Seed resolved_substance_values for all food+variant+nutrient combos
 - [x] Seed serving_measures (per 100g, per cup, per piece where applicable)
 - [x] Seed retention_profiles for common cooking methods
 
@@ -154,12 +154,12 @@
 
 ## Phase 3: Settings — Nutrient Limits
 
-> Users configure which nutrients they track and their limits.
+> Users configure which substances they track and their limits.
 
-- [x] Settings page UI: list of available nutrients, toggle tracking, set limit
-- [x] Add/remove tracked nutrients
+- [x] Settings page UI: list of available substances, toggle tracking, set limit
+- [x] Add/remove tracked substances
 - [x] Mode selector per nutrient (strict vs stability — stability stores range_min/range_max)
-- [x] Server action to save/update `user_nutrient_limits` (RLS ensures user can only write own)
+- [x] Server action to save/update `user_substance_limits` (RLS ensures user can only write own)
 - [x] Zod validation on inputs
 
 **Deliverable**: Users can set and persist nutrient limits.
@@ -172,7 +172,7 @@
 
 - [x] Server action or API route for search
   - Query `foods` + `food_aliases` with ILIKE (or Supabase full-text search)
-  - Join `food_variants` and `resolved_nutrient_values`
+  - Join `food_variants` and `resolved_substance_values`
   - Return food name, variants, top nutrient indicator, confidence badge
 - [x] Search page with debounced input
 - [x] Autocomplete dropdown using shadcn Command component
@@ -184,7 +184,7 @@
 
 ## Phase 5: Food Details + "If You Eat This"
 
-> Core decision screen: see nutrients, choose serving, see impact on daily limits.
+> Core decision screen: see substances, choose serving, see impact on daily limits.
 
 - [x] Food detail page: `/food/[id]`
 - [x] Variant selector (tabs or dropdown for prep methods)
@@ -207,7 +207,7 @@
 > Home screen showing today's nutrient status and recent foods.
 
 - [ ] Fetch today's consumption_logs for user (RLS scoped)
-- [ ] Aggregate nutrient totals from nutrient_snapshot
+- [ ] Aggregate substance totals from substance_snapshot
 - [ ] Progress bars per tracked nutrient (consumed / limit)
   - Color coded: green (<80%), yellow (80-100%), red (>100%)
 - [ ] Remaining allowance display

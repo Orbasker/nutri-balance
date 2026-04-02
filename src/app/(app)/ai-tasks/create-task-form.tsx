@@ -7,19 +7,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { createAiTask } from "./actions";
 
-interface Nutrient {
+interface Substance {
   id: string;
   name: string;
   displayName: string;
   unit: string;
 }
 
-export function CreateTaskForm({ nutrients }: { nutrients: Nutrient[] }) {
+export function CreateTaskForm({ substances }: { substances: Substance[] }) {
   const [state, formAction, isPending] = useActionState(
     async (_prev: { error?: string; ok?: boolean } | null, formData: FormData) => {
-      const nutrientId = formData.get("nutrientId") as string;
-      if (!nutrientId) return { error: "Please select a nutrient." };
-      const result = await createAiTask(nutrientId);
+      const substanceId = formData.get("substanceId") as string;
+      if (!substanceId) return { error: "Please select a substance." };
+      const result = await createAiTask(substanceId);
       if ("error" in result) return { error: result.error };
       return { ok: true };
     },
@@ -34,17 +34,17 @@ export function CreateTaskForm({ nutrients }: { nutrients: Nutrient[] }) {
       <CardContent>
         <form action={formAction} className="flex items-end gap-3">
           <div className="flex-1">
-            <label htmlFor="nutrientId" className="mb-1 block text-sm font-medium">
-              Nutrient to research
+            <label htmlFor="substanceId" className="mb-1 block text-sm font-medium">
+              Substance to research
             </label>
             <select
-              id="nutrientId"
-              name="nutrientId"
+              id="substanceId"
+              name="substanceId"
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               required
             >
-              <option value="">Select a nutrient…</option>
-              {nutrients.map((n) => (
+              <option value="">Select a substance…</option>
+              {substances.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.displayName} ({n.unit})
                 </option>

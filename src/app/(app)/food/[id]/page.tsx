@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { FeedbackForm } from "@/components/food/feedback-form";
 
-import { getFoodDetail, getTodaysConsumption, getUserNutrientLimits } from "./actions";
+import { getFoodDetail, getTodaysConsumption, getUserSubstanceLimits } from "./actions";
 import { FoodDetailClient } from "./food-detail-client";
 
 export default async function FoodDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +12,7 @@ export default async function FoodDetailPage({ params }: { params: Promise<{ id:
   const [food, todaysConsumption, userLimits] = await Promise.all([
     getFoodDetail(id),
     getTodaysConsumption(),
-    getUserNutrientLimits(),
+    getUserSubstanceLimits(),
   ]);
 
   if (!food) notFound();
@@ -57,8 +57,8 @@ export default async function FoodDetailPage({ params }: { params: Promise<{ id:
         variants={food.variants.map((v) => ({
           id: v.id,
           preparationMethod: v.preparationMethod,
-          nutrients: v.nutrients.map((n) => ({
-            nutrientId: n.nutrientId,
+          substances: v.substances.map((n) => ({
+            substanceId: n.substanceId,
             displayName: n.displayName,
             unit: n.unit,
           })),

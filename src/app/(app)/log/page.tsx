@@ -10,7 +10,7 @@ import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
 import { profiles } from "@/lib/db/schema/users";
 
-import { getDailySummary, getLogEntries, getNutrientInfo } from "./actions";
+import { getDailySummary, getLogEntries, getSubstanceInfo } from "./actions";
 
 function getTodayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -38,9 +38,9 @@ export default async function LogPage({
 
   const entries = await getLogEntries(currentDate);
 
-  const [summary, nutrientInfo] = await Promise.all([
+  const [summary, substanceInfo] = await Promise.all([
     getDailySummary(entries),
-    getNutrientInfo([...new Set(entries.flatMap((e) => Object.keys(e.nutrientSnapshot)))]),
+    getSubstanceInfo([...new Set(entries.flatMap((e) => Object.keys(e.substanceSnapshot)))]),
   ]);
 
   const isToday = currentDate === todayStr;
@@ -68,7 +68,7 @@ export default async function LogPage({
       {/* Meal Log */}
       <section className="space-y-8 mt-8">
         <h3 className="font-bold text-xl px-2">Meal Log</h3>
-        <LogEntryList entries={entries} nutrientInfo={nutrientInfo} />
+        <LogEntryList entries={entries} substanceInfo={substanceInfo} />
       </section>
 
       {/* FAB */}

@@ -2,29 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { NutrientOption } from "@/types";
+import type { SubstanceOption } from "@/types";
 
 import { cn } from "@/lib/utils";
 
-interface NutrientPickerProps {
-  nutrients: NutrientOption[];
+interface SubstancePickerProps {
+  substances: SubstanceOption[];
   isLoading: boolean;
   isResearchingUnknown?: boolean;
-  selectedNutrient: NutrientOption | null;
-  onSelect: (nutrient: NutrientOption) => void;
+  selectedSubstance: SubstanceOption | null;
+  onSelect: (substance: SubstanceOption) => void;
   onSearchUnknown?: (query: string) => void;
   onClear: () => void;
 }
 
-export function NutrientPicker({
-  nutrients,
+export function SubstancePicker({
+  substances,
   isLoading,
   isResearchingUnknown = false,
-  selectedNutrient,
+  selectedSubstance,
   onSelect,
   onSearchUnknown,
   onClear,
-}: NutrientPickerProps) {
+}: SubstancePickerProps) {
   const [filterText, setFilterText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -32,29 +32,28 @@ export function NutrientPicker({
   const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
-    if (!filterText.trim()) return nutrients;
+    if (!filterText.trim()) return substances;
     const term = filterText.toLowerCase();
-    return nutrients.filter(
-      (n) => n.displayName.toLowerCase().includes(term) || n.name.toLowerCase().includes(term),
+    return substances.filter(
+      (substance) =>
+        substance.displayName.toLowerCase().includes(term) ||
+        substance.name.toLowerCase().includes(term),
     );
-  }, [nutrients, filterText]);
+  }, [substances, filterText]);
 
-  // Highlight reset is handled in the onChange handler below
-
-  // Scroll highlighted item into view
   useEffect(() => {
     if (highlightIndex >= 0 && listRef.current) {
-      const items = listRef.current.querySelectorAll("[data-nutrient-item]");
+      const items = listRef.current.querySelectorAll("[data-substance-item]");
       items[highlightIndex]?.scrollIntoView({ block: "nearest" });
     }
   }, [highlightIndex]);
 
   const handleSelect = useCallback(
-    (nutrient: NutrientOption) => {
+    (substance: SubstanceOption) => {
       setFilterText("");
       setIsOpen(false);
       setHighlightIndex(-1);
-      onSelect(nutrient);
+      onSelect(substance);
     },
     [onSelect],
   );
@@ -82,15 +81,15 @@ export function NutrientPicker({
     [filterText, filtered, highlightIndex, handleSelect, onSearchUnknown],
   );
 
-  if (selectedNutrient) {
+  if (selectedSubstance) {
     return (
       <div className="relative group">
         <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
           <span className="material-symbols-outlined text-md-primary">science</span>
         </div>
         <div className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-28 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] text-md-on-surface flex items-center gap-2">
-          <span className="font-bold">{selectedNutrient.displayName}</span>
-          <span className="text-md-outline text-sm">({selectedNutrient.unit})</span>
+          <span className="font-bold">{selectedSubstance.displayName}</span>
+          <span className="text-md-outline text-sm">({selectedSubstance.unit})</span>
         </div>
         <div className="absolute inset-y-0 right-4 flex items-center">
           <button
@@ -122,17 +121,17 @@ export function NutrientPicker({
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => {
-            // Delay close so clicks on items register
             setTimeout(() => setIsOpen(false), 200);
           }}
           onKeyDown={handleKeyDown}
           className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-6 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
-          placeholder={isLoading ? "Loading nutrients..." : "Search nutrients or type a new one..."}
+          placeholder={
+            isLoading ? "Loading substances..." : "Search substances or type a new one..."
+          }
           disabled={isLoading || isResearchingUnknown}
         />
       </div>
 
-      {/* Dropdown */}
       {isOpen && !isLoading && (
         <div
           ref={listRef}
@@ -141,7 +140,7 @@ export function NutrientPicker({
           {filtered.length === 0 ? (
             <div className="px-5 py-4 text-center space-y-3">
               <p className="text-sm text-md-outline">
-                No saved nutrients found for &ldquo;{filterText}&rdquo;.
+                No saved substances found for &ldquo;{filterText}&rdquo;.
               </p>
               {filterText.trim().length >= 2 && onSearchUnknown && (
                 <button
@@ -159,12 +158,12 @@ export function NutrientPicker({
               )}
             </div>
           ) : (
-            filtered.map((nutrient, idx) => (
+            filtered.map((substance, idx) => (
               <button
-                key={nutrient.id}
-                data-nutrient-item
+                key={substance.id}
+                data-substance-item
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleSelect(nutrient)}
+                onClick={() => handleSelect(substance)}
                 onMouseEnter={() => setHighlightIndex(idx)}
                 className={cn(
                   "w-full text-left px-5 py-3 flex items-center justify-between transition-colors",
@@ -175,8 +174,8 @@ export function NutrientPicker({
                   idx === filtered.length - 1 && "rounded-b-2xl",
                 )}
               >
-                <span className="font-medium">{nutrient.displayName}</span>
-                <span className="text-xs text-md-outline">{nutrient.unit}</span>
+                <span className="font-medium">{substance.displayName}</span>
+                <span className="text-xs text-md-outline">{substance.unit}</span>
               </button>
             ))
           )}

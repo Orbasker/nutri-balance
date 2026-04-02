@@ -15,8 +15,8 @@ export default function TermsPage() {
           <h2 className="mb-2 text-lg font-semibold">Service Description</h2>
           <p>
             NutriBalance is a free nutrition tracking tool designed for individuals with medical or
-            dietary constraints. It helps you monitor daily nutrient intake, check if foods are safe
-            to eat based on your personal limits, and log meals — via web or messaging bots
+            dietary constraints. It helps you monitor daily substance intake, check if foods are
+            safe to eat based on your personal limits, and log meals — via web or messaging bots
             (Telegram, Discord, WhatsApp).
           </p>
         </div>
@@ -24,7 +24,7 @@ export default function TermsPage() {
         <div>
           <h2 className="mb-2 text-lg font-semibold">No Medical Advice</h2>
           <p>
-            NutriBalance is an informational tool, not a medical service. The nutrient data,
+            NutriBalance is an informational tool, not a medical service. The substance data,
             AI-generated food analysis, and dietary suggestions provided are for reference only and
             should not replace professional medical advice. Always consult your healthcare provider
             regarding dietary decisions related to medical conditions.
@@ -35,7 +35,7 @@ export default function TermsPage() {
           <h2 className="mb-2 text-lg font-semibold">User Responsibilities</h2>
           <ul className="list-disc space-y-1 pl-6">
             <li>
-              You are responsible for the accuracy of the nutrient limits and health goals you set.
+              You are responsible for the accuracy of the substance limits and health goals you set.
             </li>
             <li>You agree to use the service for personal, non-commercial purposes.</li>
             <li>
@@ -49,7 +49,7 @@ export default function TermsPage() {
           <h2 className="mb-2 text-lg font-semibold">AI-Generated Content</h2>
           <p>
             NutriBalance uses AI models to research foods and provide dietary analysis. AI-generated
-            nutrient data is approximate and may contain inaccuracies. All AI-researched foods are
+            substance data is approximate and may contain inaccuracies. All AI-researched foods are
             clearly marked as estimates. Verified data from sources like the USDA database is
             preferred when available.
           </p>

@@ -9,20 +9,20 @@ import { type AiRunHandle, finishAiRun, startAiRun } from "@/lib/ai-run-audit";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
 import {
   evidenceItems,
-  nutrientObservations,
   sourceRecords,
   sources,
+  substanceObservations,
 } from "@/lib/db/schema/observations";
+import { substances } from "@/lib/db/schema/substances";
 import { flushLangfuse } from "@/lib/langfuse";
 import { getLangfuse } from "@/lib/langfuse";
 import { finishJobRun, recordAiUsageEvent, startJobRun } from "@/lib/ops-monitoring";
 
 const AI_SOURCE_NAME = "NutriBalance AI Researcher";
 
-const nutrientDataPointSchema = z.object({
+const substanceDataPointSchema = z.object({
   foodName: z.string(),
   preparationMethod: z.string(),
   valuePer100g: z.number().nonnegative(),
@@ -32,7 +32,7 @@ const nutrientDataPointSchema = z.object({
 });
 
 const batchResultSchema = z.object({
-  results: z.array(nutrientDataPointSchema),
+  results: z.array(substanceDataPointSchema),
 });
 
 /**
@@ -60,13 +60,13 @@ async function getOrCreateAiSource(): Promise<string> {
 }
 
 /**
- * Find food variants that are missing observations for a given nutrient.
+ * Find food variants that are missing observations for a given substance.
  */
-async function findMissingVariants(nutrientId: string) {
+async function findMissingVariants(substanceId: string) {
   const variantsWithData = db
-    .select({ foodVariantId: nutrientObservations.foodVariantId })
-    .from(nutrientObservations)
-    .where(eq(nutrientObservations.nutrientId, nutrientId));
+    .select({ foodVariantId: substanceObservations.foodVariantId })
+    .from(substanceObservations)
+    .where(eq(substanceObservations.substanceId, substanceId));
 
   return db
     .select({
@@ -80,11 +80,11 @@ async function findMissingVariants(nutrientId: string) {
 }
 
 /**
- * Call AI to research nutrient content for a batch of food variants.
+ * Call AI to research substance content for a batch of food variants.
  */
 async function researchBatch(
-  nutrientName: string,
-  nutrientUnit: string,
+  substanceName: string,
+  substanceUnit: string,
   batch: { variantId: string; foodName: string; preparationMethod: string }[],
   options?: {
     aiTaskId?: string;
@@ -97,8 +97,8 @@ async function researchBatch(
 
   const langfuse = getLangfuse();
   const trace = langfuse.trace({
-    name: "nutrient-research-batch",
-    metadata: { nutrient: nutrientName, batchSize: batch.length },
+    name: "substance-research-batch",
+    metadata: { substance: substanceName, batchSize: batch.length },
   });
 
   const modelName = typeof model === "string" ? model : model.modelId;
@@ -106,13 +106,13 @@ async function researchBatch(
   const generation = trace.generation({
     name: "research-batch",
     model: modelName,
-    input: { nutrientName, foodList },
+    input: { substanceName, foodList },
   });
 
   const { object, usage } = await generateObject({
     model,
     schema: batchResultSchema,
-    prompt: `You are a nutrition data researcher. Estimate ${nutrientName} (${nutrientUnit}) content per 100g for these foods:
+    prompt: `You are a nutrition data researcher. Estimate ${substanceName} (${substanceUnit}) content per 100g for these foods:
 ${foodList}
 
 Rules:
@@ -133,7 +133,7 @@ Rules:
 
   await recordAiUsageEvent({
     feature: "ai-task-research",
-    operation: "nutrient-research-batch",
+    operation: "substance-research-batch",
     model: modelName,
     aiTaskId: options?.aiTaskId,
     jobRunId: options?.jobRunId,
@@ -144,7 +144,7 @@ Rules:
       totalTokens: usage.totalTokens,
     },
     metadata: {
-      nutrientName,
+      substanceName,
       batchSize: batch.length,
     },
   });
@@ -153,9 +153,9 @@ Rules:
 }
 
 /**
- * Process a single AI task: research a nutrient across all foods missing data.
+ * Process a single AI task: research a substance across all foods missing data.
  */
-export async function processNutrientResearchTask(
+export async function processSubstanceResearchTask(
   taskId: string,
   source: "cron" | "manual" = "manual",
 ): Promise<void> {
@@ -163,18 +163,18 @@ export async function processNutrientResearchTask(
   if (!task || task.status !== "pending") return;
 
   const run = await startJobRun({
-    jobKey: "nutrient-research-task",
+    jobKey: "substance-research-task",
     source,
     aiTaskId: taskId,
     metadata: {
-      targetNutrientId: task.targetNutrientId,
+      targetSubstanceId: task.targetSubstanceId,
     },
   });
 
   let processed = 0;
   let errors = 0;
   let totalMissing = 0;
-  let nutrientName = "Unknown nutrient";
+  let substanceName = "Unknown substance";
   let aiRun: AiRunHandle | null = null;
 
   try {
@@ -183,26 +183,26 @@ export async function processNutrientResearchTask(
       .set({ status: "running", startedAt: new Date() })
       .where(eq(aiTasks.id, taskId));
 
-    const [nutrient] = await db
+    const [substance] = await db
       .select()
-      .from(nutrients)
-      .where(eq(nutrients.id, task.targetNutrientId))
+      .from(substances)
+      .where(eq(substances.id, task.targetSubstanceId))
       .limit(1);
 
-    if (!nutrient) throw new Error("Nutrient not found");
-    nutrientName = nutrient.displayName;
+    if (!substance) throw new Error("Substance not found");
+    substanceName = substance.displayName;
     aiRun = await startAiRun({
-      type: "nutrient_research_task",
-      goal: `Research missing ${nutrient.displayName} values`,
+      type: "substance_research_task",
+      goal: `Research missing ${substance.displayName} values`,
       source,
       aiTaskId: taskId,
       metadata: {
-        nutrientId: nutrient.id,
-        nutrientName: nutrient.displayName,
+        substanceId: substance.id,
+        substanceName: substance.displayName,
       },
     });
 
-    const missing = await findMissingVariants(nutrient.id);
+    const missing = await findMissingVariants(substance.id);
     totalMissing = missing.length;
 
     if (missing.length === 0) {
@@ -218,10 +218,10 @@ export async function processNutrientResearchTask(
 
       await finishJobRun(run, {
         status: "completed",
-        message: `No missing data found for ${nutrient.displayName}`,
+        message: `No missing data found for ${substance.displayName}`,
         metadata: {
-          nutrientId: nutrient.id,
-          nutrientName: nutrient.displayName,
+          substanceId: substance.id,
+          substanceName: substance.displayName,
         },
       });
 
@@ -229,10 +229,10 @@ export async function processNutrientResearchTask(
         await finishAiRun(aiRun, {
           status: "completed",
           itemCount: 0,
-          resultSummary: `No missing data found for ${nutrient.displayName}.`,
+          resultSummary: `No missing data found for ${substance.displayName}.`,
           metadata: {
-            nutrientId: nutrient.id,
-            nutrientName: nutrient.displayName,
+            substanceId: substance.id,
+            substanceName: substance.displayName,
           },
         });
       }
@@ -246,7 +246,7 @@ export async function processNutrientResearchTask(
       const batch = missing.slice(i, i + BATCH_SIZE);
 
       try {
-        const results = await researchBatch(nutrient.name, nutrient.unit, batch, {
+        const results = await researchBatch(substance.name, substance.unit, batch, {
           aiTaskId: taskId,
           jobRunId: run.id,
           aiRunId: aiRun?.id,
@@ -265,10 +265,10 @@ export async function processNutrientResearchTask(
             .returning({ id: sourceRecords.id });
 
           const [observation] = await db
-            .insert(nutrientObservations)
+            .insert(substanceObservations)
             .values({
               foodVariantId: variant.variantId,
-              nutrientId: nutrient.id,
+              substanceId: substance.id,
               value: String(result.valuePer100g),
               unit: result.unit,
               basisAmount: "100",
@@ -278,7 +278,7 @@ export async function processNutrientResearchTask(
               confidenceScore: result.confidence,
               reviewStatus: "pending",
             })
-            .returning({ id: nutrientObservations.id });
+            .returning({ id: substanceObservations.id });
 
           await db.insert(evidenceItems).values({
             observationId: observation.id,
@@ -303,18 +303,18 @@ export async function processNutrientResearchTask(
         status: "completed",
         completedAt: new Date(),
         progress: { processed, total: missing.length, errors },
-        resultSummary: `Researched ${processed} food variants for ${nutrient.displayName}. ${errors} errors.`,
+        resultSummary: `Researched ${processed} food variants for ${substance.displayName}. ${errors} errors.`,
       })
       .where(eq(aiTasks.id, taskId));
 
     await finishJobRun(run, {
       status: "completed",
-      message: `Researched ${processed} variants for ${nutrient.displayName}`,
+      message: `Researched ${processed} variants for ${substance.displayName}`,
       recordsProcessed: processed,
       errorCount: errors,
       metadata: {
-        nutrientId: nutrient.id,
-        nutrientName: nutrient.displayName,
+        substanceId: substance.id,
+        substanceName: substance.displayName,
         totalMissing: missing.length,
       },
     });
@@ -323,10 +323,10 @@ export async function processNutrientResearchTask(
       await finishAiRun(aiRun, {
         status: "completed",
         itemCount: processed,
-        resultSummary: `Researched ${processed} food variants for ${nutrient.displayName}.`,
+        resultSummary: `Researched ${processed} food variants for ${substance.displayName}.`,
         metadata: {
-          nutrientId: nutrient.id,
-          nutrientName: nutrient.displayName,
+          substanceId: substance.id,
+          substanceName: substance.displayName,
           totalMissing: missing.length,
           errors,
         },
@@ -346,7 +346,7 @@ export async function processNutrientResearchTask(
 
     await finishJobRun(run, {
       status: "failed",
-      message: `Research failed for ${nutrientName}`,
+      message: `Research failed for ${substanceName}`,
       errorMessage,
       recordsProcessed: processed,
       errorCount: errors,
@@ -360,7 +360,7 @@ export async function processNutrientResearchTask(
         status: "failed",
         itemCount: processed,
         errorMessage,
-        resultSummary: `Research failed for ${nutrientName}.`,
+        resultSummary: `Research failed for ${substanceName}.`,
         metadata: {
           totalMissing,
           errors,
@@ -373,21 +373,21 @@ export async function processNutrientResearchTask(
 }
 
 /**
- * Find nutrient data gaps and create tasks to fill them.
+ * Find substance data gaps and create tasks to fill them.
  * Called by the daily scheduler.
  */
 export async function findAndCreateGapTasks(): Promise<number> {
-  const allNutrients = await db.select().from(nutrients);
+  const allSubstances = await db.select().from(substances);
   const totalVariants = await db.select({ count: count() }).from(foodVariants);
   const variantCount = totalVariants[0]?.count ?? 0;
 
   let tasksCreated = 0;
 
-  for (const nutrient of allNutrients) {
+  for (const substance of allSubstances) {
     const [{ count: observedCount }] = await db
-      .select({ count: countDistinct(nutrientObservations.foodVariantId) })
-      .from(nutrientObservations)
-      .where(eq(nutrientObservations.nutrientId, nutrient.id));
+      .select({ count: countDistinct(substanceObservations.foodVariantId) })
+      .from(substanceObservations)
+      .where(eq(substanceObservations.substanceId, substance.id));
 
     const missingRatio = 1 - Number(observedCount) / Number(variantCount);
     if (missingRatio <= 0.2) continue;
@@ -397,7 +397,7 @@ export async function findAndCreateGapTasks(): Promise<number> {
       .from(aiTasks)
       .where(
         and(
-          eq(aiTasks.targetNutrientId, nutrient.id),
+          eq(aiTasks.targetSubstanceId, substance.id),
           inArray(aiTasks.status, ["pending", "running"]),
         ),
       )
@@ -406,8 +406,8 @@ export async function findAndCreateGapTasks(): Promise<number> {
     if (existingTask) continue;
 
     await db.insert(aiTasks).values({
-      type: "nutrient_research",
-      targetNutrientId: nutrient.id,
+      type: "substance_research",
+      targetSubstanceId: substance.id,
       status: "pending",
       createdBy: "scheduler",
     });

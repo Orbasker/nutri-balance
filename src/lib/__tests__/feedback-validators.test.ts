@@ -17,7 +17,7 @@ describe("submitFeedbackSchema", () => {
   it("accepts valid correction feedback with suggested value", () => {
     const result = submitFeedbackSchema.safeParse({
       foodId: validUuid,
-      nutrientId: validUuid,
+      substanceId: validUuid,
       foodVariantId: validUuid,
       type: "correction",
       message: "The sodium value should be 142mg per USDA database.",

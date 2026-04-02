@@ -1,6 +1,6 @@
 create type ai_run_type as enum (
   'food_generation',
-  'nutrient_research_task',
+  'substance_research_task',
   'ai_review'
 );
 

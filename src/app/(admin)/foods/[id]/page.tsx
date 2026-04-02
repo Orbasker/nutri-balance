@@ -5,12 +5,12 @@ import { ArrowLeft } from "lucide-react";
 
 import { FoodEditor } from "@/components/admin/food-editor";
 
-import { getAdminFoodDetail, getAllNutrients } from "../actions";
+import { getAdminFoodDetail, getAllSubstances } from "../actions";
 
 export default async function EditFoodPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [food, allNutrients] = await Promise.all([getAdminFoodDetail(id), getAllNutrients()]);
+  const [food, allSubstances] = await Promise.all([getAdminFoodDetail(id), getAllSubstances()]);
 
   if (!food) notFound();
 
@@ -26,7 +26,7 @@ export default async function EditFoodPage({ params }: { params: Promise<{ id: s
         </Link>
       </div>
       <h2 className="mb-4 text-lg font-semibold">Edit: {food.name}</h2>
-      <FoodEditor food={food} allNutrients={allNutrients} />
+      <FoodEditor food={food} allSubstances={allSubstances} />
     </div>
   );
 }

@@ -29,7 +29,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     icon: "nutrition",
-    label: "Explore nutrients",
+    label: "Explore substances",
     color: "bg-amber-500",
     tooltipColor: "bg-amber-600",
     onClick: () => {},

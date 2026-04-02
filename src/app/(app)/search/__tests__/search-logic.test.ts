@@ -12,9 +12,9 @@ describe("mapSearchRows", () => {
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        nutrientName: "Vitamin K",
-        nutrientDisplayName: "Vitamin K",
-        nutrientUnit: "mcg",
+        substanceName: "Vitamin K",
+        substanceDisplayName: "Vitamin K",
+        substanceUnit: "mcg",
         valuePer100g: "482.9",
         confidenceScore: 95,
         sourceSummary: null,
@@ -26,9 +26,9 @@ describe("mapSearchRows", () => {
         variantId: "v2",
         preparationMethod: "boiled",
         isDefault: false,
-        nutrientName: "Vitamin K",
-        nutrientDisplayName: "Vitamin K",
-        nutrientUnit: "mcg",
+        substanceName: "Vitamin K",
+        substanceDisplayName: "Vitamin K",
+        substanceUnit: "mcg",
         valuePer100g: "360.0",
         confidenceScore: 85,
         sourceSummary: null,
@@ -43,7 +43,7 @@ describe("mapSearchRows", () => {
     expect(results[0].variants[1].preparationMethod).toBe("boiled");
   });
 
-  it("picks the highest-value nutrient as topNutrient per variant", () => {
+  it("picks the highest-value substance as topSubstance per variant", () => {
     const rows = [
       {
         foodId: "f1",
@@ -52,9 +52,9 @@ describe("mapSearchRows", () => {
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        nutrientName: "Vitamin K",
-        nutrientDisplayName: "Vitamin K",
-        nutrientUnit: "mcg",
+        substanceName: "Vitamin K",
+        substanceDisplayName: "Vitamin K",
+        substanceUnit: "mcg",
         valuePer100g: "482.9",
         confidenceScore: 95,
         sourceSummary: null,
@@ -66,9 +66,9 @@ describe("mapSearchRows", () => {
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        nutrientName: "Iron",
-        nutrientDisplayName: "Iron",
-        nutrientUnit: "mg",
+        substanceName: "Iron",
+        substanceDisplayName: "Iron",
+        substanceUnit: "mg",
         valuePer100g: "2.7",
         confidenceScore: 90,
         sourceSummary: null,
@@ -76,11 +76,11 @@ describe("mapSearchRows", () => {
     ];
 
     const results = mapSearchRows(rows);
-    expect(results[0].variants[0].topNutrient?.name).toBe("Vitamin K");
-    expect(results[0].variants[0].topNutrient?.valuePer100g).toBe(482.9);
+    expect(results[0].variants[0].topSubstance?.name).toBe("Vitamin K");
+    expect(results[0].variants[0].topSubstance?.valuePer100g).toBe(482.9);
   });
 
-  it("handles variant with no nutrient data", () => {
+  it("handles variant with no substance data", () => {
     const rows = [
       {
         foodId: "f1",
@@ -89,9 +89,9 @@ describe("mapSearchRows", () => {
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        nutrientName: null,
-        nutrientDisplayName: null,
-        nutrientUnit: null,
+        substanceName: null,
+        substanceDisplayName: null,
+        substanceUnit: null,
         valuePer100g: null,
         confidenceScore: null,
         sourceSummary: null,
@@ -100,7 +100,7 @@ describe("mapSearchRows", () => {
 
     const results = mapSearchRows(rows);
     expect(results).toHaveLength(1);
-    expect(results[0].variants[0].topNutrient).toBeNull();
+    expect(results[0].variants[0].topSubstance).toBeNull();
   });
 
   it("returns empty array for empty input", () => {
@@ -117,9 +117,9 @@ describe("mapSearchRows", () => {
         variantId: "v1",
         preparationMethod: "raw",
         isDefault: true,
-        nutrientName: "Vitamin K",
-        nutrientDisplayName: "Vitamin K",
-        nutrientUnit: "mcg",
+        substanceName: "Vitamin K",
+        substanceDisplayName: "Vitamin K",
+        substanceUnit: "mcg",
         valuePer100g: "482.9",
         confidenceScore: 95,
         sourceSummary: null,
@@ -131,9 +131,9 @@ describe("mapSearchRows", () => {
         variantId: "v2",
         preparationMethod: "steamed",
         isDefault: true,
-        nutrientName: "Vitamin C",
-        nutrientDisplayName: "Vitamin C",
-        nutrientUnit: "mg",
+        substanceName: "Vitamin C",
+        substanceDisplayName: "Vitamin C",
+        substanceUnit: "mg",
         valuePer100g: "64.9",
         confidenceScore: 88,
         sourceSummary: null,

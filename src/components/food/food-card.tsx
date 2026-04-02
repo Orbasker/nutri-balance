@@ -22,13 +22,13 @@ interface FoodCardProps {
 
 export function FoodCard({ food }: FoodCardProps) {
   const defaultVariant = food.variants.find((v) => v.isDefault) ?? food.variants[0];
-  const topNutrient = defaultVariant?.topNutrient;
+  const topSubstance = defaultVariant?.topSubstance;
 
-  const confidenceLevel = topNutrient?.confidenceLabel ?? "moderate";
+  const confidenceLevel = topSubstance?.confidenceLabel ?? "moderate";
   const tagColor = tagColors[confidenceLevel] ?? tagColors.moderate;
   const barColor = densityBarColors[confidenceLevel] ?? densityBarColors.moderate;
 
-  const densityPct = topNutrient ? Math.min(topNutrient.confidenceScore, 100) : 50;
+  const densityPct = topSubstance ? Math.min(topSubstance.confidenceScore, 100) : 50;
 
   return (
     <Link href={`/food/${food.id}`}>
@@ -42,9 +42,9 @@ export function FoodCard({ food }: FoodCardProps) {
             )}
             <h4 className="text-xl font-bold text-md-on-surface">{food.name}</h4>
           </div>
-          {topNutrient && (
+          {topSubstance && (
             <div className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase`}>
-              {topNutrient.displayName}
+              {topSubstance.displayName}
             </div>
           )}
         </div>
@@ -69,11 +69,11 @@ export function FoodCard({ food }: FoodCardProps) {
                   {defaultVariant.preparationMethod}
                 </span>
               </div>
-              {topNutrient && (
+              {topSubstance && (
                 <>
                   <div className="w-1 h-1 rounded-full bg-md-outline-variant" />
                   <div className="text-sm font-medium text-md-on-surface-variant">
-                    {topNutrient.valuePer100g.toFixed(0)} {topNutrient.unit} / 100g
+                    {topSubstance.valuePer100g.toFixed(0)} {topSubstance.unit} / 100g
                   </div>
                 </>
               )}
@@ -83,7 +83,7 @@ export function FoodCard({ food }: FoodCardProps) {
 
         <div className="space-y-2">
           <div className="flex justify-between text-[11px] font-bold text-md-outline uppercase tracking-tighter">
-            <span>Nutrient Density</span>
+            <span>Substance Density</span>
             <span className="text-md-primary">{densityPct}%</span>
           </div>
           <div className="h-2 w-full bg-md-surface-container-high rounded-full overflow-hidden">

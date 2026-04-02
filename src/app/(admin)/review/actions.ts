@@ -8,9 +8,9 @@ import { eq, inArray } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { evidenceItems, nutrientObservations } from "@/lib/db/schema/observations";
+import { evidenceItems, substanceObservations } from "@/lib/db/schema/observations";
 import { reviews } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { reviewObservationSchema } from "@/lib/validators";
 
 export type ReviewActionResult = { ok: true } | { error: string };
@@ -21,24 +21,24 @@ export async function getPendingObservations(): Promise<PendingObservation[]> {
 
   const rows = await db
     .select({
-      id: nutrientObservations.id,
-      foodVariantId: nutrientObservations.foodVariantId,
+      id: substanceObservations.id,
+      foodVariantId: substanceObservations.foodVariantId,
       foodName: foods.name,
       preparationMethod: foodVariants.preparationMethod,
-      nutrientName: nutrients.name,
-      nutrientDisplayName: nutrients.displayName,
-      value: nutrientObservations.value,
-      unit: nutrientObservations.unit,
-      derivationType: nutrientObservations.derivationType,
-      confidenceScore: nutrientObservations.confidenceScore,
-      reviewStatus: nutrientObservations.reviewStatus,
+      substanceName: substances.name,
+      substanceDisplayName: substances.displayName,
+      value: substanceObservations.value,
+      unit: substanceObservations.unit,
+      derivationType: substanceObservations.derivationType,
+      confidenceScore: substanceObservations.confidenceScore,
+      reviewStatus: substanceObservations.reviewStatus,
     })
-    .from(nutrientObservations)
-    .innerJoin(foodVariants, eq(foodVariants.id, nutrientObservations.foodVariantId))
+    .from(substanceObservations)
+    .innerJoin(foodVariants, eq(foodVariants.id, substanceObservations.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .innerJoin(nutrients, eq(nutrients.id, nutrientObservations.nutrientId))
-    .where(eq(nutrientObservations.reviewStatus, "pending"))
-    .orderBy(foods.name, nutrients.sortOrder);
+    .innerJoin(substances, eq(substances.id, substanceObservations.substanceId))
+    .where(eq(substanceObservations.reviewStatus, "pending"))
+    .orderBy(foods.name, substances.sortOrder);
 
   if (rows.length === 0) return [];
 
@@ -68,8 +68,8 @@ export async function getPendingObservations(): Promise<PendingObservation[]> {
     foodVariantId: r.foodVariantId,
     foodName: r.foodName,
     preparationMethod: r.preparationMethod,
-    nutrientName: r.nutrientName,
-    nutrientDisplayName: r.nutrientDisplayName,
+    substanceName: r.substanceName,
+    substanceDisplayName: r.substanceDisplayName,
     value: Number(r.value),
     unit: r.unit,
     derivationType: r.derivationType,
@@ -94,13 +94,13 @@ export async function reviewObservation(raw: unknown): Promise<ReviewActionResul
 
   // Update the observation's review status
   await db
-    .update(nutrientObservations)
+    .update(substanceObservations)
     .set({ reviewStatus: parsed.data.status as "approved" | "rejected" | "pending" })
-    .where(eq(nutrientObservations.id, parsed.data.observationId));
+    .where(eq(substanceObservations.id, parsed.data.observationId));
 
   // Create a review record
   await db.insert(reviews).values({
-    entityType: "nutrient_observation",
+    entityType: "substance_observation",
     entityId: parsed.data.observationId,
     reviewerId: adminId,
     status: parsed.data.status as "approved" | "rejected" | "pending",

@@ -6,7 +6,7 @@ CREATE TYPE "public"."limit_mode" AS ENUM('strict', 'stability');--> statement-b
 CREATE TYPE "public"."user_role" AS ENUM('user', 'admin');--> statement-breakpoint
 CREATE TABLE "retention_profiles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"nutrient_id" uuid NOT NULL,
+	"substance_id" uuid NOT NULL,
 	"preparation_method" "preparation_method" NOT NULL,
 	"retention_factor" numeric NOT NULL,
 	"source_id" uuid
@@ -59,13 +59,13 @@ CREATE TABLE "serving_measures" (
 	"grams_equivalent" numeric NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "nutrients" (
+CREATE TABLE "substances" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"unit" text NOT NULL,
 	"display_name" text NOT NULL,
 	"sort_order" integer DEFAULT 0,
-	CONSTRAINT "nutrients_name_unique" UNIQUE("name")
+	CONSTRAINT "substances_name_unique" UNIQUE("name")
 );
 --> statement-breakpoint
 CREATE TABLE "evidence_items" (
@@ -77,10 +77,10 @@ CREATE TABLE "evidence_items" (
 	"url" text
 );
 --> statement-breakpoint
-CREATE TABLE "nutrient_observations" (
+CREATE TABLE "substance_observations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"food_variant_id" uuid NOT NULL,
-	"nutrient_id" uuid NOT NULL,
+	"substance_id" uuid NOT NULL,
 	"value" numeric NOT NULL,
 	"unit" text NOT NULL,
 	"basis_amount" numeric DEFAULT '100',
@@ -107,10 +107,10 @@ CREATE TABLE "sources" (
 	"trust_level" integer DEFAULT 50
 );
 --> statement-breakpoint
-CREATE TABLE "resolved_nutrient_values" (
+CREATE TABLE "resolved_substance_values" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"food_variant_id" uuid NOT NULL,
-	"nutrient_id" uuid NOT NULL,
+	"substance_id" uuid NOT NULL,
 	"value_per_100g" numeric NOT NULL,
 	"confidence_score" integer DEFAULT 50,
 	"confidence_label" text,
@@ -134,7 +134,7 @@ CREATE TABLE "consumption_logs" (
 	"food_variant_id" uuid NOT NULL,
 	"serving_measure_id" uuid,
 	"quantity" numeric NOT NULL,
-	"nutrient_snapshot" jsonb,
+	"substance_snapshot" jsonb,
 	"logged_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"meal_label" text
 );
@@ -146,17 +146,17 @@ CREATE TABLE "profiles" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "user_nutrient_limits" (
+CREATE TABLE "user_substance_limits" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
-	"nutrient_id" uuid NOT NULL,
+	"substance_id" uuid NOT NULL,
 	"daily_limit" numeric NOT NULL,
 	"mode" "limit_mode" DEFAULT 'strict' NOT NULL,
 	"range_min" numeric,
 	"range_max" numeric
 );
 --> statement-breakpoint
-ALTER TABLE "retention_profiles" ADD CONSTRAINT "retention_profiles_nutrient_id_nutrients_id_fk" FOREIGN KEY ("nutrient_id") REFERENCES "public"."nutrients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "retention_profiles" ADD CONSTRAINT "retention_profiles_substance_id_substances_id_fk" FOREIGN KEY ("substance_id") REFERENCES "public"."substances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "retention_profiles" ADD CONSTRAINT "retention_profiles_source_id_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."sources"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "variant_calculation_rules" ADD CONSTRAINT "variant_calculation_rules_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "variant_calculation_rules" ADD CONSTRAINT "variant_calculation_rules_base_variant_id_food_variants_id_fk" FOREIGN KEY ("base_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -166,13 +166,13 @@ ALTER TABLE "yield_profiles" ADD CONSTRAINT "yield_profiles_food_id_foods_id_fk"
 ALTER TABLE "food_aliases" ADD CONSTRAINT "food_aliases_food_id_foods_id_fk" FOREIGN KEY ("food_id") REFERENCES "public"."foods"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "food_variants" ADD CONSTRAINT "food_variants_food_id_foods_id_fk" FOREIGN KEY ("food_id") REFERENCES "public"."foods"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "serving_measures" ADD CONSTRAINT "serving_measures_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "evidence_items" ADD CONSTRAINT "evidence_items_observation_id_nutrient_observations_id_fk" FOREIGN KEY ("observation_id") REFERENCES "public"."nutrient_observations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "nutrient_observations" ADD CONSTRAINT "nutrient_observations_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "nutrient_observations" ADD CONSTRAINT "nutrient_observations_nutrient_id_nutrients_id_fk" FOREIGN KEY ("nutrient_id") REFERENCES "public"."nutrients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "nutrient_observations" ADD CONSTRAINT "nutrient_observations_source_record_id_source_records_id_fk" FOREIGN KEY ("source_record_id") REFERENCES "public"."source_records"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "evidence_items" ADD CONSTRAINT "evidence_items_observation_id_substance_observations_id_fk" FOREIGN KEY ("observation_id") REFERENCES "public"."substance_observations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "substance_observations" ADD CONSTRAINT "substance_observations_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "substance_observations" ADD CONSTRAINT "substance_observations_substance_id_substances_id_fk" FOREIGN KEY ("substance_id") REFERENCES "public"."substances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "substance_observations" ADD CONSTRAINT "substance_observations_source_record_id_source_records_id_fk" FOREIGN KEY ("source_record_id") REFERENCES "public"."source_records"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "source_records" ADD CONSTRAINT "source_records_source_id_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "resolved_nutrient_values" ADD CONSTRAINT "resolved_nutrient_values_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "resolved_nutrient_values" ADD CONSTRAINT "resolved_nutrient_values_nutrient_id_nutrients_id_fk" FOREIGN KEY ("nutrient_id") REFERENCES "public"."nutrients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "resolved_substance_values" ADD CONSTRAINT "resolved_substance_values_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "resolved_substance_values" ADD CONSTRAINT "resolved_substance_values_substance_id_substances_id_fk" FOREIGN KEY ("substance_id") REFERENCES "public"."substances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "consumption_logs" ADD CONSTRAINT "consumption_logs_food_variant_id_food_variants_id_fk" FOREIGN KEY ("food_variant_id") REFERENCES "public"."food_variants"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "consumption_logs" ADD CONSTRAINT "consumption_logs_serving_measure_id_serving_measures_id_fk" FOREIGN KEY ("serving_measure_id") REFERENCES "public"."serving_measures"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user_nutrient_limits" ADD CONSTRAINT "user_nutrient_limits_nutrient_id_nutrients_id_fk" FOREIGN KEY ("nutrient_id") REFERENCES "public"."nutrients"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "user_substance_limits" ADD CONSTRAINT "user_substance_limits_substance_id_substances_id_fk" FOREIGN KEY ("substance_id") REFERENCES "public"."substances"("id") ON DELETE cascade ON UPDATE no action;

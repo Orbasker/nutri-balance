@@ -1,42 +1,46 @@
 import { randomUUID } from "crypto";
 import { and, eq, gte, ilike, inArray, or } from "drizzle-orm";
 
-import { calculateNutrientAmount, getConfidenceLabel, getNutrientStatus } from "@/lib/calculations";
+import {
+  calculateSubstanceAmount,
+  getConfidenceLabel,
+  getSubstanceStatus,
+} from "@/lib/calculations";
 import { db } from "@/lib/db";
 import { foodAliases, foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
-import { consumptionLogs, userNutrientLimits } from "@/lib/db/schema/users";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
+import { consumptionLogs, userSubstanceLimits } from "@/lib/db/schema/users";
 
 export interface ToolContext {
   userId: string;
 }
 
 /**
- * Fetch user nutrient limits via Drizzle.
+ * Fetch user substance limits via Drizzle.
  * Used internally by tools that need limit context.
  */
 async function fetchUserLimits(ctx: ToolContext) {
   return db
     .select({
-      nutrient_id: userNutrientLimits.nutrientId,
-      daily_limit: userNutrientLimits.dailyLimit,
-      mode: userNutrientLimits.mode,
-      range_min: userNutrientLimits.rangeMin,
-      range_max: userNutrientLimits.rangeMax,
+      substance_id: userSubstanceLimits.substanceId,
+      daily_limit: userSubstanceLimits.dailyLimit,
+      mode: userSubstanceLimits.mode,
+      range_min: userSubstanceLimits.rangeMin,
+      range_max: userSubstanceLimits.rangeMax,
     })
-    .from(userNutrientLimits)
-    .where(eq(userNutrientLimits.userId, ctx.userId));
+    .from(userSubstanceLimits)
+    .where(eq(userSubstanceLimits.userId, ctx.userId));
 }
 
 /**
- * Build a Map of nutrient ID -> { dailyLimit, mode } from raw limit rows.
+ * Build a Map of substance ID -> { dailyLimit, mode } from raw limit rows.
  */
 function buildLimitsMap(
-  userLimits: Array<{ nutrient_id: string; daily_limit: string; mode: string }>,
+  userLimits: Array<{ substance_id: string; daily_limit: string; mode: string }>,
 ) {
   return new Map(
-    userLimits.map((l) => [l.nutrient_id, { dailyLimit: Number(l.daily_limit), mode: l.mode }]),
+    userLimits.map((l) => [l.substance_id, { dailyLimit: Number(l.daily_limit), mode: l.mode }]),
   );
 }
 
@@ -142,23 +146,23 @@ export async function searchFood(params: { query: string }, _ctx: ToolContext) {
   };
 }
 
-export async function getFoodNutrients(params: { foodVariantId: string }, _ctx: ToolContext) {
+export async function getFoodSubstances(params: { foodVariantId: string }, _ctx: ToolContext) {
   const rows = await db
     .select({
-      nutrientId: resolvedNutrientValues.nutrientId,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
-      confidenceScore: resolvedNutrientValues.confidenceScore,
-      displayName: nutrients.displayName,
-      unit: nutrients.unit,
+      substanceId: resolvedSubstanceValues.substanceId,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
+      confidenceScore: resolvedSubstanceValues.confidenceScore,
+      displayName: substances.displayName,
+      unit: substances.unit,
     })
-    .from(resolvedNutrientValues)
-    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
-    .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId))
-    .orderBy(nutrients.sortOrder);
+    .from(resolvedSubstanceValues)
+    .innerJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
+    .where(eq(resolvedSubstanceValues.foodVariantId, params.foodVariantId))
+    .orderBy(substances.sortOrder);
 
   return {
-    nutrients: rows.map((r) => ({
-      nutrientId: r.nutrientId,
+    substances: rows.map((r) => ({
+      substanceId: r.substanceId,
       displayName: r.displayName,
       unit: r.unit,
       valuePer100g: Number(r.valuePer100g),
@@ -192,44 +196,44 @@ export async function checkCanIEat(
   today.setHours(0, 0, 0, 0);
 
   const logs = await db
-    .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+    .select({ substanceSnapshot: consumptionLogs.substanceSnapshot })
     .from(consumptionLogs)
     .where(and(eq(consumptionLogs.userId, ctx.userId), gte(consumptionLogs.loggedAt, today)));
 
   const todayTotals: Record<string, number> = {};
   for (const log of logs) {
-    const snap = log.nutrientSnapshot as Record<string, number> | null;
+    const snap = log.substanceSnapshot as Record<string, number> | null;
     if (!snap) continue;
     for (const [nId, amt] of Object.entries(snap)) {
       todayTotals[nId] = (todayTotals[nId] ?? 0) + amt;
     }
   }
 
-  // Get nutrient values for this variant
-  const nutrientRows = await db
+  // Get substance values for this variant
+  const substanceRows = await db
     .select({
-      nutrientId: resolvedNutrientValues.nutrientId,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
-      displayName: nutrients.displayName,
-      unit: nutrients.unit,
+      substanceId: resolvedSubstanceValues.substanceId,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
+      displayName: substances.displayName,
+      unit: substances.unit,
     })
-    .from(resolvedNutrientValues)
-    .innerJoin(nutrients, eq(nutrients.id, resolvedNutrientValues.nutrientId))
-    .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId))
-    .orderBy(nutrients.sortOrder);
+    .from(resolvedSubstanceValues)
+    .innerJoin(substances, eq(substances.id, resolvedSubstanceValues.substanceId))
+    .where(eq(resolvedSubstanceValues.foodVariantId, params.foodVariantId))
+    .orderBy(substances.sortOrder);
 
   const limitsMap = buildLimitsMap(userLimits);
 
-  const impact = nutrientRows.map((n) => {
-    const added = calculateNutrientAmount(Number(n.valuePer100g), params.portionGrams);
-    const consumed = todayTotals[n.nutrientId] ?? 0;
+  const impact = substanceRows.map((n) => {
+    const added = calculateSubstanceAmount(Number(n.valuePer100g), params.portionGrams);
+    const consumed = todayTotals[n.substanceId] ?? 0;
     const newTotal = consumed + added;
-    const limit = limitsMap.get(n.nutrientId);
-    const status = getNutrientStatus(newTotal, limit?.dailyLimit ?? null);
+    const limit = limitsMap.get(n.substanceId);
+    const status = getSubstanceStatus(newTotal, limit?.dailyLimit ?? null);
     const pct = limit ? Math.round((newTotal / limit.dailyLimit) * 100) : null;
 
     return {
-      nutrient: n.displayName,
+      substance: n.displayName,
       unit: n.unit,
       consumedToday: Math.round(consumed * 10) / 10,
       adding: Math.round(added * 10) / 10,
@@ -249,8 +253,8 @@ export async function checkCanIEat(
     preparationMethod: variantInfo?.method ?? "raw",
     portionGrams: params.portionGrams,
     overallVerdict: hasExceed ? "exceed" : hasCaution ? "caution" : "safe",
-    trackedNutrients: trackedImpact,
-    allNutrients: impact,
+    trackedSubstances: trackedImpact,
+    allSubstances: impact,
   };
 }
 
@@ -279,26 +283,26 @@ export async function recordMeal(
     };
   }
 
-  // Calculate nutrient snapshot
-  const nutrientRows = await db
+  // Calculate substance snapshot
+  const substanceRows = await db
     .select({
-      nutrientId: resolvedNutrientValues.nutrientId,
-      valuePer100g: resolvedNutrientValues.valuePer100g,
+      substanceId: resolvedSubstanceValues.substanceId,
+      valuePer100g: resolvedSubstanceValues.valuePer100g,
     })
-    .from(resolvedNutrientValues)
-    .where(eq(resolvedNutrientValues.foodVariantId, params.foodVariantId));
+    .from(resolvedSubstanceValues)
+    .where(eq(resolvedSubstanceValues.foodVariantId, params.foodVariantId));
 
-  if (nutrientRows.length === 0) {
-    console.error("[recordMeal] No nutrient data for variant:", params.foodVariantId);
+  if (substanceRows.length === 0) {
+    console.error("[recordMeal] No substance data for variant:", params.foodVariantId);
     return {
       success: false,
-      error: `No nutrient data found for "${variantInfo.foodName}". The food may need to be researched first using aiResearchFood.`,
+      error: `No substance data found for "${variantInfo.foodName}". The food may need to be researched first using aiResearchFood.`,
     };
   }
 
   const snapshot: Record<string, number> = {};
-  for (const row of nutrientRows) {
-    snapshot[row.nutrientId] = calculateNutrientAmount(
+  for (const row of substanceRows) {
+    snapshot[row.substanceId] = calculateSubstanceAmount(
       Number(row.valuePer100g),
       params.portionGrams,
     );
@@ -311,7 +315,7 @@ export async function recordMeal(
       foodVariantId: params.foodVariantId,
       servingMeasureId: params.servingMeasureId ?? null,
       quantity: String(params.quantity),
-      nutrientSnapshot: snapshot,
+      substanceSnapshot: snapshot,
       mealLabel: params.mealLabel ?? null,
     });
   } catch (err) {
@@ -330,66 +334,66 @@ export async function recordMeal(
       quantity: params.quantity,
       portionGrams: params.portionGrams,
       mealLabel: params.mealLabel ?? null,
-      nutrientCount: Object.keys(snapshot).length,
+      substanceCount: Object.keys(snapshot).length,
     },
   };
 }
 
 export async function getDailySummary(_params: Record<string, never>, ctx: ToolContext) {
   const userLimits = await fetchUserLimits(ctx);
-  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
+  const limitSubstanceIds = userLimits.map((l) => l.substance_id);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const logs = await db
-    .select({ nutrientSnapshot: consumptionLogs.nutrientSnapshot })
+    .select({ substanceSnapshot: consumptionLogs.substanceSnapshot })
     .from(consumptionLogs)
     .where(and(eq(consumptionLogs.userId, ctx.userId), gte(consumptionLogs.loggedAt, today)))
     .orderBy(consumptionLogs.loggedAt);
 
   const totals: Record<string, number> = {};
   for (const log of logs) {
-    const snap = log.nutrientSnapshot as Record<string, number> | null;
+    const snap = log.substanceSnapshot as Record<string, number> | null;
     if (!snap) continue;
     for (const [nId, amt] of Object.entries(snap)) {
       totals[nId] = (totals[nId] ?? 0) + amt;
     }
   }
 
-  if (limitNutrientIds.length === 0) {
+  if (limitSubstanceIds.length === 0) {
     return {
       mealCount: logs.length,
-      trackedNutrients: [],
-      message: "No nutrient limits configured.",
+      trackedSubstances: [],
+      message: "No substance limits configured.",
     };
   }
 
-  const nutrientRows = await db
-    .select({ id: nutrients.id, displayName: nutrients.displayName, unit: nutrients.unit })
-    .from(nutrients)
-    .where(inArray(nutrients.id, limitNutrientIds))
-    .orderBy(nutrients.sortOrder);
+  const substanceRows = await db
+    .select({ id: substances.id, displayName: substances.displayName, unit: substances.unit })
+    .from(substances)
+    .where(inArray(substances.id, limitSubstanceIds))
+    .orderBy(substances.sortOrder);
 
   const limitsMap = buildLimitsMap(userLimits);
 
-  const summary = nutrientRows.map((n) => {
+  const summary = substanceRows.map((n) => {
     const total = totals[n.id] ?? 0;
     const limit = limitsMap.get(n.id);
     const pct = limit ? Math.round((total / limit.dailyLimit) * 100) : null;
     return {
-      nutrient: n.displayName,
+      substance: n.displayName,
       unit: n.unit,
       consumed: Math.round(total * 10) / 10,
       dailyLimit: limit?.dailyLimit ?? null,
       percentOfLimit: pct,
-      status: getNutrientStatus(total, limit?.dailyLimit ?? null),
+      status: getSubstanceStatus(total, limit?.dailyLimit ?? null),
     };
   });
 
   return {
     mealCount: logs.length,
-    trackedNutrients: summary,
+    trackedSubstances: summary,
   };
 }
 
@@ -411,7 +415,7 @@ export async function aiResearchFood(params: { foodName: string }, ctx: ToolCont
       foodName: result.foodName,
       variantsCount: result.variantsCount,
       defaultVariant: result.defaultVariant,
-      message: `Successfully researched "${result.foodName}" and saved nutrient data for immediate use.`,
+      message: `Successfully researched "${result.foodName}" and saved substance data for immediate use.`,
     };
   } catch (err) {
     console.error("[aiResearchFood] Exception:", err);
