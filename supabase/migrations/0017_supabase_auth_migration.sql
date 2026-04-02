@@ -44,8 +44,10 @@ ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_trigger_user_id_user_id_fk
 ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
 ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
 
--- Disable the trigger so migrated users don't get duplicate profiles
-ALTER TABLE auth.users DISABLE TRIGGER on_auth_user_created;
+-- Disable all triggers so migrated users don't get duplicate profiles.
+-- We use session_replication_role instead of ALTER TABLE ... DISABLE TRIGGER
+-- because the migration role is not the owner of auth.users.
+SET session_replication_role = 'replica';
 
 -- ============================================================
 -- STEP 3: Migrate existing users to auth.users (with new UUIDs)
@@ -81,8 +83,8 @@ WHERE NOT EXISTS (
   SELECT 1 FROM auth.users au WHERE au.email = u.email
 );
 
--- Re-enable the trigger for future signups
-ALTER TABLE auth.users ENABLE TRIGGER on_auth_user_created;
+-- Re-enable all triggers for future signups
+SET session_replication_role = 'origin';
 
 -- ============================================================
 -- STEP 4: Update all FK references from old text IDs to new UUID text IDs
