@@ -87,7 +87,7 @@ supabase/
 
 - **Server client**: `import { createClient } from "@/lib/supabase/server"` — cookie-based, RLS-enforced
 - **Browser client**: `import { createClient } from "@/lib/supabase/client"` — for client components
-- **Admin client**: `import { supabaseAdmin } from "@/lib/supabase/admin"` — service-role, bypasses RLS (server-only)
+- **Admin client**: `import { getSupabaseAdmin } from "@/lib/supabase/admin"` — service-role, bypasses RLS (server-only, lazily initialized)
 - **Server session**: `import { getSession } from "@/lib/auth-session"` — returns session or null
 - **Admin check**: `import { requireAdmin } from "@/lib/auth-admin"` — returns userId or null
 - **OAuth callback**: `src/app/api/auth/callback/route.ts` — handles PKCE code exchange

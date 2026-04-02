@@ -54,7 +54,7 @@ INSERT INTO auth.identities (
   id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
 )
 SELECT
-  gen_random_uuid()::text,
+  gen_random_uuid(),
   a.account_id,
   a.user_id::uuid,
   jsonb_build_object('sub', a.account_id, 'email', u.email),
@@ -75,7 +75,7 @@ INSERT INTO auth.identities (
   id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
 )
 SELECT
-  gen_random_uuid()::text,
+  gen_random_uuid(),
   au.id::text,
   au.id,
   jsonb_build_object('sub', au.id::text, 'email', au.email),

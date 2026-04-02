@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { accountLinkTokens } from "@/lib/db/schema/account-link-tokens";
 import { platformAccounts } from "@/lib/db/schema/platform-accounts";
 import { consumptionLogs, profiles, userNutrientLimits } from "@/lib/db/schema/users";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export type LinkResult =
   | { success: true; platform: string; platformUsername: string | null }
@@ -170,7 +170,7 @@ export async function linkAccountToWeb(token: string): Promise<LinkResult> {
       if (!otherAccounts) {
         await tx.delete(profiles).where(eq(profiles.id, oldBotUserId));
         // Delete the auth user via Supabase Admin API (cascades to auth.users)
-        await supabaseAdmin.auth.admin.deleteUser(oldBotUserId);
+        await getSupabaseAdmin().auth.admin.deleteUser(oldBotUserId);
       }
 
       await tx

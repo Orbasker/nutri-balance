@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { platformAccounts } from "@/lib/db/schema/platform-accounts";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type PlatformAccount = typeof platformAccounts.$inferSelect;
 
@@ -40,7 +40,7 @@ export async function findOrCreatePlatformAccount(
     const email = `${platform}_${platformUserId}@bot.nutribalance.local`;
 
     // Create user via Supabase Admin API (triggers handle_new_user for profile creation)
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: authUser, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
       email,
       email_confirm: true,
       user_metadata: {
