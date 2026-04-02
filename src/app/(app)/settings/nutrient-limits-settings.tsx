@@ -33,6 +33,9 @@ export type UserNutrientLimitDto = {
   range_max: string | null;
 };
 
+const CUSTOM_UNIT_VALUE = "__custom__";
+const UNIT_OPTIONS = ["mg", "mcg", "g", "IU", "mEq", "kcal"] as const;
+
 type NutrientLimitsSettingsProps = {
   nutrients: NutrientDto[];
   limits: UserNutrientLimitDto[];
@@ -83,7 +86,11 @@ export function NutrientLimitsSettings({
   const [notesSaved, setNotesSaved] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newUnit, setNewUnit] = useState("");
+  const [newUnitChoice, setNewUnitChoice] = useState<string>("");
+  const [customUnit, setCustomUnit] = useState("");
+
+  const resolvedNewUnit =
+    newUnitChoice === CUSTOM_UNIT_VALUE ? customUnit.trim() : newUnitChoice.trim();
 
   // Derive initial mode from existing limits (majority wins), default to "strict"
   const [activeMode, setActiveMode] = useState<"strict" | "stability">(() => {
@@ -127,49 +134,72 @@ export function NutrientLimitsSettings({
             <span className="material-symbols-outlined text-[20px]">
               {showAddForm ? "close" : "add_circle"}
             </span>
-            {showAddForm ? "Cancel" : "Add Substance"}
+            {showAddForm ? "Cancel" : "Track Something Else"}
           </button>
         </div>
 
         {showAddForm && (
           <div className="mb-8 p-5 bg-md-surface-container-low rounded-xl space-y-4">
-            <p className="text-sm font-bold text-md-on-surface">Add a custom substance to track</p>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-md-on-surface">
+                Track something that is not already in the list
+              </p>
+              <p className="text-xs text-md-on-surface-variant">
+                Give it a name, then choose the unit you want to track each day.
+              </p>
+            </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 className="flex-1 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
-                placeholder="Name (e.g. Gluten, Caffeine, Fiber)"
+                placeholder="Name to track (e.g. Gluten, Caffeine, Fiber)"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
-              <input
-                className="w-full sm:w-28 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
-                placeholder="Unit (e.g. mg)"
-                value={newUnit}
-                onChange={(e) => setNewUnit(e.target.value)}
-              />
+              <select
+                className="w-full sm:w-40 bg-md-surface-container-lowest border border-md-outline-variant/20 rounded-lg px-4 py-2.5 text-sm text-md-on-surface outline-none focus:ring-2 focus:ring-md-primary/20"
+                value={newUnitChoice}
+                onChange={(e) => setNewUnitChoice(e.target.value)}
+              >
+                <option value="">Choose unit</option>
+                {UNIT_OPTIONS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+                <option value={CUSTOM_UNIT_VALUE}>Custom unit</option>
+              </select>
+              {newUnitChoice === CUSTOM_UNIT_VALUE && (
+                <input
+                  className="w-full sm:w-32 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
+                  placeholder="Custom unit"
+                  value={customUnit}
+                  onChange={(e) => setCustomUnit(e.target.value)}
+                />
+              )}
               <button
                 type="button"
-                disabled={pending || !newName.trim() || !newUnit.trim()}
+                disabled={pending || !newName.trim() || !resolvedNewUnit}
                 onClick={() => {
                   setError(null);
                   startTransition(async () => {
                     const res = await createCustomNutrient({
                       displayName: newName.trim(),
-                      unit: newUnit.trim(),
+                      unit: resolvedNewUnit,
                     });
                     if ("error" in res) {
                       setError(res.error);
                       return;
                     }
                     setNewName("");
-                    setNewUnit("");
+                    setNewUnitChoice("");
+                    setCustomUnit("");
                     setShowAddForm(false);
                     refresh();
                   });
                 }}
                 className="bg-md-primary text-white font-bold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50 active:scale-95 transition-all whitespace-nowrap"
               >
-                {pending ? "Adding..." : "Add"}
+                {pending ? "Adding..." : "Track"}
               </button>
             </div>
           </div>
@@ -405,11 +435,6 @@ function NutrientLimitField({
           >
             {nutrient.display_name}
           </label>
-          {isCustom && (
-            <span className="text-[10px] font-bold text-md-primary/60 bg-md-primary/8 px-1.5 py-0.5 rounded">
-              CUSTOM
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2">
           {isCustom && (

@@ -9,16 +9,20 @@ import { cn } from "@/lib/utils";
 interface NutrientPickerProps {
   nutrients: NutrientOption[];
   isLoading: boolean;
+  isResearchingUnknown?: boolean;
   selectedNutrient: NutrientOption | null;
   onSelect: (nutrient: NutrientOption) => void;
+  onSearchUnknown?: (query: string) => void;
   onClear: () => void;
 }
 
 export function NutrientPicker({
   nutrients,
   isLoading,
+  isResearchingUnknown = false,
   selectedNutrient,
   onSelect,
+  onSearchUnknown,
   onClear,
 }: NutrientPickerProps) {
   const [filterText, setFilterText] = useState("");
@@ -67,12 +71,15 @@ export function NutrientPicker({
       } else if (e.key === "Enter" && highlightIndex >= 0 && highlightIndex < filtered.length) {
         e.preventDefault();
         handleSelect(filtered[highlightIndex]);
+      } else if (e.key === "Enter" && filtered.length === 0 && filterText.trim().length >= 2) {
+        e.preventDefault();
+        onSearchUnknown?.(filterText.trim());
       } else if (e.key === "Escape") {
         setIsOpen(false);
         setHighlightIndex(-1);
       }
     },
-    [filtered, highlightIndex, handleSelect],
+    [filterText, filtered, highlightIndex, handleSelect, onSearchUnknown],
   );
 
   if (selectedNutrient) {
@@ -120,8 +127,8 @@ export function NutrientPicker({
           }}
           onKeyDown={handleKeyDown}
           className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-6 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
-          placeholder={isLoading ? "Loading nutrients..." : "Type to filter nutrients..."}
-          disabled={isLoading}
+          placeholder={isLoading ? "Loading nutrients..." : "Search nutrients or type a new one..."}
+          disabled={isLoading || isResearchingUnknown}
         />
       </div>
 
@@ -132,8 +139,24 @@ export function NutrientPicker({
           className="absolute z-50 top-full mt-2 left-0 right-0 bg-md-surface-container-lowest rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-md-outline/10 max-h-72 overflow-y-auto"
         >
           {filtered.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-md-outline text-center">
-              No nutrients found matching &ldquo;{filterText}&rdquo;
+            <div className="px-5 py-4 text-center space-y-3">
+              <p className="text-sm text-md-outline">
+                No saved nutrients found for &ldquo;{filterText}&rdquo;.
+              </p>
+              {filterText.trim().length >= 2 && onSearchUnknown && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onSearchUnknown(filterText.trim())}
+                  disabled={isResearchingUnknown}
+                  className="inline-flex items-center gap-2 bg-md-primary text-white font-bold py-2 px-4 rounded-xl active:scale-95 transition-all duration-200 hover:bg-md-primary/90 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+                  {isResearchingUnknown
+                    ? "Researching..."
+                    : `Research "${filterText.trim()}" anyway`}
+                </button>
+              )}
             </div>
           ) : (
             filtered.map((nutrient, idx) => (

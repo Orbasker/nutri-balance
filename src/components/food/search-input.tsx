@@ -7,6 +7,7 @@ import {
   aiDiscoverFoodsByNutrient,
   aiSearchFood,
   listNutrients,
+  resolveNutrientSearchTerm,
   searchByNutrientId,
   searchFoods,
   uploadNutrientPdf,
@@ -46,6 +47,16 @@ export function SearchInput() {
   const [nutrientsLoading, setNutrientsLoading] = useState(false);
   const [nutrientsLoaded, setNutrientsLoaded] = useState(false);
   const [selectedNutrient, setSelectedNutrient] = useState<NutrientOption | null>(null);
+
+  const addNutrientOption = useCallback((nutrient: NutrientOption) => {
+    setNutrientsList((prev) => {
+      if (prev.some((item) => item.id === nutrient.id)) {
+        return prev;
+      }
+
+      return [...prev, nutrient].sort((a, b) => a.displayName.localeCompare(b.displayName));
+    });
+  }, []);
 
   // -- Mode switching --
   const handleModeSwitch = useCallback(
@@ -145,6 +156,54 @@ export function SearchInput() {
     setAiError(null);
     setAiSuccess(null);
   }, []);
+
+  const handleUnknownNutrientSearch = useCallback(
+    async (term: string) => {
+      const trimmed = term.trim();
+      if (trimmed.length < 2) return;
+
+      setIsAiSearching(true);
+      setAiError(null);
+      setAiSuccess(null);
+      setFilters({});
+
+      try {
+        const resolved = await resolveNutrientSearchTerm(trimmed);
+        if (resolved.status === "error") {
+          setAiError(resolved.message);
+          return;
+        }
+
+        setNutrientsLoaded(true);
+        addNutrientOption(resolved.nutrient);
+        setSelectedNutrient(resolved.nutrient);
+
+        const result = await aiDiscoverFoodsByNutrient(resolved.nutrient.id);
+        const refreshed = await searchByNutrientId(
+          resolved.nutrient.id,
+          {},
+          { page: 1, pageSize: PAGE_SIZE },
+        );
+        setSearchResult(refreshed);
+        setHasSearched(true);
+
+        if (result.status === "found") {
+          setAiSuccess(
+            resolved.status === "created"
+              ? `${resolved.message} ${result.summary}`
+              : result.summary,
+          );
+        } else {
+          setAiError(result.message);
+        }
+      } catch {
+        setAiError("Something went wrong. Please try again.");
+      } finally {
+        setIsAiSearching(false);
+      }
+    },
+    [addNutrientOption],
+  );
 
   // -- Shared handlers --
   const handleFiltersChange = useCallback(
@@ -342,7 +401,7 @@ export function SearchInput() {
           )}
         >
           <span className="material-symbols-outlined text-[20px]">science</span>
-          Search Nutrient
+          Find by Nutrient
         </button>
       </div>
 
@@ -391,8 +450,10 @@ export function SearchInput() {
           <NutrientPicker
             nutrients={nutrientsList}
             isLoading={nutrientsLoading}
+            isResearchingUnknown={isAiSearching}
             selectedNutrient={selectedNutrient}
             onSelect={handleNutrientSelect}
+            onSearchUnknown={handleUnknownNutrientSearch}
             onClear={handleNutrientClear}
           />
           {/* AI Discover button for nutrient mode */}
@@ -645,8 +706,8 @@ export function SearchInput() {
           <div className="relative z-10">
             <h4 className="text-2xl font-bold mb-2">Nutrient Explorer</h4>
             <p className="text-md-tertiary-fixed-dim text-sm max-w-[70%] leading-relaxed">
-              Select a nutrient above to discover which foods contain the highest amounts. Great for
-              targeted dietary planning.
+              Pick a saved nutrient or type a new one and we will research foods for it. Great for
+              targeted dietary planning and missing nutrients.
             </p>
           </div>
           <div className="absolute -right-8 -bottom-8 opacity-10 group-hover:scale-110 transition-transform duration-700">

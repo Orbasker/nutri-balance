@@ -35,6 +35,72 @@ import { type SearchRow, mapSearchRows } from "./search-utils";
 
 const DEFAULT_PAGE_SIZE = 20;
 
+function createNutrientSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function inferUnitForCustomNutrient(name: string) {
+  const normalized = name.trim().toLowerCase();
+
+  const explicitUnits: Record<string, string> = {
+    caffeine: "mg",
+    calcium: "mg",
+    carbohydrate: "g",
+    carbohydrates: "g",
+    cholesterol: "mg",
+    copper: "mg",
+    fat: "g",
+    fiber: "g",
+    folate: "mcg",
+    gluten: "g",
+    iodine: "mcg",
+    iron: "mg",
+    magnesium: "mg",
+    manganese: "mg",
+    niacin: "mg",
+    phosphorus: "mg",
+    potassium: "mg",
+    protein: "g",
+    riboflavin: "mg",
+    selenium: "mcg",
+    sodium: "mg",
+    sugar: "g",
+    sugars: "g",
+    thiamin: "mg",
+    zinc: "mg",
+  };
+
+  if (explicitUnits[normalized]) {
+    return explicitUnits[normalized];
+  }
+
+  if (normalized.startsWith("vitamin ")) {
+    if (
+      normalized === "vitamin a" ||
+      normalized === "vitamin b12" ||
+      normalized === "vitamin d" ||
+      normalized === "vitamin k"
+    ) {
+      return "mcg";
+    }
+
+    return "mg";
+  }
+
+  if (
+    normalized.includes("protein") ||
+    normalized.includes("fiber") ||
+    normalized.includes("gluten")
+  ) {
+    return "g";
+  }
+
+  return "mg";
+}
+
 /**
  * Check if query matches a nutrient name/display_name.
  * Returns the nutrient if found, null otherwise.
@@ -116,7 +182,7 @@ async function getCategoriesForNutrient(nutrientId: string): Promise<string[]> {
 }
 
 /**
- * Search foods by nutrient — paginated, with filters.
+ * Search foods by nutrient - paginated, with filters.
  */
 async function searchByNutrient(
   nutrientId: string,
@@ -190,7 +256,7 @@ async function searchByNutrient(
 }
 
 /**
- * Standard food name/alias search — paginated, with filters.
+ * Standard food name/alias search - paginated, with filters.
  */
 async function searchByName(
   query: string,
@@ -325,8 +391,65 @@ export async function listNutrients(): Promise<NutrientOption[]> {
   return rows;
 }
 
+export async function resolveNutrientSearchTerm(
+  query: string,
+): Promise<
+  | { status: "matched"; nutrient: NutrientOption }
+  | { status: "created"; nutrient: NutrientOption; message: string }
+  | { status: "error"; message: string }
+> {
+  const parsed = searchInputSchema.safeParse({ query });
+  if (!parsed.success) {
+    return { status: "error", message: "Enter at least 2 characters." };
+  }
+
+  const existing = await findMatchingNutrient(parsed.data.query);
+  if (existing) {
+    return {
+      status: "matched",
+      nutrient: {
+        id: existing.id,
+        name: existing.name,
+        displayName: existing.displayName,
+        unit: existing.unit,
+      },
+    };
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return { status: "error", message: "You must be signed in." };
+  }
+
+  const displayName = parsed.data.query;
+  const slug = createNutrientSlug(displayName);
+  const unit = inferUnitForCustomNutrient(displayName);
+
+  const [created] = await db
+    .insert(nutrients)
+    .values({
+      name: `custom_${slug}_${session.user.id.slice(0, 8)}`,
+      displayName,
+      unit,
+      sortOrder: 999,
+      createdBy: session.user.id,
+    })
+    .returning({
+      id: nutrients.id,
+      name: nutrients.name,
+      displayName: nutrients.displayName,
+      unit: nutrients.unit,
+    });
+
+  return {
+    status: "created",
+    nutrient: created,
+    message: `Added "${created.displayName}" to your nutrient list.`,
+  };
+}
+
 /**
- * Search foods by nutrient ID — public server action wrapping the internal searchByNutrient.
+ * Search foods by nutrient ID - public server action wrapping the internal searchByNutrient.
  * Accepts a nutrientId directly (no query matching needed).
  */
 export async function searchByNutrientId(
