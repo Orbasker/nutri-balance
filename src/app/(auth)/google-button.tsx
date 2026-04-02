@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { authClient } from "@/lib/auth-client";
+import { createClient } from "@/lib/supabase/client";
 
 export function GoogleButton({ callbackURL = "/dashboard" }: { callbackURL?: string } = {}) {
   const [loading, setLoading] = useState(false);
@@ -12,9 +12,12 @@ export function GoogleButton({ callbackURL = "/dashboard" }: { callbackURL?: str
   async function handleGoogleSignIn() {
     setLoading(true);
     try {
-      await authClient.signIn.social({
+      const supabase = createClient();
+      await supabase.auth.signInWithOAuth({
         provider: "google",
-        callbackURL,
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(callbackURL)}`,
+        },
       });
     } catch {
       setLoading(false);

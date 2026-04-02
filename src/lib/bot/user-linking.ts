@@ -1,9 +1,8 @@
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { user } from "@/lib/db/schema/auth";
 import { platformAccounts } from "@/lib/db/schema/platform-accounts";
-import { profiles } from "@/lib/db/schema/users";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type PlatformAccount = typeof platformAccounts.$inferSelect;
 
@@ -11,8 +10,8 @@ type PlatformAccount = typeof platformAccounts.$inferSelect;
  * Find an existing platform account or create a new one with a linked auth user.
  *
  * When creating:
- * 1. Creates a user row in the better-auth user table
- * 2. Creates a profiles row
+ * 1. Creates a user in Supabase Auth via admin API
+ * 2. The handle_new_user trigger auto-creates the profile row
  * 3. Creates a platform_accounts row with onboarding_state='new'
  */
 export async function findOrCreatePlatformAccount(
@@ -35,25 +34,25 @@ export async function findOrCreatePlatformAccount(
     return existing[0];
   }
 
-  // Create new auth user + profile + platform account
+  // Create new auth user + platform account
   try {
-    const userId = crypto.randomUUID();
     const displayName = platformUsername ?? "Bot User";
     const email = `${platform}_${platformUserId}@bot.nutribalance.local`;
 
-    // Create auth user directly via Drizzle
-    await db.insert(user).values({
-      id: userId,
-      name: displayName,
+    // Create user via Supabase Admin API (triggers handle_new_user for profile creation)
+    const { data: authUser, error: authError } = await getSupabaseAdmin().auth.admin.createUser({
       email,
-      emailVerified: true,
+      email_confirm: true,
+      user_metadata: {
+        display_name: displayName,
+      },
     });
 
-    // Create profile
-    await db.insert(profiles).values({
-      id: userId,
-      displayName,
-    });
+    if (authError || !authUser.user) {
+      throw new Error(`Failed to create auth user: ${authError?.message ?? "unknown error"}`);
+    }
+
+    const userId = authUser.user.id;
 
     // Create platform account
     const [account] = await db

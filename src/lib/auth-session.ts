@@ -1,16 +1,26 @@
-import { headers } from "next/headers";
-
-import { type Session, auth } from "@/lib/auth";
+import type { Session } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Get the current session in server components and server actions.
  * Returns null if not authenticated.
  */
 export async function getSession(): Promise<Session | null> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  return session;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email ?? "",
+      name: user.user_metadata?.display_name ?? user.user_metadata?.full_name ?? user.email ?? "",
+      image: user.user_metadata?.avatar_url ?? null,
+    },
+  };
 }
 
 /**
