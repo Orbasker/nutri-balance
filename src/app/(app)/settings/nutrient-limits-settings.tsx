@@ -85,6 +85,13 @@ export function NutrientLimitsSettings({
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
 
+  // Derive initial mode from existing limits (majority wins), default to "strict"
+  const [activeMode, setActiveMode] = useState<"strict" | "stability">(() => {
+    if (limits.length === 0) return "strict";
+    const stabilityCount = limits.filter((l) => l.mode === "stability").length;
+    return stabilityCount > limits.length / 2 ? "stability" : "strict";
+  });
+
   const limitByNutrient = useMemo(() => {
     const m = new Map<string, UserNutrientLimitDto>();
     for (const l of limits) {
@@ -182,6 +189,7 @@ export function NutrientLimitsSettings({
                 isFirst={i === 0}
                 isCustom={!!n.created_by}
                 disabled={pending}
+                activeMode={activeMode}
                 onToggle={(on) => {
                   setError(null);
                   if (on) {
@@ -250,7 +258,11 @@ export function NutrientLimitsSettings({
                     Hard stop notifications when limits are hit.
                   </p>
                 </div>
-                <ToggleSwitch checked={true} onCheckedChange={() => {}} />
+                <ToggleSwitch
+                  checked={activeMode === "strict"}
+                  disabled={pending}
+                  onCheckedChange={() => setActiveMode("strict")}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -259,7 +271,11 @@ export function NutrientLimitsSettings({
                     Focuses on consistent day-to-day variance.
                   </p>
                 </div>
-                <ToggleSwitch checked={false} onCheckedChange={() => {}} />
+                <ToggleSwitch
+                  checked={activeMode === "stability"}
+                  disabled={pending}
+                  onCheckedChange={() => setActiveMode("stability")}
+                />
               </div>
             </div>
           </div>
@@ -273,7 +289,9 @@ export function NutrientLimitsSettings({
                 <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
                 <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
               </div>
-              <span className="text-xs font-bold text-md-primary">High Confidence Active</span>
+              <span className="text-xs font-bold text-md-primary">
+                {activeMode === "strict" ? "High Confidence Active" : "Stability Tracking Active"}
+              </span>
             </div>
           </div>
         </section>
@@ -325,6 +343,7 @@ function NutrientLimitField({
   isFirst,
   isCustom,
   disabled,
+  activeMode,
   onToggle,
   onSave,
   onRemoveNutrient,
@@ -335,6 +354,7 @@ function NutrientLimitField({
   isFirst: boolean;
   isCustom: boolean;
   disabled: boolean;
+  activeMode: "strict" | "stability";
   onToggle: (on: boolean) => void;
   onSave: (payload: {
     nutrientId: string;
@@ -347,6 +367,31 @@ function NutrientLimitField({
   onRemoveNutrient: () => void;
 }) {
   const [dailyLimit, setDailyLimit] = useState(limit?.daily_limit ?? "");
+  const [rangeMin, setRangeMin] = useState(limit?.range_min ?? "");
+  const [rangeMax, setRangeMax] = useState(limit?.range_max ?? "");
+
+  function saveStrict() {
+    if (dailyLimit) {
+      void onSave({
+        nutrientId: nutrient.id,
+        limitId: limit?.id,
+        mode: "strict",
+        dailyLimit,
+      });
+    }
+  }
+
+  function saveStability() {
+    if (rangeMin && rangeMax) {
+      void onSave({
+        nutrientId: nutrient.id,
+        limitId: limit?.id,
+        mode: "stability",
+        rangeMin,
+        rangeMax,
+      });
+    }
+  }
 
   return (
     <div className="group border-b border-md-outline-variant/15 pb-4 focus-within:border-md-primary transition-all">
@@ -381,7 +426,7 @@ function NutrientLimitField({
           <ToggleSwitch checked={isTracked} disabled={disabled} onCheckedChange={onToggle} />
         </div>
       </div>
-      {isTracked && (
+      {isTracked && activeMode === "strict" && (
         <div className="flex items-baseline gap-2">
           <input
             className="w-full bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
@@ -389,16 +434,31 @@ function NutrientLimitField({
             type="text"
             value={dailyLimit}
             onChange={(e) => setDailyLimit(e.target.value)}
-            onBlur={() => {
-              if (dailyLimit) {
-                void onSave({
-                  nutrientId: nutrient.id,
-                  limitId: limit?.id,
-                  mode: "strict",
-                  dailyLimit,
-                });
-              }
-            }}
+            onBlur={saveStrict}
+          />
+          <span className="text-md-on-surface-variant font-medium whitespace-nowrap">
+            {nutrient.unit}/day
+          </span>
+        </div>
+      )}
+      {isTracked && activeMode === "stability" && (
+        <div className="flex items-baseline gap-2">
+          <input
+            className="w-20 bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
+            placeholder="min"
+            type="text"
+            value={rangeMin}
+            onChange={(e) => setRangeMin(e.target.value)}
+            onBlur={saveStability}
+          />
+          <span className="text-md-on-surface-variant font-medium">–</span>
+          <input
+            className="w-20 bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
+            placeholder="max"
+            type="text"
+            value={rangeMax}
+            onChange={(e) => setRangeMax(e.target.value)}
+            onBlur={saveStability}
           />
           <span className="text-md-on-surface-variant font-medium whitespace-nowrap">
             {nutrient.unit}/day
