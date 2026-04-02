@@ -103,6 +103,107 @@ export function LandingPage() {
             </div>
           </section>
 
+          {/* Data Transparency */}
+          <section className="px-6 py-20 bg-md-surface-container-lowest">
+            <div className="mx-auto max-w-screen-lg">
+              <div className="text-center mb-12">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700">
+                  <span className="material-symbols-outlined text-[18px]">verified</span>
+                  Transparent by design
+                </div>
+                <h3 className="font-heading text-2xl font-extrabold tracking-tight text-md-on-surface mb-3">
+                  Know where every number comes from
+                </h3>
+                <p className="mx-auto max-w-lg text-md-on-surface-variant">
+                  Every substance value in NutriBalance is traceable to its source, scored for
+                  confidence, and reviewed before you see it.
+                </p>
+              </div>
+
+              <div className="grid gap-6 sm:grid-cols-3 mb-10">
+                <div className="rounded-2xl bg-white p-6 shadow-sm border border-md-outline-variant/10">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100">
+                    <span className="material-symbols-outlined text-[20px] text-emerald-700">
+                      database
+                    </span>
+                  </div>
+                  <h4 className="mb-1 font-bold text-md-on-surface">Verified Sources</h4>
+                  <p className="text-sm leading-relaxed text-md-on-surface-variant">
+                    USDA FoodData Central, scientific papers, and government nutrition databases —
+                    not AI guesses.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-sm border border-md-outline-variant/10">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100">
+                    <span className="material-symbols-outlined text-[20px] text-blue-700">
+                      speed
+                    </span>
+                  </div>
+                  <h4 className="mb-1 font-bold text-md-on-surface">Confidence Scores</h4>
+                  <p className="text-sm leading-relaxed text-md-on-surface-variant">
+                    Every value is scored 0–100. You see the confidence level on each food so you
+                    know how much to trust it.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-sm border border-md-outline-variant/10">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
+                    <span className="material-symbols-outlined text-[20px] text-amber-700">
+                      rate_review
+                    </span>
+                  </div>
+                  <h4 className="mb-1 font-bold text-md-on-surface">Human Review</h4>
+                  <p className="text-sm leading-relaxed text-md-on-surface-variant">
+                    AI-researched data is flagged and goes through human review before becoming
+                    trusted. Nothing slips through unchecked.
+                  </p>
+                </div>
+              </div>
+
+              {/* Pipeline mini-visual */}
+              <div className="mx-auto max-w-screen-sm rounded-2xl bg-md-surface-container-low p-6">
+                <div className="flex items-center justify-between gap-2 text-center">
+                  {[
+                    { icon: "download", label: "Import" },
+                    { icon: "visibility", label: "Observe" },
+                    { icon: "link", label: "Evidence" },
+                    { icon: "rate_review", label: "Review" },
+                    { icon: "check_circle", label: "Resolve" },
+                  ].map((step, i) => (
+                    <div key={step.label} className="flex items-center gap-2">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-md-primary-fixed">
+                          <span className="material-symbols-outlined text-[18px] text-md-on-primary-fixed-variant">
+                            {step.icon}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-md-on-surface-variant">
+                          {step.label}
+                        </span>
+                      </div>
+                      {i < 4 && (
+                        <span className="material-symbols-outlined text-md-outline-variant text-[16px] mb-4">
+                          chevron_right
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-8 text-center">
+                <Link
+                  href="/methodology"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-md-primary hover:opacity-80 transition-opacity"
+                >
+                  Read our full data methodology
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </Link>
+              </div>
+            </div>
+          </section>
+
           {/* CTA */}
           <section className="px-6 py-20">
             <div className="glass-card mx-auto max-w-screen-sm rounded-3xl border border-md-outline-variant/20 p-10 text-center">
@@ -126,7 +227,18 @@ export function LandingPage() {
         <footer className="border-t border-md-outline-variant/20 px-6 py-8">
           <div className="mx-auto flex max-w-screen-xl items-center justify-between text-sm text-md-on-surface-variant">
             <span className="font-semibold text-md-primary">NutriBalance</span>
-            <span>&copy; {new Date().getFullYear()}</span>
+            <div className="flex items-center gap-4">
+              <Link href="/methodology" className="hover:text-md-on-surface transition-colors">
+                Our Data
+              </Link>
+              <Link href="/privacy" className="hover:text-md-on-surface transition-colors">
+                Privacy
+              </Link>
+              <Link href="/terms" className="hover:text-md-on-surface transition-colors">
+                Terms
+              </Link>
+              <span>&copy; {new Date().getFullYear()}</span>
+            </div>
           </div>
         </footer>
       </div>

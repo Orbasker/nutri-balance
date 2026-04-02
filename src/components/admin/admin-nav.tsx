@@ -11,6 +11,7 @@ const navItems = [
   { href: "/review", label: "Review Queue" },
   { href: "/ai-observations", label: "AI Items" },
   { href: "/foods-review", label: "Food Review" },
+  { href: "/data-sources", label: "Data Sources" },
   { href: "/admin-settings", label: "Settings" },
 ];
 

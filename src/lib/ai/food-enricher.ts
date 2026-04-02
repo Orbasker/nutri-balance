@@ -26,6 +26,23 @@ const enrichResultSchema = z.object({
       unit: z.string(),
       confidence: z.number().min(0).max(100),
       reasoning: z.string(),
+      sourceDatabase: z
+        .string()
+        .describe(
+          "The primary database or reference used (e.g. 'USDA FoodData Central', 'McCance and Widdowson', 'NCCDB'). Use 'General nutrition literature' only as a last resort.",
+        ),
+      sourceReference: z
+        .string()
+        .optional()
+        .describe(
+          "Specific reference ID, food code, or citation (e.g. 'USDA NDB#11090', 'FDC ID 170567', 'McCance 7th ed, Table 2.1'). Leave empty if no specific reference.",
+        ),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe(
+          "URL to the source data if known (e.g. 'https://fdc.nal.usda.gov/fdc-app.html#/food-details/170567/nutrients'). Leave empty if not available.",
+        ),
     }),
   ),
 });
@@ -113,8 +130,12 @@ Rules:
 - Confidence: 85-95 for well-established USDA/NCCDB data, 60-80 for reasonable estimates, <60 for uncertain
 - If a nutrient is truly not present (e.g., cholesterol in a plant food), use valuePer100g: 0 and confidence: 90
 - If you cannot estimate at all, use valuePer100g: 0 and confidence: 10
-- Base values on USDA FoodData Central, NCCDB, or established nutrition literature
-- Include brief reasoning citing the source basis`,
+
+SOURCE CITATION (critical):
+- sourceDatabase: Name the specific database you based the value on (e.g. "USDA FoodData Central", "McCance and Widdowson", "NCCDB", "NZ Food Composition Database"). Use "General nutrition literature" ONLY as a last resort.
+- sourceReference: Provide the food code, NDB number, FDC ID, or specific citation if you know it (e.g. "FDC ID 170567", "USDA NDB#11090").
+- sourceUrl: If you know the direct URL to the data entry, include it.
+- reasoning: Explain how you arrived at this value, including what reference food you used if the exact food was not available.`,
   });
 
   if (!object) {
@@ -157,7 +178,17 @@ Rules:
     await db.insert(evidenceItems).values({
       observationId: observation.id,
       snippet: result.reasoning,
+      pageRef: result.sourceReference ?? null,
+      url: result.sourceUrl ?? null,
     });
+
+    // Build a human-readable source summary
+    const sourceParts = [`AI-researched via ${result.sourceDatabase}`];
+    if (result.sourceReference) {
+      sourceParts.push(`(${result.sourceReference})`);
+    }
+    sourceParts.push("— pending review");
+    const sourceSummary = sourceParts.join(" ");
 
     // Also insert as resolved value so it shows up immediately
     await db.insert(resolvedSubstanceValues).values({
@@ -173,7 +204,7 @@ Rules:
             : result.confidence >= 60
               ? "Moderate confidence"
               : "Low confidence",
-      sourceSummary: "AI-researched (pending review)",
+      sourceSummary,
     });
 
     enriched++;
