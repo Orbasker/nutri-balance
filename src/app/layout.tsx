@@ -28,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${manrope.variable} ${inter.variable} h-full antialiased`}>
       <head>
+        <meta name="facebook-domain-verification" content="h0brabaw5vwab7rcw3pulyxqud1asg8" />
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
           rel="stylesheet"
