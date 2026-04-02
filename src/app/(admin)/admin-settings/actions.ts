@@ -40,7 +40,7 @@ export async function updateSetting(
   if (trimmed === "") {
     // Empty = delete (revert to env var)
     await deleteConfigValue(def);
-    revalidatePath("/settings");
+    revalidatePath("/admin-settings");
     return { ok: true };
   }
 
@@ -52,7 +52,7 @@ export async function updateSetting(
   }
 
   await setConfigValue(def, parsed);
-  revalidatePath("/settings");
+  revalidatePath("/admin-settings");
   return { ok: true };
 }
 
@@ -64,6 +64,6 @@ export async function resetSetting(key: string): Promise<{ ok: true } | { error:
   if (!def) return { error: `Unknown config key: ${key}` };
 
   await deleteConfigValue(def);
-  revalidatePath("/settings");
+  revalidatePath("/admin-settings");
   return { ok: true };
 }
