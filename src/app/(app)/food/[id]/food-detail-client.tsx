@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import type { FoodDetail, FoodVariantDetail, SubstanceImpact } from "@/types";
 
+import { useAiResearchTracker } from "@/components/food/ai-research-tracker-provider";
 import { ConfidenceBadge } from "@/components/food/confidence-badge";
 import { ServingSelector } from "@/components/food/serving-selector";
 import { SubstanceBreakdown } from "@/components/food/substance-breakdown";
@@ -41,6 +42,7 @@ export function FoodDetailClient({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [enrichPending, startEnrichTransition] = useTransition();
+  const { setResearchTracker } = useAiResearchTracker();
 
   const defaultVariant = food.variants.find((v) => v.isDefault) ?? food.variants[0];
   const [selectedVariant, setSelectedVariant] = useState<FoodVariantDetail>(defaultVariant);
@@ -188,8 +190,32 @@ export function FoodDetailClient({
         substanceReferenceValues={substanceReferenceValues}
         enrichPending={enrichPending}
         onEnrichRequest={() => {
+          const label = `Enrich ${food.name}`;
+          setResearchTracker({
+            phase: "searching",
+            label,
+            detail: "Researching missing nutrients...",
+          });
           startEnrichTransition(async () => {
-            await enrichFoodWithAi(food.id, selectedVariant.id);
+            const result = await enrichFoodWithAi(food.id, selectedVariant.id);
+            if ("error" in result) {
+              setResearchTracker({
+                phase: "error",
+                label,
+                error: result.error,
+              });
+              return;
+            }
+
+            const msg =
+              result.enriched > 0
+                ? `Added ${result.enriched} nutrient${result.enriched === 1 ? "" : "s"} (pending review)`
+                : "No new nutrient values found.";
+            setResearchTracker({
+              phase: "done",
+              label,
+              result: msg,
+            });
             router.refresh();
           });
         }}

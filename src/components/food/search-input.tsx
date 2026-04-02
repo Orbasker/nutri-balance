@@ -76,7 +76,9 @@ export function SearchInput() {
       setAiSuccess(null);
       setSelectedSubstance(null);
       setShowUpload(false);
-      resetResearchTracker();
+      if (researchTracker.phase !== "searching") {
+        resetResearchTracker();
+      }
 
       // Load substances on first switch to substance mode
       if (newMode === "substance" && !substancesLoaded) {
@@ -92,7 +94,7 @@ export function SearchInput() {
           .finally(() => setSubstancesLoading(false));
       }
     },
-    [mode, resetResearchTracker, substancesLoaded],
+    [mode, researchTracker.phase, resetResearchTracker, substancesLoaded],
   );
 
   // -- Food search handlers (existing behavior preserved) --

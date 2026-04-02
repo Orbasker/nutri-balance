@@ -5,6 +5,7 @@ import { eq, notInArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getModel } from "@/lib/ai-provider";
+import { type AiRunHandle, finishAiRun, startAiRun } from "@/lib/ai-run-audit";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/lib/db/schema/observations";
 import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
 import { substances } from "@/lib/db/schema/substances";
+import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
 const AI_SOURCE_NAME = "NutriBalance AI Enricher";
 
@@ -74,7 +76,7 @@ async function getOrCreateAiSource(): Promise<string> {
 export async function enrichFoodVariant(
   foodId: string,
   foodVariantId: string,
-  _userId: string,
+  userId: string,
 ): Promise<{ ok: true; enriched: number } | { error: string }> {
   // Get the food and variant info
   const [food] = await db.select({ name: foods.name }).from(foods).where(eq(foods.id, foodId));
@@ -113,11 +115,28 @@ export async function enrichFoodVariant(
     .join("\n");
 
   const model = getModel();
+  const modelName = typeof model === "string" ? model : model.modelId;
+  const goal = `Enrich "${food.name}" (${variant.preparationMethod})`;
+  let aiRun: AiRunHandle | null = null;
 
-  const { output: object } = await generateText({
-    model,
-    output: Output.object({ schema: enrichResultSchema }),
-    prompt: `You are a nutrition data researcher. Estimate the nutritional content per 100g for:
+  try {
+    aiRun = await startAiRun({
+      type: "substance_research_task",
+      goal,
+      source: "food-detail",
+      triggerUserId: userId,
+      foodId,
+      metadata: {
+        foodId,
+        foodVariantId,
+        missingCount: missingSubstances.length,
+      },
+    });
+
+    const { output: object, usage } = await generateText({
+      model,
+      output: Output.object({ schema: enrichResultSchema }),
+      prompt: `You are a nutrition data researcher. Estimate the nutritional content per 100g for:
 
 Food: ${food.name} (${variant.preparationMethod})
 
@@ -136,79 +155,140 @@ SOURCE CITATION (critical):
 - sourceReference: Provide the food code, NDB number, FDC ID, or specific citation if you know it (e.g. "FDC ID 170567", "USDA NDB#11090").
 - sourceUrl: If you know the direct URL to the data entry, include it.
 - reasoning: Explain how you arrived at this value, including what reference food you used if the exact food was not available.`,
-  });
+    });
 
-  if (!object) {
-    return { error: "AI did not return structured output." };
-  }
+    if (!object) {
+      if (aiRun) {
+        await finishAiRun(aiRun, {
+          status: "failed",
+          errorMessage: "AI did not return structured output.",
+          resultSummary: "Food enrichment failed.",
+          foodId,
+        });
+      }
+      return { error: "AI did not return structured output." };
+    }
 
-  const sourceId = await getOrCreateAiSource();
-  let enriched = 0;
+    await recordAiUsageEvent({
+      feature: "food-enrichment",
+      operation: "enrich-food-variant",
+      model: modelName,
+      userId,
+      aiRunId: aiRun?.id,
+      usage: {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+      },
+      metadata: {
+        foodId,
+        foodVariantId,
+        missingCount: missingSubstances.length,
+      },
+    });
 
-  // Map substance names to IDs
-  const nameToSubstance = new Map(missingSubstances.map((s) => [s.name, s]));
+    const sourceId = await getOrCreateAiSource();
+    let enriched = 0;
 
-  for (const result of object.nutrients) {
-    const substance = nameToSubstance.get(result.substanceName);
-    if (!substance) continue;
-    // Skip very low confidence or zero-value with low confidence
-    if (result.confidence < 15) continue;
+    // Map substance names to IDs
+    const nameToSubstance = new Map(missingSubstances.map((s) => [s.name, s]));
 
-    const [record] = await db
-      .insert(sourceRecords)
-      .values({ sourceId, rawData: result })
-      .returning({ id: sourceRecords.id });
+    for (const result of object.nutrients) {
+      const substance = nameToSubstance.get(result.substanceName);
+      if (!substance) continue;
+      // Skip very low confidence or zero-value with low confidence
+      if (result.confidence < 15) continue;
 
-    const [observation] = await db
-      .insert(substanceObservations)
-      .values({
+      const [record] = await db
+        .insert(sourceRecords)
+        .values({ sourceId, rawData: result })
+        .returning({ id: sourceRecords.id });
+
+      const [observation] = await db
+        .insert(substanceObservations)
+        .values({
+          foodVariantId,
+          substanceId: substance.id,
+          value: String(result.valuePer100g),
+          unit: result.unit,
+          basisAmount: "100",
+          basisUnit: "g",
+          sourceRecordId: record.id,
+          derivationType: "ai_extracted",
+          confidenceScore: result.confidence,
+          reviewStatus: "pending",
+        })
+        .returning({ id: substanceObservations.id });
+
+      await db.insert(evidenceItems).values({
+        observationId: observation.id,
+        snippet: result.reasoning,
+        pageRef: result.sourceReference ?? null,
+        url: result.sourceUrl ?? null,
+      });
+
+      // Build a human-readable source summary
+      const sourceParts = [`AI-researched via ${result.sourceDatabase}`];
+      if (result.sourceReference) {
+        sourceParts.push(`(${result.sourceReference})`);
+      }
+      sourceParts.push("— pending review");
+      const sourceSummary = sourceParts.join(" ");
+
+      // Also insert as resolved value so it shows up immediately
+      await db.insert(resolvedSubstanceValues).values({
         foodVariantId,
         substanceId: substance.id,
-        value: String(result.valuePer100g),
-        unit: result.unit,
-        basisAmount: "100",
-        basisUnit: "g",
-        sourceRecordId: record.id,
-        derivationType: "ai_extracted",
+        valuePer100g: String(result.valuePer100g),
         confidenceScore: result.confidence,
-        reviewStatus: "pending",
-      })
-      .returning({ id: substanceObservations.id });
+        confidenceLabel:
+          result.confidence >= 90
+            ? "High confidence"
+            : result.confidence >= 80
+              ? "Good confidence"
+              : result.confidence >= 60
+                ? "Moderate confidence"
+                : "Low confidence",
+        sourceSummary,
+      });
 
-    await db.insert(evidenceItems).values({
-      observationId: observation.id,
-      snippet: result.reasoning,
-      pageRef: result.sourceReference ?? null,
-      url: result.sourceUrl ?? null,
-    });
-
-    // Build a human-readable source summary
-    const sourceParts = [`AI-researched via ${result.sourceDatabase}`];
-    if (result.sourceReference) {
-      sourceParts.push(`(${result.sourceReference})`);
+      enriched++;
     }
-    sourceParts.push("— pending review");
-    const sourceSummary = sourceParts.join(" ");
 
-    // Also insert as resolved value so it shows up immediately
-    await db.insert(resolvedSubstanceValues).values({
-      foodVariantId,
-      substanceId: substance.id,
-      valuePer100g: String(result.valuePer100g),
-      confidenceScore: result.confidence,
-      confidenceLabel:
-        result.confidence >= 90
-          ? "High confidence"
-          : result.confidence >= 80
-            ? "Good confidence"
-            : result.confidence >= 60
-              ? "Moderate confidence"
-              : "Low confidence",
-      sourceSummary,
-    });
+    if (aiRun) {
+      await finishAiRun(aiRun, {
+        status: "completed",
+        itemCount: enriched,
+        foodId,
+        resultSummary:
+          enriched > 0
+            ? `Enriched ${food.name} with ${enriched} nutrient${enriched === 1 ? "" : "s"}.`
+            : `No new nutrient values found for ${food.name}.`,
+        metadata: {
+          foodId,
+          foodVariantId,
+          missingCount: missingSubstances.length,
+        },
+      });
+    }
 
-    enriched++;
+    return { ok: true, enriched };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (aiRun) {
+      await finishAiRun(aiRun, {
+        status: "failed",
+        errorMessage,
+        resultSummary: "Food enrichment failed.",
+        foodId,
+        metadata: {
+          foodId,
+          foodVariantId,
+          missingCount: missingSubstances.length,
+        },
+      });
+    }
+    console.error("AI food enrichment error:", error);
+    return { error: "Failed to enrich food. Please try again." };
   }
-
-  return { ok: true, enriched };
 }
