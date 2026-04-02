@@ -2,6 +2,7 @@ import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createMemoryState } from "@chat-adapter/state-memory";
 import { createPostgresState } from "@chat-adapter/state-pg";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
+import { createWhatsAppAdapter } from "@chat-adapter/whatsapp";
 import { stepCountIs, streamText } from "ai";
 import { Chat, toAiMessages } from "chat";
 import { and, eq, inArray } from "drizzle-orm";
@@ -80,6 +81,10 @@ export function getBot(): Chat {
 
   if (process.env.DISCORD_BOT_TOKEN) {
     adapters.discord = createDiscordAdapter();
+  }
+
+  if (process.env.WHATSAPP_ACCESS_TOKEN) {
+    adapters.whatsapp = createWhatsAppAdapter();
   }
 
   const hasPostgresState = Boolean(process.env.POSTGRES_URL) || Boolean(process.env.DATABASE_URL);
@@ -459,7 +464,7 @@ async function handleAiMessage(
     },
   });
 
-  if (thread.id.startsWith("telegram:")) {
+  if (thread.id.startsWith("telegram:") || thread.id.startsWith("whatsapp:")) {
     const finalText = (await result.text).trim();
     const fallbackText =
       buildToolOnlyReply({
@@ -551,7 +556,7 @@ async function resolveAccount(
   adapterName: string,
   message: { author: { userId: string; userName: string; fullName: string } },
 ) {
-  const platform = adapterName as "telegram" | "discord";
+  const platform = adapterName as "telegram" | "discord" | "whatsapp";
   const platformUserId = message.author.userId;
   const platformUsername = message.author.userName || message.author.fullName || null;
 

@@ -241,7 +241,7 @@ function buildFailureMessage(reason: string): string {
 async function notifyPlatformUser(platform: string, platformUserId: string, message: string) {
   try {
     const bot = getBot();
-    const adapter = bot.getAdapter(platform as "telegram" | "discord");
+    const adapter = bot.getAdapter(platform as "telegram" | "discord" | "whatsapp");
     if (!adapter?.openDM) {
       throw new Error(`Adapter "${platform}" does not support direct messages.`);
     }
