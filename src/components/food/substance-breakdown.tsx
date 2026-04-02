@@ -4,12 +4,18 @@ import { useMemo, useState } from "react";
 
 import type { ConfidenceLabel, SubstanceCategory, SubstanceDetail } from "@/types";
 
-import { calculateSubstanceAmount } from "@/lib/calculations";
+import {
+  calculateSubstanceAmount,
+  getReferenceDailyValue,
+  getSubstanceProminence,
+} from "@/lib/calculations";
+import type { SubstanceReferenceValues } from "@/lib/substance-reference-values";
 
 interface SubstanceBreakdownProps {
   substances: SubstanceDetail[];
   portionGrams: number;
   totalSubstanceCount?: number;
+  substanceReferenceValues: SubstanceReferenceValues;
   onEnrichRequest?: () => void;
   enrichPending?: boolean;
 }
@@ -45,6 +51,7 @@ export function SubstanceBreakdown({
   substances,
   portionGrams,
   totalSubstanceCount,
+  substanceReferenceValues,
   onEnrichRequest,
   enrichPending,
 }: SubstanceBreakdownProps) {
@@ -137,6 +144,39 @@ export function SubstanceBreakdown({
           if (!items || items.length === 0) return null;
 
           const isExpanded = expandedCategories.has(cat);
+          const scoredItems = items.map((s) => {
+            const amount = calculateSubstanceAmount(s.valuePer100g, portionGrams);
+            const referenceDailyValue = getReferenceDailyValue(
+              s.name,
+              s.displayName,
+              substanceReferenceValues,
+            );
+            const prominence = getSubstanceProminence(
+              {
+                name: s.name,
+                displayName: s.displayName,
+                amount,
+                unit: s.unit,
+              },
+              substanceReferenceValues,
+            );
+
+            return {
+              substance: s,
+              amount,
+              prominence,
+              referenceDailyValue,
+            };
+          });
+          const useReferenceScale = scoredItems.every((item) => item.referenceDailyValue !== null);
+          const maxScaleValue = Math.max(
+            0,
+            ...scoredItems.map((item) =>
+              useReferenceScale && item.referenceDailyValue
+                ? item.amount / item.referenceDailyValue
+                : item.prominence.score,
+            ),
+          );
 
           return (
             <div key={cat} className="bg-md-surface-container-low rounded-2xl overflow-hidden">
@@ -166,11 +206,19 @@ export function SubstanceBreakdown({
               </button>
 
               {isExpanded && (
-                <div className="px-5 pb-4 space-y-4">
-                  {items.map((s) => {
-                    const amount = calculateSubstanceAmount(s.valuePer100g, portionGrams);
+                <div className="px-5 pb-5 space-y-5">
+                  {scoredItems.map(({ substance: s, amount, prominence, referenceDailyValue }) => {
+                    const scaleValue =
+                      useReferenceScale && referenceDailyValue
+                        ? amount / referenceDailyValue
+                        : prominence.score;
+                    const width =
+                      scaleValue > 0 && maxScaleValue > 0
+                        ? Math.min(100, Math.max(4, (scaleValue / maxScaleValue) * 100))
+                        : 0;
+
                     return (
-                      <div key={s.substanceId} className="space-y-1.5">
+                      <div key={s.substanceId} className="space-y-2 pb-1">
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-sm text-md-on-surface">
                             {s.displayName}
@@ -184,9 +232,7 @@ export function SubstanceBreakdown({
                         <div className="h-1.5 w-full bg-md-surface-container-high rounded-full overflow-hidden">
                           <div
                             className="h-full bg-md-primary/70 rounded-full"
-                            style={{
-                              width: `${Math.min(50, Math.max(2, (amount / (s.valuePer100g * 2 || 1)) * 100))}%`,
-                            }}
+                            style={{ width: `${width}%` }}
                           />
                         </div>
                         {s.sourceSummary && (
@@ -257,14 +303,14 @@ function SourceTag({ summary, confidence }: { summary: string; confidence: Confi
 
   return (
     <div
-      className={`flex items-center gap-1.5 text-[11px] leading-tight ${
+      className={`flex flex-wrap items-start gap-x-2 gap-y-1 pt-0.5 text-[11px] leading-relaxed ${
         isPending ? "text-md-tertiary" : "text-md-outline"
       }`}
     >
-      <span className="material-symbols-outlined text-[14px]">{icon}</span>
-      <span className="truncate">{summary}</span>
+      <span className="material-symbols-outlined mt-px shrink-0 text-[14px]">{icon}</span>
+      <span className="min-w-0 flex-1 break-words">{summary}</span>
       {confidence === "low" && (
-        <span className="ml-auto shrink-0 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
+        <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-700">
           Low confidence
         </span>
       )}

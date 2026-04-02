@@ -2,6 +2,11 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { appConfig } from "@/lib/db/schema/app-config";
+import {
+  DEFAULT_SUBSTANCE_REFERENCE_VALUES,
+  type SubstanceReferenceValues,
+  sanitizeSubstanceReferenceValues,
+} from "@/lib/substance-reference-values";
 
 /**
  * Well-known config keys and their env var fallbacks.
@@ -38,13 +43,20 @@ export const CONFIG_KEYS = {
     label: "Alert Email Recipient",
     description: "Email address for ops alert notifications",
   },
+  SUBSTANCE_REFERENCE_VALUES: {
+    key: "substance_reference_values",
+    envVar: "SUBSTANCE_REFERENCE_VALUES_JSON",
+    label: "Substance Reference Values",
+    description:
+      "Reference nutrient targets used to rank the most nutritionally prominent substance (JSON: substance_name -> target value in the substance unit).",
+    defaultValue: DEFAULT_SUBSTANCE_REFERENCE_VALUES,
+  },
 } as const;
 
 export type ConfigKeyDef = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS];
 
 /**
- * Read a config value from the database, falling back to the env var default.
- * Returns the raw JSON value stored in the DB, or the parsed env var.
+ * Read a config value from the database, falling back to env vars and then code defaults.
  */
 export async function getConfigValue<T = unknown>(def: ConfigKeyDef): Promise<T | null> {
   const row = await db
@@ -59,7 +71,9 @@ export async function getConfigValue<T = unknown>(def: ConfigKeyDef): Promise<T 
 
   // Fall back to env var
   const envRaw = process.env[def.envVar];
-  if (!envRaw) return null;
+  if (!envRaw) {
+    return ("defaultValue" in def ? (def.defaultValue as T) : null) ?? null;
+  }
 
   // Try to parse as JSON; if that fails, return as string
   try {
@@ -75,7 +89,12 @@ export async function getConfigValue<T = unknown>(def: ConfigKeyDef): Promise<T 
 export async function getAllConfig(): Promise<
   Record<
     string,
-    { value: unknown; source: "database" | "env" | "unset"; description: string; label: string }
+    {
+      value: unknown;
+      source: "database" | "env" | "default" | "unset";
+      description: string;
+      label: string;
+    }
   >
 > {
   const dbRows = await db.select().from(appConfig);
@@ -83,7 +102,12 @@ export async function getAllConfig(): Promise<
 
   const result: Record<
     string,
-    { value: unknown; source: "database" | "env" | "unset"; description: string; label: string }
+    {
+      value: unknown;
+      source: "database" | "env" | "default" | "unset";
+      description: string;
+      label: string;
+    }
   > = {};
 
   for (const def of Object.values(CONFIG_KEYS)) {
@@ -110,6 +134,16 @@ export async function getAllConfig(): Promise<
       result[def.key] = {
         value: parsed,
         source: "env",
+        description: def.description,
+        label: def.label,
+      };
+      continue;
+    }
+
+    if ("defaultValue" in def) {
+      result[def.key] = {
+        value: def.defaultValue,
+        source: "default",
         description: def.description,
         label: def.label,
       };
@@ -154,4 +188,9 @@ export async function setConfigValue(def: ConfigKeyDef, value: unknown): Promise
  */
 export async function deleteConfigValue(def: ConfigKeyDef): Promise<void> {
   await db.delete(appConfig).where(eq(appConfig.key, def.key));
+}
+
+export async function getSubstanceReferenceValues(): Promise<SubstanceReferenceValues> {
+  const configured = await getConfigValue<unknown>(CONFIG_KEYS.SUBSTANCE_REFERENCE_VALUES);
+  return sanitizeSubstanceReferenceValues(configured);
 }

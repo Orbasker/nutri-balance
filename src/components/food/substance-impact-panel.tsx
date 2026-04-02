@@ -165,17 +165,22 @@ export function SubstanceImpactPanel({
       </div>
 
       {/* CTA */}
-      <section className="fixed bottom-24 left-0 right-0 px-6 flex justify-center pointer-events-none z-40">
-        <button
-          onClick={onAddToToday}
-          disabled={pending || success}
-          className="pointer-events-auto bg-md-primary text-white px-10 py-5 rounded-full font-extrabold text-lg shadow-[0_15px_35px_rgba(0,68,147,0.2)] active:scale-95 transition-all duration-200 flex items-center gap-3 disabled:opacity-60"
-        >
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-            {success ? "check_circle" : "add_circle"}
-          </span>
-          {pending ? "Adding..." : success ? "Added to today" : "Add to today"}
-        </button>
+      <section className="sticky bottom-24 z-40 pt-6">
+        <div className="flex justify-center pointer-events-none">
+          <button
+            onClick={onAddToToday}
+            disabled={pending || success}
+            className="pointer-events-auto bg-md-primary text-white px-10 py-5 rounded-full font-extrabold text-lg shadow-[0_15px_35px_rgba(0,68,147,0.2)] active:scale-95 transition-all duration-200 flex items-center gap-3 disabled:opacity-60"
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              {success ? "check_circle" : "add_circle"}
+            </span>
+            {pending ? "Adding..." : success ? "Added to today" : "Add to today"}
+          </button>
+        </div>
       </section>
 
       {error && <p className="text-sm text-md-error text-center">{error}</p>}

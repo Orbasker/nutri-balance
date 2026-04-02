@@ -47,7 +47,11 @@ export function FoodCard({ food }: FoodCardProps) {
             <h4 className="text-xl font-bold text-md-on-surface">{food.name}</h4>
           </div>
           {topSubstance && (
-            <InfoTooltip title="Top Substance" description="Top substance in this food" side="left">
+            <InfoTooltip
+              title="Top Substance"
+              description="Most nutritionally prominent substance in this food"
+              side="left"
+            >
               <div className={`${tagColor} px-3 py-1 rounded-full text-[10px] font-bold uppercase`}>
                 {topSubstance.displayName}
               </div>

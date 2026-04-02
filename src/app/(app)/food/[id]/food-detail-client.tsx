@@ -13,6 +13,7 @@ import { SubstanceImpactPanel } from "@/components/food/substance-impact-panel";
 import { VariantSelector } from "@/components/food/variant-selector";
 
 import { calculateSubstanceAmount, getSubstanceStatus } from "@/lib/calculations";
+import type { SubstanceReferenceValues } from "@/lib/substance-reference-values";
 
 import { addToToday, enrichFoodWithAi } from "./actions";
 
@@ -27,6 +28,7 @@ interface FoodDetailClientProps {
     rangeMin: number | null;
     rangeMax: number | null;
   }>;
+  substanceReferenceValues: SubstanceReferenceValues;
 }
 
 export function FoodDetailClient({
@@ -34,6 +36,7 @@ export function FoodDetailClient({
   totalSubstanceCount,
   todaysConsumption,
   userLimits,
+  substanceReferenceValues,
 }: FoodDetailClientProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -182,6 +185,7 @@ export function FoodDetailClient({
         substances={selectedVariant.substances}
         portionGrams={portionGrams}
         totalSubstanceCount={totalSubstanceCount}
+        substanceReferenceValues={substanceReferenceValues}
         enrichPending={enrichPending}
         onEnrichRequest={() => {
           startEnrichTransition(async () => {
