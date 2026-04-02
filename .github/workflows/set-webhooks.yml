@@ -22,11 +22,15 @@ jobs:
         if: contains(inputs.platforms, 'telegram')
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET_TOKEN: ${{ secrets.TELEGRAM_WEBHOOK_SECRET_TOKEN }}
         run: |
           WEBHOOK_URL="${{ inputs.base_url }}/api/bot/telegram"
           echo "Setting Telegram webhook to: $WEBHOOK_URL"
 
-          RESPONSE=$(curl -sf "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=${WEBHOOK_URL}")
+          RESPONSE=$(curl -sf -X POST \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\":\"${WEBHOOK_URL}\",\"secret_token\":\"${TELEGRAM_WEBHOOK_SECRET_TOKEN}\"}")
           echo "$RESPONSE"
 
           if echo "$RESPONSE" | jq -e '.ok == true' > /dev/null 2>&1; then
