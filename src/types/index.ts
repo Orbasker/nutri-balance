@@ -195,7 +195,7 @@ export interface AiObservationStatusCounts {
 
 export interface AiRunItem {
   id: string;
-  type: "food_generation" | "substance_research_task" | "ai_review";
+  type: "food_generation" | "substance_research_task" | "substance_discovery" | "ai_review";
   status: "running" | "completed" | "failed";
   goal: string;
   source: string;
