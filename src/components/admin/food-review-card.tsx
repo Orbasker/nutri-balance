@@ -113,13 +113,13 @@ export function FoodReviewCard({ food }: { food: FoodReviewItem }) {
           <span>{food.feedbackCount} feedback</span>
         </div>
 
-        {/* Variants & Nutrients toggle */}
+        {/* Variants & Substances toggle */}
         <button
           onClick={() => setVariantsOpen(!variantsOpen)}
           className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
         >
           {variantsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          Variants & Nutrients
+          Variants & Substances
         </button>
 
         {variantsOpen && (
@@ -129,11 +129,11 @@ export function FoodReviewCard({ food }: { food: FoodReviewItem }) {
                 <Badge variant="outline" className="text-xs">
                   {v.preparationMethod}
                 </Badge>
-                {v.nutrients.length > 0 ? (
+                {v.substances.length > 0 ? (
                   <div className="grid grid-cols-1 gap-0.5 text-xs">
-                    {v.nutrients.map((n, i) => (
+                    {v.substances.map((n, i) => (
                       <div key={i} className="flex justify-between gap-2 text-muted-foreground">
-                        <span>{n.nutrientDisplayName}</span>
+                        <span>{n.substanceDisplayName}</span>
                         <span>
                           {n.value} {n.unit}
                           <span className="ml-1 text-[10px]">
@@ -156,7 +156,7 @@ export function FoodReviewCard({ food }: { food: FoodReviewItem }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground italic">No nutrients</p>
+                  <p className="text-xs text-muted-foreground italic">No substances</p>
                 )}
               </div>
             ))}
@@ -190,8 +190,8 @@ export function FoodReviewCard({ food }: { food: FoodReviewItem }) {
                     >
                       {fb.type}
                     </Badge>
-                    {fb.nutrientDisplayName && (
-                      <span className="text-muted-foreground">{fb.nutrientDisplayName}</span>
+                    {fb.substanceDisplayName && (
+                      <span className="text-muted-foreground">{fb.substanceDisplayName}</span>
                     )}
                     <Badge
                       variant={fb.status === "open" ? "outline" : "secondary"}

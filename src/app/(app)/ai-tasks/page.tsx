@@ -2,19 +2,19 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
-import { nutrients } from "@/lib/db/schema/nutrients";
+import { substances } from "@/lib/db/schema/substances";
 
 import { CreateTaskForm } from "./create-task-form";
 import { AiTaskList } from "./task-list";
 
 export default async function AiTasksPage() {
-  const [allNutrients, tasks] = await Promise.all([
-    db.select().from(nutrients).orderBy(nutrients.sortOrder),
+  const [allSubstances, tasks] = await Promise.all([
+    db.select().from(substances).orderBy(substances.sortOrder),
     db
       .select({
         id: aiTasks.id,
         type: aiTasks.type,
-        targetNutrientId: aiTasks.targetNutrientId,
+        targetSubstanceId: aiTasks.targetSubstanceId,
         status: aiTasks.status,
         createdBy: aiTasks.createdBy,
         progress: aiTasks.progress,
@@ -23,10 +23,10 @@ export default async function AiTasksPage() {
         createdAt: aiTasks.createdAt,
         startedAt: aiTasks.startedAt,
         completedAt: aiTasks.completedAt,
-        nutrientName: nutrients.displayName,
+        substanceName: substances.displayName,
       })
       .from(aiTasks)
-      .leftJoin(nutrients, eq(aiTasks.targetNutrientId, nutrients.id))
+      .leftJoin(substances, eq(aiTasks.targetSubstanceId, substances.id))
       .orderBy(desc(aiTasks.createdAt)),
   ]);
 
@@ -35,10 +35,10 @@ export default async function AiTasksPage() {
       <div>
         <h1 className="text-2xl font-bold">AI Research Tasks</h1>
         <p className="text-sm text-muted-foreground">
-          Create tasks to automatically research nutrient data for all foods in the database.
+          Create tasks to automatically research substance data for all foods in the database.
         </p>
       </div>
-      <CreateTaskForm nutrients={allNutrients} />
+      <CreateTaskForm substances={allSubstances} />
       <AiTaskList tasks={tasks} />
     </div>
   );

@@ -17,7 +17,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "NutriBalance",
-  description: "Nutrient intake tracker for people with medical and dietary constraints",
+  description: "Substance intake tracker for people with medical and dietary constraints",
 };
 
 export default function RootLayout({

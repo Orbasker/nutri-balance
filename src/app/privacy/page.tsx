@@ -15,8 +15,8 @@ export default function PrivacyPage() {
           <h2 className="mb-2 text-lg font-semibold">What is NutriBalance?</h2>
           <p>
             NutriBalance is a free, personal nutrition tracking service that helps people with
-            medical or dietary constraints monitor their daily nutrient intake. It is available as a
-            web application and through messaging platforms (Telegram, Discord, WhatsApp).
+            medical or dietary constraints monitor their daily substance intake. It is available as
+            a web application and through messaging platforms (Telegram, Discord, WhatsApp).
           </p>
         </div>
 
@@ -31,7 +31,7 @@ export default function PrivacyPage() {
               credentials (email/password or Google OAuth).
             </li>
             <li>
-              <strong>Health and nutrition data</strong> — dietary constraints, nutrient limits,
+              <strong>Health and nutrition data</strong> — dietary constraints, substance limits,
               food consumption logs, and health goals you provide.
             </li>
             <li>
@@ -45,7 +45,7 @@ export default function PrivacyPage() {
         <div>
           <h2 className="mb-2 text-lg font-semibold">How We Use Your Information</h2>
           <ul className="list-disc space-y-1 pl-6">
-            <li>To track your nutrient intake and provide personalized dietary guidance.</li>
+            <li>To track your substance intake and provide personalized dietary guidance.</li>
             <li>To sync your data across web and messaging platforms.</li>
             <li>
               To generate AI-powered food analysis using third-party AI providers (your messages are

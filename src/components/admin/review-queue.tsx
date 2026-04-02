@@ -62,7 +62,7 @@ export function ReviewQueue({ observations }: { observations: PendingObservation
                     </Badge>
                   </div>
                   <p className="text-sm">
-                    <span className="text-muted-foreground">{obs.nutrientDisplayName}:</span>{" "}
+                    <span className="text-muted-foreground">{obs.substanceDisplayName}:</span>{" "}
                     <span className="font-medium">
                       {obs.value} {obs.unit}
                     </span>

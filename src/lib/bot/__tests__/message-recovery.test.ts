@@ -48,7 +48,7 @@ describe("message recovery helpers", () => {
     expect(reply).toContain("Provider timeout");
   });
 
-  it("includes immediate nutrient data when research succeeds", () => {
+  it("includes immediate substance data when research succeeds", () => {
     const reply = buildToolOnlyReply({
       userText: "check watermelon data",
       toolCall: {
@@ -59,7 +59,7 @@ describe("message recovery helpers", () => {
         success: true,
         defaultVariant: {
           preparationMethod: "raw",
-          nutrients: [
+          substances: [
             { displayName: "Vitamin K", unit: "mcg", valuePer100g: 0.2 },
             { displayName: "Vitamin C", unit: "mg", valuePer100g: 8.1 },
           ],

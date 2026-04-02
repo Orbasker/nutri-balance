@@ -20,7 +20,7 @@ export async function submitFeedback(raw: unknown): Promise<FeedbackActionResult
 
   await db.insert(foodFeedback).values({
     foodId: parsed.data.foodId,
-    nutrientId: parsed.data.nutrientId ?? null,
+    substanceId: parsed.data.substanceId ?? null,
     foodVariantId: parsed.data.foodVariantId ?? null,
     userId: session.user.id,
     type: parsed.data.type as "flag" | "correction",

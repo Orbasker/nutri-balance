@@ -1,7 +1,7 @@
 import { Card, CardText, Divider } from "chat";
 
-interface TrackedNutrient {
-  nutrient: string;
+interface TrackedSubstance {
+  substance: string;
   unit: string;
   consumedToday: number;
   adding: number;
@@ -16,12 +16,12 @@ interface CanIEatResult {
   preparationMethod: string;
   portionGrams: number;
   overallVerdict: "safe" | "caution" | "exceed";
-  trackedNutrients: TrackedNutrient[];
+  trackedSubstances: TrackedSubstance[];
 }
 
 interface DailySummaryResult {
-  nutrients: Array<{
-    nutrient: string;
+  substances: Array<{
+    substance: string;
     unit: string;
     consumed: number;
     dailyLimit: number | null;
@@ -41,8 +41,8 @@ interface MealLoggedResult {
   food: string;
   portionGrams: number;
   mealLabel?: string;
-  nutrients: Array<{
-    nutrient: string;
+  substances: Array<{
+    substance: string;
     unit: string;
     amount: number;
   }>;
@@ -67,11 +67,11 @@ export function formatCanIEatCard(result: CanIEatResult) {
   const verdictEmoji = VERDICT_EMOJI[result.overallVerdict] ?? "";
   const title = `${verdictEmoji} ${result.food} (${result.preparationMethod}, ${result.portionGrams}g)`;
 
-  const nutrientLines = result.trackedNutrients.map((n) => {
+  const substanceLines = result.trackedSubstances.map((n) => {
     const icon = STATUS_ICON[n.status] ?? "";
     const limitStr = n.dailyLimit != null ? `/${n.dailyLimit}` : "";
     const pctStr = n.percentOfLimit != null ? ` (${n.percentOfLimit}%)` : "";
-    return `${icon} **${n.nutrient}**: +${n.adding}${n.unit} \u2192 ${n.newTotal}${limitStr}${n.unit}${pctStr}`;
+    return `${icon} **${n.substance}**: +${n.adding}${n.unit} \u2192 ${n.newTotal}${limitStr}${n.unit}${pctStr}`;
   });
 
   return Card({
@@ -79,7 +79,7 @@ export function formatCanIEatCard(result: CanIEatResult) {
     children: [
       CardText(`**Verdict: ${result.overallVerdict.toUpperCase()}**`),
       Divider(),
-      CardText(nutrientLines.join("\n")),
+      CardText(substanceLines.join("\n")),
     ],
   });
 }
@@ -88,11 +88,11 @@ export function formatCanIEatCard(result: CanIEatResult) {
  * Format a daily summary as a rich card.
  */
 export function formatDailySummaryCard(summary: DailySummaryResult) {
-  const nutrientLines = summary.nutrients.map((n) => {
+  const substanceLines = summary.substances.map((n) => {
     const icon = STATUS_ICON[n.status] ?? "";
     const limitStr = n.dailyLimit != null ? `/${n.dailyLimit}` : "";
     const pctStr = n.percentOfLimit != null ? ` (${n.percentOfLimit}%)` : "";
-    return `${icon} **${n.nutrient}**: ${n.consumed}${limitStr}${n.unit}${pctStr}`;
+    return `${icon} **${n.substance}**: ${n.consumed}${limitStr}${n.unit}${pctStr}`;
   });
 
   return Card({
@@ -100,7 +100,7 @@ export function formatDailySummaryCard(summary: DailySummaryResult) {
     children: [
       CardText(`**${summary.mealsLogged} meals logged today**`),
       Divider(),
-      CardText(nutrientLines.join("\n")),
+      CardText(substanceLines.join("\n")),
     ],
   });
 }
@@ -131,12 +131,12 @@ export function formatFoodSearchCard(foods: FoodSearchResult[], appUrl: string) 
  */
 export function formatMealLoggedCard(result: MealLoggedResult) {
   const mealStr = result.mealLabel ? ` (${result.mealLabel})` : "";
-  const nutrientLines = result.nutrients
-    .map((n) => `\u2022 ${n.nutrient}: +${n.amount}${n.unit}`)
+  const substanceLines = result.substances
+    .map((n) => `\u2022 ${n.substance}: +${n.amount}${n.unit}`)
     .join("\n");
 
   return Card({
     title: `\u2705 Logged: ${result.food} \u2014 ${result.portionGrams}g${mealStr}`,
-    children: [CardText(`**Nutrient impact:**\n${nutrientLines}`)],
+    children: [CardText(`**Substance impact:**\n${substanceLines}`)],
   });
 }

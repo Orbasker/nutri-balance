@@ -66,7 +66,7 @@ export default async function AiObservationsPage({
           <Input
             name="q"
             defaultValue={query}
-            placeholder="Search food, nutrient, or prep method"
+            placeholder="Search food, substance, or prep method"
           />
           <button type="submit" className="sr-only">
             Search

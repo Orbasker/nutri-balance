@@ -7,14 +7,14 @@ import { z } from "zod";
 import { getModel } from "@/lib/ai-provider";
 import { db } from "@/lib/db";
 import { foodVariants, foods, servingMeasures } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
 import {
   evidenceItems,
-  nutrientObservations,
   sourceRecords,
   sources,
+  substanceObservations,
 } from "@/lib/db/schema/observations";
-import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
+import { resolvedSubstanceValues } from "@/lib/db/schema/reviews";
+import { substances } from "@/lib/db/schema/substances";
 import { flushLangfuse, getLangfuse } from "@/lib/langfuse";
 import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
@@ -52,7 +52,7 @@ const parsedFoodEntrySchema = z.object({
       "other",
     ])
     .describe("Food category"),
-  valuePer100g: z.number().nonnegative().describe("Nutrient value per 100g"),
+  valuePer100g: z.number().nonnegative().describe("Substance value per 100g"),
   confidence: z.number().min(0).max(100).describe("Data confidence 0-100"),
   preparationMethod: z.string().describe("raw, boiled, steamed, etc."),
   evidence: z.string().describe("Source/citation for this data point"),
@@ -92,13 +92,13 @@ async function getOrCreateSource(
 }
 
 /**
- * Insert a single food entry into the database with a nutrient observation.
+ * Insert a single food entry into the database with a substance observation.
  * Returns the food ID if created, null if skipped.
  */
 async function insertFoodEntry(
   entry: z.infer<typeof parsedFoodEntrySchema>,
-  nutrientId: string,
-  nutrientUnit: string,
+  substanceId: string,
+  substanceUnit: string,
   sourceId: string,
   sourceName: string,
   sourceUrl?: string,
@@ -145,12 +145,12 @@ async function insertFoodEntry(
   const derivationType = entry.confidence >= 85 ? "analytical" : "ai_extracted";
 
   const [observation] = await db
-    .insert(nutrientObservations)
+    .insert(substanceObservations)
     .values({
       foodVariantId: fv.id,
-      nutrientId,
+      substanceId,
       value: String(entry.valuePer100g),
-      unit: nutrientUnit,
+      unit: substanceUnit,
       basisAmount: "100",
       basisUnit: "g",
       sourceRecordId: record.id,
@@ -158,7 +158,7 @@ async function insertFoodEntry(
       confidenceScore,
       reviewStatus: "pending",
     })
-    .returning({ id: nutrientObservations.id });
+    .returning({ id: substanceObservations.id });
 
   await db.insert(evidenceItems).values({
     observationId: observation.id,
@@ -175,9 +175,9 @@ async function insertFoodEntry(
           ? "Moderate"
           : "Low";
 
-  await db.insert(resolvedNutrientValues).values({
+  await db.insert(resolvedSubstanceValues).values({
     foodVariantId: fv.id,
-    nutrientId,
+    substanceId,
     valuePer100g: String(entry.valuePer100g),
     confidenceScore,
     confidenceLabel,
@@ -192,9 +192,9 @@ async function insertFoodEntry(
  */
 async function parseUSDASource(
   source: DiscoveredSource,
-  nutrientId: string,
-  nutrientName: string,
-  nutrientUnit: string,
+  substanceId: string,
+  substanceName: string,
+  substanceUnit: string,
 ): Promise<ParserResult> {
   if (!source.usdaData?.foods?.length) {
     return { created: 0, skipped: 0, sourceType: "usda_api" };
@@ -211,14 +211,14 @@ async function parseUSDASource(
   let skipped = 0;
 
   for (const usdaFood of source.usdaData.foods) {
-    // Find the target nutrient in this food's data
-    const nutrientData = usdaFood.foodNutrients?.find((fn) => {
-      const fnName = fn.nutrientName?.toLowerCase() ?? "";
-      const target = nutrientName.toLowerCase();
+    // Find the target substance in this food's data
+    const substanceData = usdaFood.foodSubstances?.find((fn) => {
+      const fnName = fn.substanceName?.toLowerCase() ?? "";
+      const target = substanceName.toLowerCase();
       return fnName.includes(target) || target.includes(fnName.split("(")[0].trim().toLowerCase());
     });
 
-    if (!nutrientData || nutrientData.value <= 0) {
+    if (!substanceData || substanceData.value <= 0) {
       skipped++;
       continue;
     }
@@ -237,17 +237,17 @@ async function parseUSDASource(
       {
         name,
         category: categorizeUSDA(usdaFood.foodCategory),
-        valuePer100g: nutrientData.value,
+        valuePer100g: substanceData.value,
         confidence: 92,
         preparationMethod: prep,
         evidence: `USDA FoodData Central FDC#${usdaFood.fdcId}: ${usdaFood.description}`,
-        sourceUrl: `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/nutrients`,
+        sourceUrl: `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/substances`,
       },
-      nutrientId,
-      nutrientUnit,
+      substanceId,
+      substanceUnit,
       sourceId,
       `USDA FoodData Central (FDC#${usdaFood.fdcId})`,
-      `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/nutrients`,
+      `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/substances`,
     );
 
     if (foodId) created++;
@@ -262,9 +262,9 @@ async function parseUSDASource(
  */
 async function parseTextSource(
   source: DiscoveredSource,
-  nutrientId: string,
-  nutrientName: string,
-  nutrientUnit: string,
+  substanceId: string,
+  substanceName: string,
+  substanceUnit: string,
   existingNames: Set<string>,
   trace: ReturnType<ReturnType<typeof getLangfuse>["trace"]>,
 ): Promise<ParserResult> {
@@ -284,7 +284,7 @@ async function parseTextSource(
   const { object, usage } = await generateObject({
     model,
     schema: parseResultSchema,
-    prompt: `Extract ALL food entries with ${nutrientName} data from this source.
+    prompt: `Extract ALL food entries with ${substanceName} data from this source.
 
 SOURCE: ${source.title}
 ${source.url ? `URL: ${source.url}` : ""}
@@ -295,7 +295,7 @@ CONTENT:
 ${source.textContent.slice(0, 20000)}
 
 RULES:
-- Extract EVERY food with a ${nutrientName} value — do not skip any
+- Extract EVERY food with a ${substanceName} value — do not skip any
 - Values must be per 100g. If given per serving, convert using common weights
 - Set confidence based on source reliability: government data = 85-95, research = 70-85, other = 50-70
 - Include the data source as evidence
@@ -350,8 +350,8 @@ RULES:
 
     const foodId = await insertFoodEntry(
       { ...entry, sourceUrl: source.url },
-      nutrientId,
-      nutrientUnit,
+      substanceId,
+      substanceUnit,
       sourceId,
       source.title,
       source.url,
@@ -379,15 +379,15 @@ RULES:
  */
 export async function parseDiscoveredSources(
   sources: DiscoveredSource[],
-  nutrientId: string,
+  substanceId: string,
   userId: string,
 ): Promise<
   { totalCreated: number; totalSkipped: number; results: ParserResult[] } | { error: string }
 > {
-  const allNutrients = await db.select().from(nutrients);
-  const nutrient = allNutrients.find((n) => n.id === nutrientId);
+  const allSubstances = await db.select().from(substances);
+  const substance = allSubstances.find((n) => n.id === substanceId);
 
-  if (!nutrient) return { error: "Nutrient not found." };
+  if (!substance) return { error: "Substance not found." };
 
   const existingFoods = await db.select({ name: foods.name }).from(foods);
   const existingNames = new Set(existingFoods.map((f) => f.name.toLowerCase()));
@@ -396,7 +396,7 @@ export async function parseDiscoveredSources(
   const trace = langfuse.trace({
     name: "parser-agent",
     userId,
-    metadata: { nutrientId, nutrientName: nutrient.displayName, sourceCount: sources.length },
+    metadata: { substanceId, substanceName: substance.displayName, sourceCount: sources.length },
   });
 
   const results: ParserResult[] = [];
@@ -406,13 +406,13 @@ export async function parseDiscoveredSources(
       let result: ParserResult;
 
       if (source.type === "usda_api" && source.usdaData) {
-        result = await parseUSDASource(source, nutrient.id, nutrient.displayName, nutrient.unit);
+        result = await parseUSDASource(source, substance.id, substance.displayName, substance.unit);
       } else if (source.textContent) {
         result = await parseTextSource(
           source,
-          nutrient.id,
-          nutrient.displayName,
-          nutrient.unit,
+          substance.id,
+          substance.displayName,
+          substance.unit,
           existingNames,
           trace,
         );

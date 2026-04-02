@@ -12,7 +12,7 @@ import { aiRuns } from "@/lib/db/schema/ai-runs";
 import { user } from "@/lib/db/schema/auth";
 
 export type AiRunStatusFilter = "all" | "running" | "completed" | "failed";
-export type AiRunTypeFilter = "all" | "food_generation" | "nutrient_research_task" | "ai_review";
+export type AiRunTypeFilter = "all" | "food_generation" | "substance_research_task" | "ai_review";
 
 const emptyCounts: AiRunStatusCounts = {
   all: 0,

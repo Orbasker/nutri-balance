@@ -2,18 +2,18 @@
 ALTER TABLE foods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE food_aliases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE food_variants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE nutrients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE substances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE serving_measures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE source_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE nutrient_observations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE substance_observations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evidence_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE retention_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE yield_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE variant_calculation_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE resolved_nutrient_values ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_nutrient_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resolved_substance_values ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_substance_limits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE consumption_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
@@ -53,11 +53,11 @@ CREATE POLICY "food_variants_insert" ON food_variants FOR INSERT TO authenticate
 CREATE POLICY "food_variants_update" ON food_variants FOR UPDATE TO authenticated USING (public.is_admin());
 CREATE POLICY "food_variants_delete" ON food_variants FOR DELETE TO authenticated USING (public.is_admin());
 
--- nutrients
-CREATE POLICY "nutrients_select" ON nutrients FOR SELECT TO authenticated USING (true);
-CREATE POLICY "nutrients_insert" ON nutrients FOR INSERT TO authenticated WITH CHECK (public.is_admin());
-CREATE POLICY "nutrients_update" ON nutrients FOR UPDATE TO authenticated USING (public.is_admin());
-CREATE POLICY "nutrients_delete" ON nutrients FOR DELETE TO authenticated USING (public.is_admin());
+-- substances
+CREATE POLICY "substances_select" ON substances FOR SELECT TO authenticated USING (true);
+CREATE POLICY "substances_insert" ON substances FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "substances_update" ON substances FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "substances_delete" ON substances FOR DELETE TO authenticated USING (public.is_admin());
 
 -- serving_measures
 CREATE POLICY "serving_measures_select" ON serving_measures FOR SELECT TO authenticated USING (true);
@@ -65,11 +65,11 @@ CREATE POLICY "serving_measures_insert" ON serving_measures FOR INSERT TO authen
 CREATE POLICY "serving_measures_update" ON serving_measures FOR UPDATE TO authenticated USING (public.is_admin());
 CREATE POLICY "serving_measures_delete" ON serving_measures FOR DELETE TO authenticated USING (public.is_admin());
 
--- resolved_nutrient_values
-CREATE POLICY "resolved_nutrient_values_select" ON resolved_nutrient_values FOR SELECT TO authenticated USING (true);
-CREATE POLICY "resolved_nutrient_values_insert" ON resolved_nutrient_values FOR INSERT TO authenticated WITH CHECK (public.is_admin());
-CREATE POLICY "resolved_nutrient_values_update" ON resolved_nutrient_values FOR UPDATE TO authenticated USING (public.is_admin());
-CREATE POLICY "resolved_nutrient_values_delete" ON resolved_nutrient_values FOR DELETE TO authenticated USING (public.is_admin());
+-- resolved_substance_values
+CREATE POLICY "resolved_substance_values_select" ON resolved_substance_values FOR SELECT TO authenticated USING (true);
+CREATE POLICY "resolved_substance_values_insert" ON resolved_substance_values FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "resolved_substance_values_update" ON resolved_substance_values FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "resolved_substance_values_delete" ON resolved_substance_values FOR DELETE TO authenticated USING (public.is_admin());
 
 -- retention_profiles
 CREATE POLICY "retention_profiles_select" ON retention_profiles FOR SELECT TO authenticated USING (true);
@@ -100,11 +100,11 @@ CREATE POLICY "source_records_insert" ON source_records FOR INSERT TO authentica
 CREATE POLICY "source_records_update" ON source_records FOR UPDATE TO authenticated USING (public.is_admin());
 CREATE POLICY "source_records_delete" ON source_records FOR DELETE TO authenticated USING (public.is_admin());
 
--- nutrient_observations
-CREATE POLICY "nutrient_observations_select" ON nutrient_observations FOR SELECT TO authenticated USING (true);
-CREATE POLICY "nutrient_observations_insert" ON nutrient_observations FOR INSERT TO authenticated WITH CHECK (public.is_admin());
-CREATE POLICY "nutrient_observations_update" ON nutrient_observations FOR UPDATE TO authenticated USING (public.is_admin());
-CREATE POLICY "nutrient_observations_delete" ON nutrient_observations FOR DELETE TO authenticated USING (public.is_admin());
+-- substance_observations
+CREATE POLICY "substance_observations_select" ON substance_observations FOR SELECT TO authenticated USING (true);
+CREATE POLICY "substance_observations_insert" ON substance_observations FOR INSERT TO authenticated WITH CHECK (public.is_admin());
+CREATE POLICY "substance_observations_update" ON substance_observations FOR UPDATE TO authenticated USING (public.is_admin());
+CREATE POLICY "substance_observations_delete" ON substance_observations FOR DELETE TO authenticated USING (public.is_admin());
 
 -- evidence_items
 CREATE POLICY "evidence_items_select" ON evidence_items FOR SELECT TO authenticated USING (true);
@@ -129,11 +129,11 @@ CREATE POLICY "variant_calculation_rules_delete" ON variant_calculation_rules FO
 -- Users can only access their own rows
 -- ============================================================
 
--- user_nutrient_limits
-CREATE POLICY "user_nutrient_limits_select" ON user_nutrient_limits FOR SELECT TO authenticated USING (user_id = auth.uid());
-CREATE POLICY "user_nutrient_limits_insert" ON user_nutrient_limits FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-CREATE POLICY "user_nutrient_limits_update" ON user_nutrient_limits FOR UPDATE TO authenticated USING (user_id = auth.uid());
-CREATE POLICY "user_nutrient_limits_delete" ON user_nutrient_limits FOR DELETE TO authenticated USING (user_id = auth.uid());
+-- user_substance_limits
+CREATE POLICY "user_substance_limits_select" ON user_substance_limits FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "user_substance_limits_insert" ON user_substance_limits FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "user_substance_limits_update" ON user_substance_limits FOR UPDATE TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "user_substance_limits_delete" ON user_substance_limits FOR DELETE TO authenticated USING (user_id = auth.uid());
 
 -- consumption_logs
 CREATE POLICY "consumption_logs_select" ON consumption_logs FOR SELECT TO authenticated USING (user_id = auth.uid());

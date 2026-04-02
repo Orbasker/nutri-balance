@@ -183,11 +183,11 @@ export function ChatInterface({
         <div className="flex items-end gap-2 max-w-2xl mx-auto">
           <QuickActionsMenu
             onAction={(label) => {
-              // For "Search food" and "Explore nutrients", pre-fill input
+              // For "Search food" and "Explore substances", pre-fill input
               if (label === "Search food") {
                 setInput("Search for ");
-              } else if (label === "Explore nutrients") {
-                setInput("What nutrients are in ");
+              } else if (label === "Explore substances") {
+                setInput("What substances are in ");
               }
             }}
           />
@@ -395,20 +395,20 @@ function ToolResultSummary({
     );
   }
 
-  if (toolType === "tool-getFoodNutrients") {
-    const nutrients = output.nutrients as
+  if (toolType === "tool-getFoodSubstances") {
+    const substances = output.substances as
       | Array<{
           displayName: string;
           valuePer100g: number;
           unit: string;
         }>
       | undefined;
-    if (!nutrients?.length) return <Detail>No nutrient data available</Detail>;
-    const top3 = nutrients.slice(0, 3);
+    if (!substances?.length) return <Detail>No substance data available</Detail>;
+    const top3 = substances.slice(0, 3);
     return (
       <Detail>
         {top3.map((n) => `${n.displayName}: ${n.valuePer100g}${n.unit}/100g`).join(" · ")}
-        {nutrients.length > 3 && ` (+${nutrients.length - 3} more)`}
+        {substances.length > 3 && ` (+${substances.length - 3} more)`}
       </Detail>
     );
   }
@@ -417,9 +417,9 @@ function ToolResultSummary({
     const verdict = output.overallVerdict as string;
     const food = output.food as string;
     const grams = output.portionGrams as number;
-    const tracked = output.trackedNutrients as
+    const tracked = output.trackedSubstances as
       | Array<{
-          nutrient: string;
+          substance: string;
           percentOfLimit: number | null;
           status: string;
         }>
@@ -444,7 +444,7 @@ function ToolResultSummary({
               <div key={i} className="flex items-center gap-1">
                 <VerdictDot verdict={t.status} />
                 <span>
-                  {t.nutrient}: {t.percentOfLimit ?? 0}% of limit
+                  {t.substance}: {t.percentOfLimit ?? 0}% of limit
                 </span>
               </div>
             ))}
@@ -471,9 +471,9 @@ function ToolResultSummary({
 
   if (toolType === "tool-getDailySummary") {
     const count = output.mealCount as number;
-    const tracked = output.trackedNutrients as
+    const tracked = output.trackedSubstances as
       | Array<{
-          nutrient: string;
+          substance: string;
           consumed: number;
           dailyLimit: number | null;
           unit: string;
@@ -493,7 +493,7 @@ function ToolResultSummary({
           <div key={i} className="flex items-center gap-1 text-[11px]">
             <VerdictDot verdict={t.status} />
             <span>
-              {t.nutrient}: {t.consumed}
+              {t.substance}: {t.consumed}
               {t.unit}
               {t.dailyLimit ? ` / ${t.dailyLimit}${t.unit} (${t.percentOfLimit}%)` : ""}
             </span>
@@ -587,13 +587,13 @@ function describeToolAction(
         errorText: `Search failed for "${query}"`,
       };
     }
-    case "tool-getFoodNutrients": {
-      const count = (output?.nutrients as unknown[])?.length;
+    case "tool-getFoodSubstances": {
+      const count = (output?.substances as unknown[])?.length;
       return {
         icon: "labs",
-        activeText: "Loading nutrient breakdown...",
-        doneText: count ? `Loaded ${count} nutrient values` : "No nutrient data found",
-        errorText: "Failed to load nutrients",
+        activeText: "Loading substance breakdown...",
+        doneText: count ? `Loaded ${count} substance values` : "No substance data found",
+        errorText: "Failed to load substances",
       };
     }
     case "tool-checkCanIEat": {

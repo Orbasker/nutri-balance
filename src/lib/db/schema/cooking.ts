@@ -2,14 +2,14 @@ import { relations } from "drizzle-orm";
 import { numeric, pgTable, uuid } from "drizzle-orm/pg-core";
 
 import { foodVariants, foods, preparationMethodEnum } from "./foods";
-import { nutrients } from "./nutrients";
 import { sources } from "./observations";
+import { substances } from "./substances";
 
 export const retentionProfiles = pgTable("retention_profiles", {
   id: uuid().defaultRandom().primaryKey(),
-  nutrientId: uuid("nutrient_id")
+  substanceId: uuid("substance_id")
     .notNull()
-    .references(() => nutrients.id, { onDelete: "cascade" }),
+    .references(() => substances.id, { onDelete: "cascade" }),
   preparationMethod: preparationMethodEnum("preparation_method").notNull(),
   retentionFactor: numeric("retention_factor").notNull(),
   sourceId: uuid("source_id").references(() => sources.id, { onDelete: "set null" }),
@@ -43,9 +43,9 @@ export const variantCalculationRules = pgTable("variant_calculation_rules", {
 // Relations
 
 export const retentionProfilesRelations = relations(retentionProfiles, ({ one }) => ({
-  nutrient: one(nutrients, {
-    fields: [retentionProfiles.nutrientId],
-    references: [nutrients.id],
+  substance: one(substances, {
+    fields: [retentionProfiles.substanceId],
+    references: [substances.id],
   }),
   source: one(sources, {
     fields: [retentionProfiles.sourceId],

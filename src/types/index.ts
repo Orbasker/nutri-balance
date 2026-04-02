@@ -1,8 +1,8 @@
 export type ConfidenceLabel = "high" | "good" | "moderate" | "low";
 
-export type NutrientStatus = "safe" | "caution" | "exceed";
+export type SubstanceStatus = "safe" | "caution" | "exceed";
 
-export interface NutrientSummary {
+export interface SubstanceSummary {
   name: string;
   displayName: string;
   valuePer100g: number;
@@ -15,7 +15,7 @@ export interface FoodVariantSummary {
   id: string;
   preparationMethod: string;
   isDefault: boolean;
-  topNutrient: NutrientSummary | null;
+  topSubstance: SubstanceSummary | null;
 }
 
 export interface FoodSearchResult {
@@ -32,8 +32,8 @@ export interface ServingMeasure {
   gramsEquivalent: number;
 }
 
-export interface NutrientDetail {
-  nutrientId: string;
+export interface SubstanceDetail {
+  substanceId: string;
   name: string;
   displayName: string;
   unit: string;
@@ -49,7 +49,7 @@ export interface FoodVariantDetail {
   description: string | null;
   isDefault: boolean;
   servingMeasures: ServingMeasure[];
-  nutrients: NutrientDetail[];
+  substances: SubstanceDetail[];
 }
 
 export interface FoodDetail {
@@ -60,8 +60,8 @@ export interface FoodDetail {
   variants: FoodVariantDetail[];
 }
 
-export interface NutrientImpact {
-  nutrientId: string;
+export interface SubstanceImpact {
+  substanceId: string;
   displayName: string;
   unit: string;
   consumedToday: number;
@@ -71,11 +71,11 @@ export interface NutrientImpact {
   mode: "strict" | "stability" | null;
   rangeMin: number | null;
   rangeMax: number | null;
-  status: NutrientStatus;
+  status: SubstanceStatus;
 }
 
-export interface NutrientProgress {
-  nutrientId: string;
+export interface SubstanceProgress {
+  substanceId: string;
   name: string;
   displayName: string;
   unit: string;
@@ -83,7 +83,7 @@ export interface NutrientProgress {
   consumed: number;
   remaining: number;
   percentage: number;
-  status: NutrientStatus;
+  status: SubstanceStatus;
 }
 
 export interface RecentLogEntry {
@@ -105,21 +105,21 @@ export interface LogEntry {
   servingLabel: string | null;
   mealLabel: string | null;
   loggedAt: string;
-  nutrientSnapshot: Record<string, number>;
+  substanceSnapshot: Record<string, number>;
 }
 
-export interface DailyNutrientTotal {
-  nutrientId: string;
+export interface DailySubstanceTotal {
+  substanceId: string;
   displayName: string;
   unit: string;
   total: number;
   dailyLimit: number | null;
   mode: "strict" | "stability" | null;
-  status: NutrientStatus;
+  status: SubstanceStatus;
 }
 
-export interface LogEntryNutrientInfo {
-  nutrientId: string;
+export interface LogEntrySubstanceInfo {
+  substanceId: string;
   displayName: string;
   unit: string;
 }
@@ -148,15 +148,15 @@ export interface AdminFoodVariant {
   preparationMethod: string;
   description: string | null;
   isDefault: boolean;
-  nutrients: AdminNutrientValue[];
+  substances: AdminSubstanceValue[];
 }
 
-export interface AdminNutrientValue {
+export interface AdminSubstanceValue {
   resolvedId: string;
-  nutrientId: string;
-  nutrientName: string;
-  nutrientDisplayName: string;
-  nutrientUnit: string;
+  substanceId: string;
+  substanceName: string;
+  substanceDisplayName: string;
+  substanceUnit: string;
   valuePer100g: number;
   confidenceScore: number;
 }
@@ -166,8 +166,8 @@ export interface PendingObservation {
   foodVariantId: string;
   foodName: string;
   preparationMethod: string;
-  nutrientName: string;
-  nutrientDisplayName: string;
+  substanceName: string;
+  substanceDisplayName: string;
   value: number;
   unit: string;
   derivationType: string;
@@ -192,7 +192,7 @@ export interface AiObservationStatusCounts {
 
 export interface AiRunItem {
   id: string;
-  type: "food_generation" | "nutrient_research_task" | "ai_review";
+  type: "food_generation" | "substance_research_task" | "ai_review";
   status: "running" | "completed" | "failed";
   goal: string;
   source: string;
@@ -228,7 +228,7 @@ export interface EvidenceItem {
   url: string | null;
 }
 
-export interface NutrientOption {
+export interface SubstanceOption {
   id: string;
   name: string;
   displayName: string;
@@ -240,7 +240,7 @@ export interface NutrientOption {
 export interface FoodFeedbackItem {
   id: string;
   foodId: string;
-  nutrientId: string | null;
+  substanceId: string | null;
   foodVariantId: string | null;
   userId: string;
   type: "flag" | "correction";
@@ -252,8 +252,8 @@ export interface FoodFeedbackItem {
   createdAt: string;
   reviewedAt: string | null;
   // Joined fields
-  nutrientDisplayName?: string;
-  nutrientUnit?: string;
+  substanceDisplayName?: string;
+  substanceUnit?: string;
 }
 
 // Admin Food Review types
@@ -274,11 +274,11 @@ export interface FoodReviewItem {
 export interface FoodReviewVariant {
   id: string;
   preparationMethod: string;
-  nutrients: FoodReviewNutrient[];
+  substances: FoodReviewSubstance[];
 }
 
-export interface FoodReviewNutrient {
-  nutrientDisplayName: string;
+export interface FoodReviewSubstance {
+  substanceDisplayName: string;
   value: number;
   unit: string;
   confidenceScore: number;
@@ -304,8 +304,8 @@ export interface PaginatedSearchResult {
   page: number;
   pageSize: number;
   totalPages: number;
-  searchType: "food" | "nutrient";
-  nutrientName?: string;
-  nutrientId?: string;
+  searchType: "food" | "substance";
+  substanceName?: string;
+  substanceId?: string;
   availableCategories: string[];
 }

@@ -7,14 +7,14 @@ import { z } from "zod";
 import { getModel } from "@/lib/ai-provider";
 import { db } from "@/lib/db";
 import { foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
+import { substances } from "@/lib/db/schema/substances";
 import { flushLangfuse, getLangfuse } from "@/lib/langfuse";
 import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 import {
   type USDASearchResponse,
   normalizeUSDAUnit,
   searchFoodByName,
-  searchFoodsByNutrient,
+  searchFoodsBySubstance,
 } from "@/lib/usda-api";
 
 /**
@@ -36,13 +36,13 @@ export interface DiscoveredSource {
 
 export interface ExplorerResult {
   sources: DiscoveredSource[];
-  nutrientName: string;
-  nutrientId: string;
+  substanceName: string;
+  substanceId: string;
   summary: string;
 }
 
 /**
- * Explorer Agent — discovers data sources for a given nutrient.
+ * Explorer Agent — discovers data sources for a given substance.
  *
  * Strategy:
  * 1. Always queries USDA FoodData Central API (free, high reliability)
@@ -51,13 +51,17 @@ export interface ExplorerResult {
  *
  * Does NOT write to DB — that's the parser's job.
  */
-export async function exploreNutrientSources(
-  nutrientId: string,
+export async function exploreSubstanceSources(
+  substanceId: string,
   userId: string,
 ): Promise<ExplorerResult | { error: string }> {
-  const [nutrient] = await db.select().from(nutrients).where(eq(nutrients.id, nutrientId)).limit(1);
+  const [substance] = await db
+    .select()
+    .from(substances)
+    .where(eq(substances.id, substanceId))
+    .limit(1);
 
-  if (!nutrient) return { error: "Nutrient not found." };
+  if (!substance) return { error: "Substance not found." };
 
   const existingFoods = await db.select({ name: foods.name }).from(foods);
   const existingNames = existingFoods.map((f) => f.name.toLowerCase());
@@ -66,7 +70,7 @@ export async function exploreNutrientSources(
   const trace = langfuse.trace({
     name: "explorer-agent",
     userId,
-    metadata: { nutrientId, nutrientName: nutrient.displayName },
+    metadata: { substanceId, substanceName: substance.displayName },
   });
 
   const discoveredSources: DiscoveredSource[] = [];
@@ -76,11 +80,11 @@ export async function exploreNutrientSources(
     const usdaSpan = trace.span({ name: "usda-api-explore" });
 
     // Fetch pages sequentially to avoid rate limiting (DEMO_KEY: 30 req/hour)
-    const page1 = await searchFoodsByNutrient(nutrient.displayName, {
+    const page1 = await searchFoodsBySubstance(substance.displayName, {
       pageSize: 50,
       pageNumber: 1,
     });
-    const page2 = await searchFoodsByNutrient(nutrient.displayName, {
+    const page2 = await searchFoodsBySubstance(substance.displayName, {
       pageSize: 50,
       pageNumber: 2,
     });
@@ -94,7 +98,7 @@ export async function exploreNutrientSources(
     if (page1.foods.length > 0) {
       discoveredSources.push({
         type: "usda_api",
-        title: `USDA FoodData Central — ${nutrient.displayName} (page 1)`,
+        title: `USDA FoodData Central — ${substance.displayName} (page 1)`,
         url: "https://fdc.nal.usda.gov",
         usdaData: page1,
         estimatedEntries: page1.foods.length,
@@ -105,7 +109,7 @@ export async function exploreNutrientSources(
     if (page2.foods.length > 0) {
       discoveredSources.push({
         type: "usda_api",
-        title: `USDA FoodData Central — ${nutrient.displayName} (page 2)`,
+        title: `USDA FoodData Central — ${substance.displayName} (page 2)`,
         url: "https://fdc.nal.usda.gov",
         usdaData: page2,
         estimatedEntries: page2.foods.length,
@@ -127,7 +131,7 @@ export async function exploreNutrientSources(
     const aiSpan = trace.generation({
       name: "ai-web-explore",
       model: modelName,
-      input: { nutrient: nutrient.displayName },
+      input: { substance: substance.displayName },
     });
 
     const { text, toolResults, usage } = await generateText({
@@ -139,7 +143,7 @@ export async function exploreNutrientSources(
             "Fetch the text content of a web page URL. Use this to grab nutrition data from websites, government databases, or reports.",
           inputSchema: z.object({
             url: z.string().url().describe("The URL to fetch"),
-            reason: z.string().describe("Why this URL is useful for nutrient data"),
+            reason: z.string().describe("Why this URL is useful for substance data"),
           }),
           execute: async (input: { url: string; reason: string }) => {
             try {
@@ -180,7 +184,8 @@ export async function exploreNutrientSources(
           },
         }),
         searchUSDA: tool({
-          description: "Search USDA FoodData Central for foods by name. Returns nutrient profiles.",
+          description:
+            "Search USDA FoodData Central for foods by name. Returns substance profiles.",
           inputSchema: z.object({
             foodName: z.string().describe("Food name to search, e.g. 'kale' or 'chicken breast'"),
           }),
@@ -191,11 +196,11 @@ export async function exploreNutrientSources(
                 foods: result.foods.map((f) => ({
                   name: f.description,
                   fdcId: f.fdcId,
-                  nutrients: f.foodNutrients
+                  substances: f.foodSubstances
                     ?.filter((n) => n.value > 0)
                     .slice(0, 20)
                     .map((n) => ({
-                      name: n.nutrientName,
+                      name: n.substanceName,
                       value: n.value,
                       unit: normalizeUSDAUnit(n.unitName),
                     })),
@@ -207,17 +212,17 @@ export async function exploreNutrientSources(
           },
         }),
       },
-      prompt: `You are a nutrition data explorer. Your job is to find data sources containing foods rich in ${nutrient.displayName} (${nutrient.unit}).
+      prompt: `You are a nutrition data explorer. Your job is to find data sources containing foods rich in ${substance.displayName} (${substance.unit}).
 
 ALREADY IN DATABASE (${existingNames.length} foods): ${existingNames.slice(0, 50).join(", ")}${existingNames.length > 50 ? "..." : ""}
 
 Your goals:
-1. Use the searchUSDA tool to find specific foods rich in ${nutrient.displayName} that are NOT in our database
+1. Use the searchUSDA tool to find specific foods rich in ${substance.displayName} that are NOT in our database
 2. Use fetchWebPage to find nutrition data pages with comprehensive lists
 3. Focus on finding REAL data with measured values, not general articles
 
 Good sources to try:
-- USDA-specific food searches for foods known to be rich in ${nutrient.displayName}
+- USDA-specific food searches for foods known to be rich in ${substance.displayName}
 - Government nutrition databases
 - NIH Office of Dietary Supplements fact sheets
 
@@ -242,7 +247,7 @@ Report what you found — list all URLs with useful data, especially any PDFs th
           totalTokens: usage.totalTokens,
         },
         metadata: {
-          nutrient: nutrient.displayName,
+          substance: substance.displayName,
           toolCalls: toolResults?.length ?? 0,
         },
       });
@@ -296,7 +301,7 @@ Report what you found — list all URLs with useful data, especially any PDFs th
 
   const summary = [
     `Found ${discoveredSources.length} data source${discoveredSources.length !== 1 ? "s" : ""}`,
-    `for ${nutrient.displayName}`,
+    `for ${substance.displayName}`,
     totalEstimated > 0 ? `(~${totalEstimated} potential food entries)` : "",
   ]
     .filter(Boolean)
@@ -312,8 +317,8 @@ Report what you found — list all URLs with useful data, especially any PDFs th
 
   return {
     sources: discoveredSources,
-    nutrientName: nutrient.displayName,
-    nutrientId: nutrient.id,
+    substanceName: substance.displayName,
+    substanceId: substance.id,
     summary,
   };
 }

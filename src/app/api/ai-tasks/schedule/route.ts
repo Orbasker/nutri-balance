@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { findAndCreateGapTasks } from "@/lib/ai/nutrient-researcher";
+import { findAndCreateGapTasks } from "@/lib/ai/substance-researcher";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 
 /**
  * POST /api/ai-tasks/schedule
- * Daily cron: finds nutrient data gaps and creates AI tasks to fill them.
+ * Daily cron: finds substance data gaps and creates AI tasks to fill them.
  * Protected by CRON_SECRET header.
  */
 export async function POST(request: Request) {

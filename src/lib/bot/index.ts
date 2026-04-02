@@ -14,14 +14,14 @@ import {
   aiResearchFood,
   checkCanIEat,
   getDailySummary,
-  getFoodNutrients,
+  getFoodSubstances,
   recordMeal,
   searchFood,
 } from "@/lib/bot/tools";
 import { db } from "@/lib/db";
 import { user } from "@/lib/db/schema/auth";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { substances } from "@/lib/db/schema/substances";
+import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 
 import { generateLinkUrl } from "./account-link";
 import {
@@ -120,25 +120,25 @@ async function buildSystemPrompt(userId: string, isLinked: boolean): Promise<str
 
   const userLimits = await db
     .select({
-      nutrient_id: userNutrientLimits.nutrientId,
-      daily_limit: userNutrientLimits.dailyLimit,
-      mode: userNutrientLimits.mode,
+      substance_id: userSubstanceLimits.substanceId,
+      daily_limit: userSubstanceLimits.dailyLimit,
+      mode: userSubstanceLimits.mode,
     })
-    .from(userNutrientLimits)
-    .where(eq(userNutrientLimits.userId, userId));
+    .from(userSubstanceLimits)
+    .where(eq(userSubstanceLimits.userId, userId));
 
-  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
+  const limitSubstanceIds = userLimits.map((l) => l.substance_id);
   let limitsContext = "";
-  if (limitNutrientIds.length > 0) {
-    const nutrientRows = await db
-      .select({ id: nutrients.id, displayName: nutrients.displayName, unit: nutrients.unit })
-      .from(nutrients)
-      .where(inArray(nutrients.id, limitNutrientIds));
-    const nutrientMap = new Map(nutrientRows.map((n) => [n.id, n]));
+  if (limitSubstanceIds.length > 0) {
+    const substanceRows = await db
+      .select({ id: substances.id, displayName: substances.displayName, unit: substances.unit })
+      .from(substances)
+      .where(inArray(substances.id, limitSubstanceIds));
+    const substanceMap = new Map(substanceRows.map((n) => [n.id, n]));
 
     limitsContext = userLimits
       .map((l) => {
-        const n = nutrientMap.get(l.nutrient_id);
+        const n = substanceMap.get(l.substance_id);
         if (!n) return null;
         return `- ${n.displayName}: ${l.daily_limit} ${n.unit}/day (${l.mode} mode)`;
       })
@@ -150,11 +150,11 @@ async function buildSystemPrompt(userId: string, isLinked: boolean): Promise<str
   const missing: string[] = [];
   if (!profile?.displayName || profile.displayName === "Bot User") missing.push("name");
   if (!profile?.healthGoal) missing.push("health goal or dietary concern");
-  if (userLimits.length === 0) missing.push("nutrient limits");
+  if (userLimits.length === 0) missing.push("substance limits");
 
   const accountLinkBlock = !isLinked
     ? `\nACCOUNT LINKING:
-This user's bot account is NOT linked to a NutriBalance web account. After initial setup is complete (name + at least one nutrient limit), mention once that they can link their account to access the web dashboard, view detailed charts, and sync their data across devices. Use the linkWebAccount tool to generate a personal link. Don't push it repeatedly — one friendly mention is enough.
+This user's bot account is NOT linked to a NutriBalance web account. After initial setup is complete (name + at least one substance limit), mention once that they can link their account to access the web dashboard, view detailed charts, and sync their data across devices. Use the linkWebAccount tool to generate a personal link. Don't push it repeatedly — one friendly mention is enough.
 If the user asks whether their account is linked, tell them it is NOT linked yet and offer to generate a link.
 `
     : `\nACCOUNT LINKING:
@@ -174,7 +174,7 @@ When helpful, include the Daily log and Dashboard links.
 This user still needs: ${missing.join(", ")}.
 ${missing.includes("name") ? "- Ask their name and save with updateProfile." : ""}
 ${missing.includes("health goal or dietary concern") ? "- Ask about their health goal / dietary concern and save with updateProfile." : ""}
-${missing.includes("nutrient limits") ? "- Help them set at least one nutrient limit. Use listAvailableNutrients to find IDs, then setNutrientLimit." : ""}
+${missing.includes("substance limits") ? "- Help them set at least one substance limit. Use listAvailableSubstances to find IDs, then setSubstanceLimit." : ""}
 
 IMPORTANT: When mentioning missing setup, always let the user know they have TWO options:
 1. Tell you right here in the chat (e.g. "My health goal is managing blood thinners" or "Set my Vitamin K limit to 90 mcg")
@@ -184,8 +184,8 @@ Keep it brief — one short sentence mentioning both options, not a lecture. If 
 Be conversational and natural. If the user provides multiple pieces of info in one message (e.g. "I'm Or, I take blood thinners and need to keep Vitamin K under 10mcg"), extract ALL of it and call the relevant tools in one go. Don't force them through rigid steps — adapt to what they give you.
 `
       : `\nRETURNING USER:
-This user's profile is fully set up${isLinked ? " and their account is linked" : ""}. Do NOT ask onboarding questions (name, health goals, or what nutrients to track) — you already have all of this information in context.
-When they greet you or say hi, respond warmly by name and offer to help with something specific — like checking if they can eat something, logging a meal, or reviewing their daily summary. Be proactive: if they have nutrient limits configured, you can mention you're ready to help them track today's intake.
+This user's profile is fully set up${isLinked ? " and their account is linked" : ""}. Do NOT ask onboarding questions (name, health goals, or what substances to track) — you already have all of this information in context.
+When they greet you or say hi, respond warmly by name and offer to help with something specific — like checking if they can eat something, logging a meal, or reviewing their daily summary. Be proactive: if they have substance limits configured, you can mention you're ready to help them track today's intake.
 `;
 
   // Build a user profile summary so the AI knows who it's talking to
@@ -214,12 +214,12 @@ IMPORTANT PRIVACY RULES:
 ${profileBlock}
 ${setupBlock}${accountLinkBlock}
 YOUR CAPABILITIES:
-- Search for foods in the database and check their nutrient content
+- Search for foods in the database and check their substance content
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
 - Record meals / log food consumption
-- Provide the user's current daily nutrient summary
-- Research foods not in the database using AI and return usable nutrient data in the same reply
-- Update the user's profile (name, health goal) and nutrient limits
+- Provide the user's current daily substance summary
+- Research foods not in the database using AI and return usable substance data in the same reply
+- Update the user's profile (name, health goal) and substance limits
 - Link this bot account to a NutriBalance web account (use linkWebAccount)
 
 USER'S NUTRIENT LIMITS:
@@ -230,10 +230,10 @@ ${getWebLinksBlock()}
 RESPONSE STYLE:
 - CRITICAL: You MUST always write a text response after using tools. Never end your turn with only tool calls. Summarize what you found and answer the user's question in plain language.
 - Be concise and direct. Use the user's name when greeting them.
-- Never ask the user for information you already have in context (their name, health goal, nutrient limits). Reference it naturally instead.
+- Never ask the user for information you already have in context (their name, health goal, substance limits). Reference it naturally instead.
 - When checking if the user can eat something, always show: current intake, what the food would add, new total, and the limit
 - Use status indicators: safe (<80% of limit), caution (80-100%), exceed (>100%)
-- When recording a meal, confirm what was logged with the nutrient impact
+- When recording a meal, confirm what was logged with the substance impact
 - If a food isn't found, offer to research it using AI
 
 TOOL USAGE:
@@ -249,23 +249,23 @@ function buildTools(toolCtx: ToolContext) {
   const tools = {
     searchFood: {
       description:
-        "Search for a food in the database by name. Returns matching foods with their variants and nutrient data.",
+        "Search for a food in the database by name. Returns matching foods with their variants and substance data.",
       inputSchema: z.object({
         query: z.string().describe("The food name to search for"),
       }),
       execute: async (params: { query: string }) => searchFood(params, toolCtx),
     },
-    getFoodNutrients: {
+    getFoodSubstances: {
       description:
-        "Get the full nutrient breakdown for a specific food variant. Use after searchFood to get detailed nutrient data.",
+        "Get the full substance breakdown for a specific food variant. Use after searchFood to get detailed substance data.",
       inputSchema: z.object({
-        foodVariantId: z.string().describe("The food variant ID to get nutrients for"),
+        foodVariantId: z.string().describe("The food variant ID to get substances for"),
       }),
-      execute: async (params: { foodVariantId: string }) => getFoodNutrients(params, toolCtx),
+      execute: async (params: { foodVariantId: string }) => getFoodSubstances(params, toolCtx),
     },
     checkCanIEat: {
       description:
-        "Check if the user can safely eat a specific food today based on their daily nutrient limits and what they've already consumed. Shows impact analysis.",
+        "Check if the user can safely eat a specific food today based on their daily substance limits and what they've already consumed. Shows impact analysis.",
       inputSchema: z.object({
         foodVariantId: z.string().describe("The food variant ID"),
         portionGrams: z.number().describe("How many grams the user wants to eat"),
@@ -275,7 +275,7 @@ function buildTools(toolCtx: ToolContext) {
     },
     recordMeal: {
       description:
-        "Log a food consumption entry for the user. Records what they ate with nutrient snapshot for tracking.",
+        "Log a food consumption entry for the user. Records what they ate with substance snapshot for tracking.",
       inputSchema: z.object({
         foodVariantId: z.string().describe("The food variant ID from searchFood results"),
         servingMeasureId: z
@@ -299,13 +299,13 @@ function buildTools(toolCtx: ToolContext) {
     },
     getDailySummary: {
       description:
-        "Get the user's nutrient intake summary for today. Shows consumed amounts vs daily limits.",
+        "Get the user's substance intake summary for today. Shows consumed amounts vs daily limits.",
       inputSchema: z.object({}),
       execute: async () => getDailySummary({} as Record<string, never>, toolCtx),
     },
     aiResearchFood: {
       description:
-        "Research a food not found in the database using AI. Returns the researched food and default-variant nutrient data so you can answer immediately in the same turn.",
+        "Research a food not found in the database using AI. Returns the researched food and default-variant substance data so you can answer immediately in the same turn.",
       inputSchema: z.object({
         foodName: z.string().describe("The name of the food to research"),
       }),
@@ -384,41 +384,41 @@ function buildTools(toolCtx: ToolContext) {
         return { success: true, updated: Object.keys(updates) };
       },
     },
-    listAvailableNutrients: {
+    listAvailableSubstances: {
       description:
-        "List all nutrients available for tracking. Returns nutrient IDs, names, and units. Use before setNutrientLimit to find the correct nutrient ID.",
+        "List all substances available for tracking. Returns substance IDs, names, and units. Use before setSubstanceLimit to find the correct substance ID.",
       inputSchema: z.object({}),
       execute: async () => {
         const rows = await db
           .select({
-            id: nutrients.id,
-            displayName: nutrients.displayName,
-            unit: nutrients.unit,
+            id: substances.id,
+            displayName: substances.displayName,
+            unit: substances.unit,
           })
-          .from(nutrients)
-          .orderBy(nutrients.sortOrder);
-        return { nutrients: rows };
+          .from(substances)
+          .orderBy(substances.sortOrder);
+        return { substances: rows };
       },
     },
-    setNutrientLimit: {
+    setSubstanceLimit: {
       description:
-        "Set a daily nutrient limit for the user. Use the nutrient ID from listAvailableNutrients. If a limit already exists for this nutrient, it will be updated.",
+        "Set a daily substance limit for the user. Use the substance ID from listAvailableSubstances. If a limit already exists for this substance, it will be updated.",
       inputSchema: z.object({
-        nutrientId: z.string().describe("The nutrient UUID from listAvailableNutrients"),
-        dailyLimit: z.number().positive().describe("The daily limit value in the nutrient's unit"),
+        substanceId: z.string().describe("The substance UUID from listAvailableSubstances"),
+        dailyLimit: z.number().positive().describe("The daily limit value in the substance's unit"),
         mode: z
           .enum(["strict", "stability"])
           .optional()
           .describe("Tracking mode: strict (hard cap) or stability (range). Defaults to strict."),
       }),
-      execute: async (params: { nutrientId: string; dailyLimit: number; mode?: string }) => {
+      execute: async (params: { substanceId: string; dailyLimit: number; mode?: string }) => {
         const [existing] = await db
-          .select({ id: userNutrientLimits.id })
-          .from(userNutrientLimits)
+          .select({ id: userSubstanceLimits.id })
+          .from(userSubstanceLimits)
           .where(
             and(
-              eq(userNutrientLimits.userId, toolCtx.userId),
-              eq(userNutrientLimits.nutrientId, params.nutrientId),
+              eq(userSubstanceLimits.userId, toolCtx.userId),
+              eq(userSubstanceLimits.substanceId, params.substanceId),
             ),
           );
 
@@ -426,13 +426,13 @@ function buildTools(toolCtx: ToolContext) {
 
         if (existing) {
           await db
-            .update(userNutrientLimits)
+            .update(userSubstanceLimits)
             .set({ dailyLimit: String(params.dailyLimit), mode })
-            .where(eq(userNutrientLimits.id, existing.id));
+            .where(eq(userSubstanceLimits.id, existing.id));
         } else {
-          await db.insert(userNutrientLimits).values({
+          await db.insert(userSubstanceLimits).values({
             userId: toolCtx.userId,
-            nutrientId: params.nutrientId,
+            substanceId: params.substanceId,
             dailyLimit: String(params.dailyLimit),
             mode,
           });
@@ -441,33 +441,33 @@ function buildTools(toolCtx: ToolContext) {
         // Verify the write actually persisted
         const [saved] = await db
           .select({
-            id: userNutrientLimits.id,
-            dailyLimit: userNutrientLimits.dailyLimit,
+            id: userSubstanceLimits.id,
+            dailyLimit: userSubstanceLimits.dailyLimit,
           })
-          .from(userNutrientLimits)
+          .from(userSubstanceLimits)
           .where(
             and(
-              eq(userNutrientLimits.userId, toolCtx.userId),
-              eq(userNutrientLimits.nutrientId, params.nutrientId),
+              eq(userSubstanceLimits.userId, toolCtx.userId),
+              eq(userSubstanceLimits.substanceId, params.substanceId),
             ),
           );
 
         if (!saved) {
-          console.error("[NutriBalance Bot] setNutrientLimit: write did NOT persist", {
+          console.error("[NutriBalance Bot] setSubstanceLimit: write did NOT persist", {
             userId: toolCtx.userId,
-            nutrientId: params.nutrientId,
+            substanceId: params.substanceId,
             dailyLimit: params.dailyLimit,
           });
           return {
             success: false,
             error:
-              "Failed to save the nutrient limit. Please try again or set it in the web dashboard.",
+              "Failed to save the substance limit. Please try again or set it in the web dashboard.",
           };
         }
 
-        console.log("[NutriBalance Bot] setNutrientLimit: verified", {
+        console.log("[NutriBalance Bot] setSubstanceLimit: verified", {
           userId: toolCtx.userId,
-          nutrientId: params.nutrientId,
+          substanceId: params.substanceId,
           savedLimit: saved.dailyLimit,
           action: existing ? "updated" : "created",
         });
@@ -613,7 +613,7 @@ async function tryHandleDeterministicResearch(
       return true;
     }
 
-    const nutrientsResult = await getFoodNutrients({ foodVariantId: defaultVariant.id }, toolCtx);
+    const substancesResult = await getFoodSubstances({ foodVariantId: defaultVariant.id }, toolCtx);
     await thread.post(
       buildResearchOutcomeReply(
         matchingFood.name,
@@ -621,7 +621,7 @@ async function tryHandleDeterministicResearch(
           success: true,
           defaultVariant: {
             preparationMethod: defaultVariant.preparationMethod,
-            nutrients: nutrientsResult.nutrients,
+            substances: substancesResult.substances,
           },
         },
         prefersHebrew,

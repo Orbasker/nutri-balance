@@ -136,7 +136,7 @@ export function buildResearchOutcomeReply(
     message?: string;
     defaultVariant?: {
       preparationMethod: string;
-      nutrients: Array<{
+      substances: Array<{
         displayName: string;
         unit: string;
         valuePer100g: number;
@@ -146,24 +146,24 @@ export function buildResearchOutcomeReply(
   prefersHebrew: boolean,
 ): string {
   if (result.success) {
-    const nutrientLines =
-      result.defaultVariant?.nutrients
+    const substanceLines =
+      result.defaultVariant?.substances
         .slice(0, 6)
         .map(
-          (nutrient) =>
-            `${nutrient.displayName}: ${formatNumber(nutrient.valuePer100g)} ${nutrient.unit}`,
+          (substance) =>
+            `${substance.displayName}: ${formatNumber(substance.valuePer100g)} ${substance.unit}`,
         ) ?? [];
 
     const summaryBlock =
-      nutrientLines.length > 0
+      substanceLines.length > 0
         ? prefersHebrew
-          ? `\n\nהנה כמה ערכים ל-100 גרם:\n${nutrientLines.map((line) => `- ${line}`).join("\n")}`
-          : `\n\nHere are a few values per 100g:\n${nutrientLines.map((line) => `- ${line}`).join("\n")}`
+          ? `\n\nהנה כמה ערכים ל-100 גרם:\n${substanceLines.map((line) => `- ${line}`).join("\n")}`
+          : `\n\nHere are a few values per 100g:\n${substanceLines.map((line) => `- ${line}`).join("\n")}`
         : "";
 
     return prefersHebrew
       ? `חקרתי את "${foodName}" ושמרתי את הנתונים.${summaryBlock}`
-      : `I researched "${foodName}" and saved the nutrient data.${summaryBlock}`;
+      : `I researched "${foodName}" and saved the substance data.${summaryBlock}`;
   }
 
   const errorText = result.error ?? "unknown error";
@@ -229,7 +229,7 @@ export function buildToolOnlyReply(args: {
             typeof result.defaultVariant === "object"
               ? (result.defaultVariant as {
                   preparationMethod: string;
-                  nutrients: Array<{
+                  substances: Array<{
                     displayName: string;
                     unit: string;
                     valuePer100g: number;

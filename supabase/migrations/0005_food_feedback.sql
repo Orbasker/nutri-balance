@@ -11,7 +11,7 @@ END $$;--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "food_feedback" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"food_id" uuid NOT NULL,
-	"nutrient_id" uuid,
+	"substance_id" uuid,
 	"food_variant_id" uuid,
 	"user_id" uuid NOT NULL,
 	"type" "feedback_type" NOT NULL,
@@ -31,7 +31,7 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  ALTER TABLE "food_feedback" ADD CONSTRAINT "food_feedback_nutrient_id_nutrients_id_fk" FOREIGN KEY ("nutrient_id") REFERENCES "public"."nutrients"("id") ON DELETE cascade ON UPDATE no action;
+  ALTER TABLE "food_feedback" ADD CONSTRAINT "food_feedback_substance_id_substances_id_fk" FOREIGN KEY ("substance_id") REFERENCES "public"."substances"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint

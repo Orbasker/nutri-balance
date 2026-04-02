@@ -36,13 +36,13 @@ export function LandingPage() {
             <div className="relative mx-auto max-w-screen-md text-center">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-md-primary-fixed/40 px-4 py-1.5 text-sm font-medium text-md-on-primary-fixed-variant">
                 <span className="material-symbols-outlined text-[18px]">vital_signs</span>
-                Medical-grade nutrient tracking
+                Medical-grade substance tracking
               </div>
               <h2 className="mb-6 font-heading text-4xl font-extrabold leading-tight tracking-tight text-md-on-surface sm:text-5xl">
                 Can I eat this today?
               </h2>
               <p className="mx-auto mb-10 max-w-lg text-lg text-md-on-surface-variant">
-                Track nutrient intake against your medical limits. Get confidence scores, cooking
+                Track substance intake against your medical limits. Get confidence scores, cooking
                 adjustments, and clear answers — not guesswork.
               </p>
               <div className="flex items-center justify-center gap-4">
@@ -72,17 +72,17 @@ export function LandingPage() {
                 <FeatureCard
                   icon="search"
                   title="Search any food"
-                  description="Look up nutrients backed by real data sources. No AI-generated guesses."
+                  description="Look up substances backed by real data sources. No AI-generated guesses."
                 />
                 <FeatureCard
                   icon="speed"
                   title="Confidence scores"
-                  description="Know how reliable each nutrient value is before you make a decision."
+                  description="Know how reliable each substance value is before you make a decision."
                 />
                 <FeatureCard
                   icon="skillet"
                   title="Cooking adjustments"
-                  description="See how boiling, frying, or baking changes nutrient retention."
+                  description="See how boiling, frying, or baking changes substance retention."
                 />
                 <FeatureCard
                   icon="monitoring"

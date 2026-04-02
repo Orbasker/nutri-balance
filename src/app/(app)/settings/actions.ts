@@ -6,20 +6,20 @@ import { and, eq } from "drizzle-orm";
 
 import { getSession } from "@/lib/auth-session";
 import { db } from "@/lib/db";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { substances } from "@/lib/db/schema/substances";
+import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 import {
-  createCustomNutrientSchema,
-  deleteCustomNutrientSchema,
-  deleteUserNutrientLimitSchema,
-  saveUserNutrientLimitSchema,
-  toUserNutrientLimitRow,
+  createCustomSubstanceSchema,
+  deleteCustomSubstanceSchema,
+  deleteUserSubstanceLimitSchema,
+  saveUserSubstanceLimitSchema,
+  toUserSubstanceLimitRow,
 } from "@/lib/validators";
 
-export type NutrientLimitActionResult = { ok: true } | { error: string };
+export type SubstanceLimitActionResult = { ok: true } | { error: string };
 
-export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActionResult> {
-  const parsed = saveUserNutrientLimitSchema.safeParse(raw);
+export async function saveSubstanceLimit(raw: unknown): Promise<SubstanceLimitActionResult> {
+  const parsed = saveUserSubstanceLimitSchema.safeParse(raw);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return { error: first?.message ?? "Invalid input." };
@@ -30,12 +30,12 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
     return { error: "You must be signed in." };
   }
 
-  const row = toUserNutrientLimitRow(parsed.data);
-  const { limitId, nutrientId } = parsed.data;
+  const row = toUserSubstanceLimitRow(parsed.data);
+  const { limitId, substanceId } = parsed.data;
 
   if (limitId) {
     await db
-      .update(userNutrientLimits)
+      .update(userSubstanceLimits)
       .set({
         dailyLimit: row.daily_limit,
         mode: row.mode as "strict" | "stability",
@@ -43,7 +43,7 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
         rangeMax: row.range_max,
       })
       .where(
-        and(eq(userNutrientLimits.id, limitId), eq(userNutrientLimits.userId, session.user.id)),
+        and(eq(userSubstanceLimits.id, limitId), eq(userSubstanceLimits.userId, session.user.id)),
       );
 
     revalidatePath("/settings");
@@ -51,19 +51,19 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
   }
 
   const [existing] = await db
-    .select({ id: userNutrientLimits.id })
-    .from(userNutrientLimits)
+    .select({ id: userSubstanceLimits.id })
+    .from(userSubstanceLimits)
     .where(
       and(
-        eq(userNutrientLimits.nutrientId, nutrientId),
-        eq(userNutrientLimits.userId, session.user.id),
+        eq(userSubstanceLimits.substanceId, substanceId),
+        eq(userSubstanceLimits.userId, session.user.id),
       ),
     )
     .limit(1);
 
   if (existing?.id) {
     await db
-      .update(userNutrientLimits)
+      .update(userSubstanceLimits)
       .set({
         dailyLimit: row.daily_limit,
         mode: row.mode as "strict" | "stability",
@@ -71,16 +71,19 @@ export async function saveNutrientLimit(raw: unknown): Promise<NutrientLimitActi
         rangeMax: row.range_max,
       })
       .where(
-        and(eq(userNutrientLimits.id, existing.id), eq(userNutrientLimits.userId, session.user.id)),
+        and(
+          eq(userSubstanceLimits.id, existing.id),
+          eq(userSubstanceLimits.userId, session.user.id),
+        ),
       );
 
     revalidatePath("/settings");
     return { ok: true };
   }
 
-  await db.insert(userNutrientLimits).values({
+  await db.insert(userSubstanceLimits).values({
     userId: session.user.id,
-    nutrientId,
+    substanceId,
     dailyLimit: row.daily_limit,
     mode: row.mode as "strict" | "stability",
     rangeMin: row.range_min,
@@ -98,7 +101,7 @@ export async function saveProfile(data: {
   gender: string | null;
   healthGoal: string;
   avatarColor: string;
-}): Promise<NutrientLimitActionResult> {
+}): Promise<SubstanceLimitActionResult> {
   const session = await getSession();
   if (!session) {
     return { error: "You must be signed in." };
@@ -138,7 +141,7 @@ export async function saveProfile(data: {
   return { ok: true };
 }
 
-export async function saveMedicalNotes(notes: string): Promise<NutrientLimitActionResult> {
+export async function saveMedicalNotes(notes: string): Promise<SubstanceLimitActionResult> {
   const session = await getSession();
   if (!session) {
     return { error: "You must be signed in." };
@@ -150,8 +153,8 @@ export async function saveMedicalNotes(notes: string): Promise<NutrientLimitActi
   return { ok: true };
 }
 
-export async function createCustomNutrient(raw: unknown): Promise<NutrientLimitActionResult> {
-  const parsed = createCustomNutrientSchema.safeParse(raw);
+export async function createCustomSubstance(raw: unknown): Promise<SubstanceLimitActionResult> {
+  const parsed = createCustomSubstanceSchema.safeParse(raw);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return { error: first?.message ?? "Invalid input." };
@@ -167,7 +170,7 @@ export async function createCustomNutrient(raw: unknown): Promise<NutrientLimitA
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "");
 
-  await db.insert(nutrients).values({
+  await db.insert(substances).values({
     name: `custom_${slug}_${session.user.id.slice(0, 8)}`,
     displayName: parsed.data.displayName,
     unit: parsed.data.unit,
@@ -179,10 +182,10 @@ export async function createCustomNutrient(raw: unknown): Promise<NutrientLimitA
   return { ok: true };
 }
 
-export async function removeCustomNutrient(raw: unknown): Promise<NutrientLimitActionResult> {
-  const parsed = deleteCustomNutrientSchema.safeParse(raw);
+export async function removeCustomSubstance(raw: unknown): Promise<SubstanceLimitActionResult> {
+  const parsed = deleteCustomSubstanceSchema.safeParse(raw);
   if (!parsed.success) {
-    return { error: "Invalid nutrient id." };
+    return { error: "Invalid substance id." };
   }
 
   const session = await getSession();
@@ -190,17 +193,19 @@ export async function removeCustomNutrient(raw: unknown): Promise<NutrientLimitA
     return { error: "You must be signed in." };
   }
 
-  // Only allow deleting user-created nutrients
+  // Only allow deleting user-created substances
   await db
-    .delete(nutrients)
-    .where(and(eq(nutrients.id, parsed.data.nutrientId), eq(nutrients.createdBy, session.user.id)));
+    .delete(substances)
+    .where(
+      and(eq(substances.id, parsed.data.substanceId), eq(substances.createdBy, session.user.id)),
+    );
 
   revalidatePath("/settings");
   return { ok: true };
 }
 
-export async function removeNutrientLimit(raw: unknown): Promise<NutrientLimitActionResult> {
-  const parsed = deleteUserNutrientLimitSchema.safeParse(raw);
+export async function removeSubstanceLimit(raw: unknown): Promise<SubstanceLimitActionResult> {
+  const parsed = deleteUserSubstanceLimitSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: "Invalid limit id." };
   }
@@ -211,11 +216,11 @@ export async function removeNutrientLimit(raw: unknown): Promise<NutrientLimitAc
   }
 
   await db
-    .delete(userNutrientLimits)
+    .delete(userSubstanceLimits)
     .where(
       and(
-        eq(userNutrientLimits.id, parsed.data.limitId),
-        eq(userNutrientLimits.userId, session.user.id),
+        eq(userSubstanceLimits.id, parsed.data.limitId),
+        eq(userSubstanceLimits.userId, session.user.id),
       ),
     );
 

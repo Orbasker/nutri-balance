@@ -2,8 +2,8 @@ import { relations } from "drizzle-orm";
 import { integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import { foodVariants } from "./foods";
-import { nutrients } from "./nutrients";
 import { reviewStatusEnum } from "./observations";
+import { substances } from "./substances";
 
 export const reviews = pgTable("reviews", {
   id: uuid().defaultRandom().primaryKey(),
@@ -15,14 +15,14 @@ export const reviews = pgTable("reviews", {
   reviewedAt: timestamp("reviewed_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const resolvedNutrientValues = pgTable("resolved_nutrient_values", {
+export const resolvedSubstanceValues = pgTable("resolved_substance_values", {
   id: uuid().defaultRandom().primaryKey(),
   foodVariantId: uuid("food_variant_id")
     .notNull()
     .references(() => foodVariants.id, { onDelete: "cascade" }),
-  nutrientId: uuid("nutrient_id")
+  substanceId: uuid("substance_id")
     .notNull()
-    .references(() => nutrients.id, { onDelete: "cascade" }),
+    .references(() => substances.id, { onDelete: "cascade" }),
   valuePer100g: numeric("value_per_100g").notNull(),
   confidenceScore: integer("confidence_score").default(50),
   confidenceLabel: text("confidence_label"),
@@ -32,13 +32,13 @@ export const resolvedNutrientValues = pgTable("resolved_nutrient_values", {
 
 // Relations
 
-export const resolvedNutrientValuesRelations = relations(resolvedNutrientValues, ({ one }) => ({
+export const resolvedSubstanceValuesRelations = relations(resolvedSubstanceValues, ({ one }) => ({
   foodVariant: one(foodVariants, {
-    fields: [resolvedNutrientValues.foodVariantId],
+    fields: [resolvedSubstanceValues.foodVariantId],
     references: [foodVariants.id],
   }),
-  nutrient: one(nutrients, {
-    fields: [resolvedNutrientValues.nutrientId],
-    references: [nutrients.id],
+  substance: one(substances, {
+    fields: [resolvedSubstanceValues.substanceId],
+    references: [substances.id],
   }),
 }));

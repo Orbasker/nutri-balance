@@ -1,9 +1,9 @@
 "use client";
 
-import type { NutrientImpact } from "@/types";
+import type { SubstanceImpact } from "@/types";
 
-interface NutrientImpactPanelProps {
-  impacts: NutrientImpact[];
+interface SubstanceImpactPanelProps {
+  impacts: SubstanceImpact[];
   portionGrams: number;
   mealLabel: string;
   onMealLabelChange: (label: string) => void;
@@ -35,7 +35,7 @@ const statusBadge: Record<string, { bg: string; text: string; label: string }> =
   },
 };
 
-export function NutrientImpactPanel({
+export function SubstanceImpactPanel({
   impacts,
   portionGrams,
   mealLabel,
@@ -44,7 +44,7 @@ export function NutrientImpactPanel({
   pending,
   error,
   success,
-}: NutrientImpactPanelProps) {
+}: SubstanceImpactPanelProps) {
   const trackedImpacts = impacts.filter((i) => i.dailyLimit !== null);
 
   // Determine overall status
@@ -90,7 +90,7 @@ export function NutrientImpactPanel({
               const labelColor = statusLabelColor[impact.status] ?? "text-md-primary";
 
               return (
-                <div key={impact.nutrientId} className="space-y-2">
+                <div key={impact.substanceId} className="space-y-2">
                   <div className="flex justify-between text-[11px] font-bold uppercase tracking-wider text-md-on-surface-variant">
                     <div className="flex items-center gap-2">
                       <span>{impact.displayName}</span>
@@ -132,7 +132,7 @@ export function NutrientImpactPanel({
           </p>
         )}
 
-        {/* Alert for exceeded nutrients */}
+        {/* Alert for exceeded substances */}
         {trackedImpacts.some((i) => i.status === "exceed") && (
           <div className="bg-white p-5 rounded-2xl flex gap-4 items-start shadow-[0_10px_30px_rgba(0,68,147,0.06)]">
             <div className="w-10 h-10 rounded-xl bg-md-primary-container/20 flex items-center justify-center shrink-0">

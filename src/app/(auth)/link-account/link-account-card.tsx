@@ -97,7 +97,7 @@ export function LinkAccountCard({
           <CardTitle className="text-2xl">Link Your Account</CardTitle>
           <CardDescription>
             Connect your {platformLabel} bot account ({displayName}) to your NutriBalance web
-            account. Your nutrient limits, meal logs, and profile will be merged.
+            account. Your substance limits, meal logs, and profile will be merged.
           </CardDescription>
         </CardHeader>
         <CardContent>

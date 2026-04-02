@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { eq } from "drizzle-orm";
 
-import { processNutrientResearchTask } from "@/lib/ai/nutrient-researcher";
+import { processSubstanceResearchTask } from "@/lib/ai/substance-researcher";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     for (const task of pendingTasks) {
       try {
-        await processNutrientResearchTask(task.id, "cron");
+        await processSubstanceResearchTask(task.id, "cron");
         results.push({ taskId: task.id, status: "processed" });
       } catch {
         results.push({ taskId: task.id, status: "error" });

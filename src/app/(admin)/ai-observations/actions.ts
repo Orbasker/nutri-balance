@@ -6,13 +6,13 @@ import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth-admin";
 import { db } from "@/lib/db";
 import { foodVariants, foods } from "@/lib/db/schema/foods";
-import { nutrients } from "@/lib/db/schema/nutrients";
 import {
   evidenceItems,
-  nutrientObservations,
   sourceRecords,
   sources,
+  substanceObservations,
 } from "@/lib/db/schema/observations";
+import { substances } from "@/lib/db/schema/substances";
 
 export type AiObservationStatusFilter =
   | "all"
@@ -35,12 +35,12 @@ export async function getAiObservationCounts(): Promise<AiObservationStatusCount
 
   const rows = await db
     .select({
-      reviewStatus: nutrientObservations.reviewStatus,
+      reviewStatus: substanceObservations.reviewStatus,
       count: sql<number>`count(*)`,
     })
-    .from(nutrientObservations)
-    .where(eq(nutrientObservations.derivationType, "ai_extracted"))
-    .groupBy(nutrientObservations.reviewStatus);
+    .from(substanceObservations)
+    .where(eq(substanceObservations.derivationType, "ai_extracted"))
+    .groupBy(substanceObservations.reviewStatus);
 
   return rows.reduce<AiObservationStatusCounts>(
     (acc, row) => {
@@ -67,10 +67,10 @@ export async function getAiObservations(input?: {
 
   const status = input?.status ?? "all";
   const query = input?.query?.trim();
-  const conditions = [eq(nutrientObservations.derivationType, "ai_extracted")];
+  const conditions = [eq(substanceObservations.derivationType, "ai_extracted")];
 
   if (status !== "all") {
-    conditions.push(eq(nutrientObservations.reviewStatus, status));
+    conditions.push(eq(substanceObservations.reviewStatus, status));
   }
 
   if (query) {
@@ -78,7 +78,7 @@ export async function getAiObservations(input?: {
     conditions.push(
       or(
         ilike(foods.name, search),
-        ilike(nutrients.displayName, search),
+        ilike(substances.displayName, search),
         ilike(foodVariants.preparationMethod, search),
       )!,
     );
@@ -86,29 +86,29 @@ export async function getAiObservations(input?: {
 
   const rows = await db
     .select({
-      id: nutrientObservations.id,
-      foodVariantId: nutrientObservations.foodVariantId,
+      id: substanceObservations.id,
+      foodVariantId: substanceObservations.foodVariantId,
       foodName: foods.name,
       preparationMethod: foodVariants.preparationMethod,
-      nutrientName: nutrients.name,
-      nutrientDisplayName: nutrients.displayName,
-      value: nutrientObservations.value,
-      unit: nutrientObservations.unit,
-      derivationType: nutrientObservations.derivationType,
-      confidenceScore: nutrientObservations.confidenceScore,
-      reviewStatus: nutrientObservations.reviewStatus,
+      substanceName: substances.name,
+      substanceDisplayName: substances.displayName,
+      value: substanceObservations.value,
+      unit: substanceObservations.unit,
+      derivationType: substanceObservations.derivationType,
+      confidenceScore: substanceObservations.confidenceScore,
+      reviewStatus: substanceObservations.reviewStatus,
       sourceName: sources.name,
       sourceType: sources.type,
       importedAt: sourceRecords.importedAt,
     })
-    .from(nutrientObservations)
-    .innerJoin(foodVariants, eq(foodVariants.id, nutrientObservations.foodVariantId))
+    .from(substanceObservations)
+    .innerJoin(foodVariants, eq(foodVariants.id, substanceObservations.foodVariantId))
     .innerJoin(foods, eq(foods.id, foodVariants.foodId))
-    .innerJoin(nutrients, eq(nutrients.id, nutrientObservations.nutrientId))
-    .leftJoin(sourceRecords, eq(sourceRecords.id, nutrientObservations.sourceRecordId))
+    .innerJoin(substances, eq(substances.id, substanceObservations.substanceId))
+    .leftJoin(sourceRecords, eq(sourceRecords.id, substanceObservations.sourceRecordId))
     .leftJoin(sources, eq(sources.id, sourceRecords.sourceId))
     .where(and(...conditions))
-    .orderBy(sql`${sourceRecords.importedAt} DESC NULLS LAST`, foods.name, nutrients.sortOrder);
+    .orderBy(sql`${sourceRecords.importedAt} DESC NULLS LAST`, foods.name, substances.sortOrder);
 
   if (rows.length === 0) return [];
 
@@ -143,8 +143,8 @@ export async function getAiObservations(input?: {
     foodVariantId: row.foodVariantId,
     foodName: row.foodName,
     preparationMethod: row.preparationMethod,
-    nutrientName: row.nutrientName,
-    nutrientDisplayName: row.nutrientDisplayName,
+    substanceName: row.substanceName,
+    substanceDisplayName: row.substanceDisplayName,
     value: Number(row.value),
     unit: row.unit,
     derivationType: row.derivationType,

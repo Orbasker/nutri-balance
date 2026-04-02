@@ -2,7 +2,7 @@
 
 # NutriBalance
 
-Nutrient intake tracker for people with medical/dietary constraints. Answers "Can I eat this today?" with confidence scores, cooking adjustments, and daily tracking.
+Substance intake tracker for people with medical/dietary constraints. Answers "Can I eat this today?" with confidence scores, cooking adjustments, and daily tracking.
 
 ## Quick Reference
 
@@ -64,7 +64,7 @@ src/
       middleware.ts   # Session refresh for proxy.ts
     db/
       index.ts       # Drizzle client (DATABASE_URL)
-      schema/        # Drizzle table definitions (auth, foods, nutrients, observations, cooking, reviews, users)
+      schema/        # Drizzle table definitions (auth, foods, substances, observations, cooking, reviews, users)
     calculations.ts  # Nutrient math
     validators.ts    # Zod schemas
   types/
@@ -80,7 +80,7 @@ supabase/
 - **ORM**: Drizzle. Schema lives in `src/lib/db/schema/`. Migrations output to `supabase/migrations/`.
 - **Config**: `drizzle.config.ts` — dialect: postgresql, schema glob: `./src/lib/db/schema/*`
 - **Auth tables**: Managed by Supabase Auth in the `auth` schema. `public.user` is a **read-only view** over `auth.users` for Drizzle compatibility — do NOT insert/update via Drizzle.
-- **App tables**: profiles, user_nutrient_limits, consumption_logs, foods, food_variants, nutrients, etc.
+- **App tables**: profiles, user_substance_limits, consumption_logs, foods, food_variants, substances, etc.
 - **Authorization**: Row Level Security (RLS) enforced at database layer via `auth.uid()`. Application-layer checks via `getSession()` and `requireAdmin()` remain as defense-in-depth.
 
 ## Auth (Supabase Auth)

@@ -84,23 +84,23 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@/lib/db/schema/users", () => ({
   profiles: { id: "id", displayName: "display_name", clinicalNotes: "clinical_notes" },
-  userNutrientLimits: {
+  userSubstanceLimits: {
     id: "id",
     userId: "user_id",
-    nutrientId: "nutrient_id",
+    substanceId: "substance_id",
     dailyLimit: "daily_limit",
     mode: "mode",
   },
   profilesRelations: {},
-  userNutrientLimitsRelations: {},
+  userSubstanceLimitsRelations: {},
   consumptionLogs: {},
   consumptionLogsRelations: {},
   userRoleEnum: vi.fn(),
   limitModeEnum: vi.fn(),
 }));
 
-vi.mock("@/lib/db/schema/nutrients", () => ({
-  nutrients: { id: "id", displayName: "display_name", unit: "unit", sortOrder: "sort_order" },
+vi.mock("@/lib/db/schema/substances", () => ({
+  substances: { id: "id", displayName: "display_name", unit: "unit", sortOrder: "sort_order" },
 }));
 
 vi.mock("@/lib/db/schema/platform-accounts", () => ({
@@ -137,8 +137,8 @@ vi.mock("@/lib/db/schema/foods", () => ({
 }));
 
 vi.mock("@/lib/db/schema/reviews", () => ({
-  resolvedNutrientValues: {
-    nutrientId: "nutrient_id",
+  resolvedSubstanceValues: {
+    substanceId: "substance_id",
     valuePer100g: "value_per_100g",
     confidenceScore: "confidence_score",
     foodVariantId: "food_variant_id",
@@ -146,9 +146,9 @@ vi.mock("@/lib/db/schema/reviews", () => ({
 }));
 
 vi.mock("@/lib/calculations", () => ({
-  calculateNutrientAmount: vi.fn(),
+  calculateSubstanceAmount: vi.fn(),
   getConfidenceLabel: vi.fn(),
-  getNutrientStatus: vi.fn(),
+  getSubstanceStatus: vi.fn(),
 }));
 
 vi.mock("zod", () => ({

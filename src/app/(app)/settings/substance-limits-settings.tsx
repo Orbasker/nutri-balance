@@ -7,14 +7,14 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 import {
-  createCustomNutrient,
-  removeCustomNutrient,
-  removeNutrientLimit,
+  createCustomSubstance,
+  removeCustomSubstance,
+  removeSubstanceLimit,
   saveMedicalNotes,
-  saveNutrientLimit,
+  saveSubstanceLimit,
 } from "./actions";
 
-export type NutrientDto = {
+export type SubstanceOptionDto = {
   id: string;
   name: string;
   unit: string;
@@ -23,19 +23,19 @@ export type NutrientDto = {
   created_by: string | null;
 };
 
-export type UserNutrientLimitDto = {
+export type UserSubstanceLimitDto = {
   id: string;
   user_id: string;
-  nutrient_id: string;
+  substance_id: string;
   daily_limit: string;
   mode: "strict" | "stability";
   range_min: string | null;
   range_max: string | null;
 };
 
-type NutrientLimitsSettingsProps = {
-  nutrients: NutrientDto[];
-  limits: UserNutrientLimitDto[];
+type SubstanceLimitsSettingsProps = {
+  substances: SubstanceOptionDto[];
+  limits: UserSubstanceLimitDto[];
   medicalNotes: string;
 };
 
@@ -70,25 +70,25 @@ function ToggleSwitch({
   );
 }
 
-export function NutrientLimitsSettings({
-  nutrients,
+export function SubstanceLimitsSettings({
+  substances,
   limits,
   medicalNotes: initialNotes,
-}: NutrientLimitsSettingsProps) {
+}: SubstanceLimitsSettingsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [draftNutrientIds, setDraftNutrientIds] = useState<Set<string>>(() => new Set());
+  const [draftSubstanceIds, setDraftSubstanceIds] = useState<Set<string>>(() => new Set());
   const [notes, setNotes] = useState(initialNotes);
   const [notesSaved, setNotesSaved] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("");
 
-  const limitByNutrient = useMemo(() => {
-    const m = new Map<string, UserNutrientLimitDto>();
+  const limitBySubstance = useMemo(() => {
+    const m = new Map<string, UserSubstanceLimitDto>();
     for (const l of limits) {
-      m.set(l.nutrient_id, l);
+      m.set(l.substance_id, l);
     }
     return m;
   }, [limits]);
@@ -105,12 +105,12 @@ export function NutrientLimitsSettings({
         </p>
       )}
 
-      {/* Daily Nutrient Limits */}
+      {/* Daily Substance Limits */}
       <section className="bg-md-surface-container-lowest p-8 rounded-xl shadow-[0_10px_30px_rgba(0,68,147,0.06)]">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-md-primary">clinical_notes</span>
-            <h3 className="font-bold text-lg">Daily Tracking Limits</h3>
+            <h3 className="font-bold text-lg">Daily Substance Limits</h3>
           </div>
           <button
             type="button"
@@ -146,7 +146,7 @@ export function NutrientLimitsSettings({
                 onClick={() => {
                   setError(null);
                   startTransition(async () => {
-                    const res = await createCustomNutrient({
+                    const res = await createCustomSubstance({
                       displayName: newName.trim(),
                       unit: newUnit.trim(),
                     });
@@ -169,33 +169,33 @@ export function NutrientLimitsSettings({
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {nutrients.map((n, i) => {
-            const limit = limitByNutrient.get(n.id);
-            const isTracked = !!limit || draftNutrientIds.has(n.id);
+          {substances.map((substance, i) => {
+            const limit = limitBySubstance.get(substance.id);
+            const isTracked = !!limit || draftSubstanceIds.has(substance.id);
 
             return (
-              <NutrientLimitField
-                key={n.id}
-                nutrient={n}
+              <SubstanceLimitField
+                key={substance.id}
+                substance={substance}
                 limit={limit}
                 isTracked={isTracked}
                 isFirst={i === 0}
-                isCustom={!!n.created_by}
+                isCustom={!!substance.created_by}
                 disabled={pending}
                 onToggle={(on) => {
                   setError(null);
                   if (on) {
-                    setDraftNutrientIds((prev) => new Set(prev).add(n.id));
+                    setDraftSubstanceIds((prev) => new Set(prev).add(substance.id));
                     return;
                   }
-                  setDraftNutrientIds((prev) => {
+                  setDraftSubstanceIds((prev) => {
                     const next = new Set(prev);
-                    next.delete(n.id);
+                    next.delete(substance.id);
                     return next;
                   });
                   if (limit) {
                     startTransition(async () => {
-                      const res = await removeNutrientLimit({ limitId: limit.id });
+                      const res = await removeSubstanceLimit({ limitId: limit.id });
                       if ("error" in res) {
                         setError(res.error);
                         return;
@@ -207,23 +207,23 @@ export function NutrientLimitsSettings({
                 onSave={async (payload) => {
                   setError(null);
                   startTransition(async () => {
-                    const res = await saveNutrientLimit(payload);
+                    const res = await saveSubstanceLimit(payload);
                     if ("error" in res) {
                       setError(res.error);
                       return;
                     }
-                    setDraftNutrientIds((prev) => {
+                    setDraftSubstanceIds((prev) => {
                       const next = new Set(prev);
-                      next.delete(n.id);
+                      next.delete(substance.id);
                       return next;
                     });
                     refresh();
                   });
                 }}
-                onRemoveNutrient={() => {
+                onRemoveSubstance={() => {
                   setError(null);
                   startTransition(async () => {
-                    const res = await removeCustomNutrient({ nutrientId: n.id });
+                    const res = await removeCustomSubstance({ substanceId: substance.id });
                     if ("error" in res) {
                       setError(res.error);
                       return;
@@ -318,8 +318,8 @@ export function NutrientLimitsSettings({
   );
 }
 
-function NutrientLimitField({
-  nutrient,
+function SubstanceLimitField({
+  substance,
   limit,
   isTracked,
   isFirst,
@@ -327,24 +327,24 @@ function NutrientLimitField({
   disabled,
   onToggle,
   onSave,
-  onRemoveNutrient,
+  onRemoveSubstance,
 }: {
-  nutrient: NutrientDto;
-  limit: UserNutrientLimitDto | undefined;
+  substance: SubstanceOptionDto;
+  limit: UserSubstanceLimitDto | undefined;
   isTracked: boolean;
   isFirst: boolean;
   isCustom: boolean;
   disabled: boolean;
   onToggle: (on: boolean) => void;
   onSave: (payload: {
-    nutrientId: string;
+    substanceId: string;
     limitId?: string;
     mode: "strict" | "stability";
     dailyLimit?: string;
     rangeMin?: string;
     rangeMax?: string;
   }) => Promise<void>;
-  onRemoveNutrient: () => void;
+  onRemoveSubstance: () => void;
 }) {
   const [dailyLimit, setDailyLimit] = useState(limit?.daily_limit ?? "");
 
@@ -358,7 +358,7 @@ function NutrientLimitField({
               isFirst ? "text-md-primary" : "text-md-outline",
             )}
           >
-            {nutrient.display_name}
+            {substance.display_name}
           </label>
           {isCustom && (
             <span className="text-[10px] font-bold text-md-primary/60 bg-md-primary/8 px-1.5 py-0.5 rounded">
@@ -371,9 +371,9 @@ function NutrientLimitField({
             <button
               type="button"
               disabled={disabled}
-              onClick={onRemoveNutrient}
+              onClick={onRemoveSubstance}
               className="text-md-error/60 hover:text-md-error transition-colors disabled:opacity-50"
-              aria-label={`Remove ${nutrient.display_name}`}
+              aria-label={`Remove ${substance.display_name}`}
             >
               <span className="material-symbols-outlined text-[18px]">delete</span>
             </button>
@@ -392,7 +392,7 @@ function NutrientLimitField({
             onBlur={() => {
               if (dailyLimit) {
                 void onSave({
-                  nutrientId: nutrient.id,
+                  substanceId: substance.id,
                   limitId: limit?.id,
                   mode: "strict",
                   dailyLimit,
@@ -401,7 +401,7 @@ function NutrientLimitField({
             }}
           />
           <span className="text-md-on-surface-variant font-medium whitespace-nowrap">
-            {nutrient.unit}/day
+            {substance.unit}/day
           </span>
         </div>
       )}

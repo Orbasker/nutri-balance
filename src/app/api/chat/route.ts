@@ -9,13 +9,13 @@ import {
   aiResearchFood,
   checkCanIEat,
   getDailySummary,
-  getFoodNutrients,
+  getFoodSubstances,
   recordMeal,
   searchFood,
 } from "@/lib/bot/tools";
 import { db } from "@/lib/db";
-import { nutrients } from "@/lib/db/schema/nutrients";
-import { profiles, userNutrientLimits } from "@/lib/db/schema/users";
+import { substances } from "@/lib/db/schema/substances";
+import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
 
 export const maxDuration = 60;
 
@@ -39,30 +39,30 @@ export async function POST(req: Request) {
     .from(profiles)
     .where(eq(profiles.id, user.id));
 
-  // Fetch user nutrient limits for context
+  // Fetch user substance limits for context
   const userLimits = await db
     .select({
-      nutrient_id: userNutrientLimits.nutrientId,
-      daily_limit: userNutrientLimits.dailyLimit,
-      mode: userNutrientLimits.mode,
-      range_min: userNutrientLimits.rangeMin,
-      range_max: userNutrientLimits.rangeMax,
+      substance_id: userSubstanceLimits.substanceId,
+      daily_limit: userSubstanceLimits.dailyLimit,
+      mode: userSubstanceLimits.mode,
+      range_min: userSubstanceLimits.rangeMin,
+      range_max: userSubstanceLimits.rangeMax,
     })
-    .from(userNutrientLimits)
-    .where(eq(userNutrientLimits.userId, user.id));
+    .from(userSubstanceLimits)
+    .where(eq(userSubstanceLimits.userId, user.id));
 
-  const limitNutrientIds = userLimits.map((l) => l.nutrient_id);
+  const limitSubstanceIds = userLimits.map((l) => l.substance_id);
   let limitsContext = "";
-  if (limitNutrientIds.length > 0) {
-    const nutrientRows = await db
-      .select({ id: nutrients.id, displayName: nutrients.displayName, unit: nutrients.unit })
-      .from(nutrients)
-      .where(inArray(nutrients.id, limitNutrientIds));
-    const nutrientMap = new Map(nutrientRows.map((n) => [n.id, n]));
+  if (limitSubstanceIds.length > 0) {
+    const substanceRows = await db
+      .select({ id: substances.id, displayName: substances.displayName, unit: substances.unit })
+      .from(substances)
+      .where(inArray(substances.id, limitSubstanceIds));
+    const substanceMap = new Map(substanceRows.map((n) => [n.id, n]));
 
     limitsContext = (userLimits ?? [])
-      .map((l: { nutrient_id: string; daily_limit: string; mode: string }) => {
-        const n = nutrientMap.get(l.nutrient_id);
+      .map((l: { substance_id: string; daily_limit: string; mode: string }) => {
+        const n = substanceMap.get(l.substance_id);
         if (!n) return null;
         return `- ${n.displayName}: ${l.daily_limit} ${n.unit}/day (${l.mode} mode)`;
       })
@@ -78,11 +78,11 @@ IMPORTANT PRIVACY RULES:
 - If asked about other people's diets, politely decline.
 
 YOUR CAPABILITIES:
-- Search for foods in the database and check their nutrient content
+- Search for foods in the database and check their substance content
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
 - Record meals / log food consumption
-- Provide the user's current daily nutrient summary
-- Research foods not in the database using AI and return usable nutrient data in the same reply
+- Provide the user's current daily substance summary
+- Research foods not in the database using AI and return usable substance data in the same reply
 
 USER'S NUTRIENT LIMITS:
 ${limitsContext || "No limits configured yet. Suggest they set up limits in Settings."}
@@ -94,7 +94,7 @@ RESPONSE STYLE:
 - Be concise and direct
 - When checking if the user can eat something, always show: current intake, what the food would add, new total, and the limit
 - Use status indicators: safe (<80% of limit), caution (80-100%), exceed (>100%)
-- When recording a meal, confirm what was logged with the nutrient impact
+- When recording a meal, confirm what was logged with the substance impact
 - If a food isn't found, offer to research it using AI
 
 TOOL USAGE:
@@ -110,25 +110,25 @@ TOOL USAGE:
     tools: {
       searchFood: {
         description:
-          "Search for a food in the database by name. Returns matching foods with their variants and nutrient data.",
+          "Search for a food in the database by name. Returns matching foods with their variants and substance data.",
         inputSchema: z.object({
           query: z.string().describe("The food name to search for"),
         }),
         execute: async (params) => searchFood(params, toolCtx),
       },
 
-      getFoodNutrients: {
+      getFoodSubstances: {
         description:
-          "Get the full nutrient breakdown for a specific food variant. Use after searchFood to get detailed nutrient data.",
+          "Get the full substance breakdown for a specific food variant. Use after searchFood to get detailed substance data.",
         inputSchema: z.object({
-          foodVariantId: z.string().describe("The food variant ID to get nutrients for"),
+          foodVariantId: z.string().describe("The food variant ID to get substances for"),
         }),
-        execute: async (params) => getFoodNutrients(params, toolCtx),
+        execute: async (params) => getFoodSubstances(params, toolCtx),
       },
 
       checkCanIEat: {
         description:
-          "Check if the user can safely eat a specific food today based on their daily nutrient limits and what they've already consumed. Shows impact analysis.",
+          "Check if the user can safely eat a specific food today based on their daily substance limits and what they've already consumed. Shows impact analysis.",
         inputSchema: z.object({
           foodVariantId: z.string().describe("The food variant ID"),
           portionGrams: z.number().describe("How many grams the user wants to eat"),
@@ -138,7 +138,7 @@ TOOL USAGE:
 
       recordMeal: {
         description:
-          "Log a food consumption entry for the user. Records what they ate with nutrient snapshot for tracking. Do NOT invent a servingMeasureId — only pass one if you got it from searchFood results. Otherwise omit it.",
+          "Log a food consumption entry for the user. Records what they ate with substance snapshot for tracking. Do NOT invent a servingMeasureId — only pass one if you got it from searchFood results. Otherwise omit it.",
         inputSchema: z.object({
           foodVariantId: z.string().describe("The food variant ID from searchFood results"),
           servingMeasureId: z
@@ -159,14 +159,14 @@ TOOL USAGE:
 
       getDailySummary: {
         description:
-          "Get the user's nutrient intake summary for today. Shows consumed amounts vs daily limits.",
+          "Get the user's substance intake summary for today. Shows consumed amounts vs daily limits.",
         inputSchema: z.object({}),
         execute: async () => getDailySummary({} as Record<string, never>, toolCtx),
       },
 
       aiResearchFood: {
         description:
-          "Research a food not found in the database using AI. Returns the researched food and default-variant nutrient data so you can answer immediately in the same turn.",
+          "Research a food not found in the database using AI. Returns the researched food and default-variant substance data so you can answer immediately in the same turn.",
         inputSchema: z.object({
           foodName: z.string().describe("The name of the food to research"),
         }),

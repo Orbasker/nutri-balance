@@ -1,16 +1,16 @@
-import type { DailyNutrientTotal } from "@/types";
+import type { DailySubstanceTotal as TrackedSubstanceTotal } from "@/types";
 
 interface DailySummaryProps {
-  totals: DailyNutrientTotal[];
+  totals: TrackedSubstanceTotal[];
 }
 
 export function DailySummary({ totals }: DailySummaryProps) {
-  // Calculate total calories (sum of all nutrient totals as a proxy, or use first nutrient)
+  // Calculate total calories (sum of all substance totals as a proxy, or use first substance)
   const totalCalories = totals.reduce((sum, n) => sum + n.total, 0);
   const totalLimit = totals.reduce((sum, n) => sum + (n.dailyLimit ?? 0), 0);
   const overallPct = totalLimit > 0 ? Math.min((totalCalories / totalLimit) * 100, 100) : 0;
 
-  // Pick first 3 nutrients as "macros" for display
+  // Pick first 3 substances as "macros" for display
   const macros = totals.slice(0, 3);
   const macroColors = ["bg-md-primary", "bg-md-secondary", "bg-md-tertiary"];
 
@@ -18,7 +18,7 @@ export function DailySummary({ totals }: DailySummaryProps) {
     return (
       <div className="bg-md-surface-container-low rounded-[2rem] p-8 text-center">
         <p className="text-md-on-surface-variant text-sm">
-          No nutrient limits configured.{" "}
+          No tracked substances configured.{" "}
           <a href="/settings" className="text-md-primary font-semibold underline">
             Set up limits
           </a>{" "}
@@ -67,19 +67,19 @@ export function DailySummary({ totals }: DailySummaryProps) {
       <div className="bg-md-surface-container-lowest rounded-[2rem] p-8 space-y-6">
         <h4 className="font-bold text-lg text-md-on-surface">Macros</h4>
         <div className="space-y-4">
-          {macros.map((nutrient, i) => {
+          {macros.map((substance, i) => {
             const pct =
-              nutrient.dailyLimit && nutrient.dailyLimit > 0
-                ? Math.min((nutrient.total / nutrient.dailyLimit) * 100, 100)
+              substance.dailyLimit && substance.dailyLimit > 0
+                ? Math.min((substance.total / substance.dailyLimit) * 100, 100)
                 : 0;
             return (
-              <div key={nutrient.nutrientId} className="space-y-1">
+              <div key={substance.substanceId} className="space-y-1">
                 <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-md-outline">{nutrient.displayName}</span>
+                  <span className="text-md-outline">{substance.displayName}</span>
                   <span>
-                    {Math.round(nutrient.total)}
-                    {nutrient.unit} / {Math.round(nutrient.dailyLimit ?? 0)}
-                    {nutrient.unit}
+                    {Math.round(substance.total)}
+                    {substance.unit} / {Math.round(substance.dailyLimit ?? 0)}
+                    {substance.unit}
                   </span>
                 </div>
                 <div className="h-1.5 bg-md-surface-container-high rounded-full overflow-hidden">

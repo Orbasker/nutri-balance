@@ -2,7 +2,7 @@
 -- NUTRIENTS (6 core)
 -- ============================================================
 
-INSERT INTO nutrients (id, name, unit, display_name, sort_order) VALUES
+INSERT INTO substances (id, name, unit, display_name, sort_order) VALUES
   ('a0000000-0000-0000-0000-000000000001', 'vitamin_k', 'mcg', 'Vitamin K', 1),
   ('a0000000-0000-0000-0000-000000000002', 'vitamin_a', 'mcg', 'Vitamin A', 2),
   ('a0000000-0000-0000-0000-000000000003', 'vitamin_c', 'mg', 'Vitamin C', 3),
@@ -143,10 +143,10 @@ INSERT INTO serving_measures (food_variant_id, label, grams_equivalent) VALUES
 
 -- ============================================================
 -- RESOLVED NUTRIENT VALUES (per 100g, USDA-sourced)
--- Nutrient IDs: K=001, A=002, C=003, Potassium=004, Sodium=005, Iron=006
+-- Substance IDs: K=001, A=002, C=003, Potassium=004, Sodium=005, Iron=006
 -- ============================================================
 
-INSERT INTO resolved_nutrient_values (food_variant_id, nutrient_id, value_per_100g, confidence_score, confidence_label, source_summary) VALUES
+INSERT INTO resolved_substance_values (food_variant_id, substance_id, value_per_100g, confidence_score, confidence_label, source_summary) VALUES
   -- Spinach raw
   ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '482.9', 95, 'High confidence', 'USDA FoodData Central'),
   ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', '469', 95, 'High confidence', 'USDA FoodData Central'),
@@ -284,11 +284,11 @@ INSERT INTO resolved_nutrient_values (food_variant_id, nutrient_id, value_per_10
   ('d0000000-0000-0000-0000-000000000022', 'a0000000-0000-0000-0000-000000000006', '0.03', 95, 'High confidence', 'USDA FoodData Central');
 
 -- ============================================================
--- RETENTION PROFILES (common cooking methods x nutrients)
--- Based on USDA nutrient retention factors
+-- RETENTION PROFILES (common cooking methods x substances)
+-- Based on USDA substance retention factors
 -- ============================================================
 
-INSERT INTO retention_profiles (nutrient_id, preparation_method, retention_factor, source_id) VALUES
+INSERT INTO retention_profiles (substance_id, preparation_method, retention_factor, source_id) VALUES
   -- Vitamin K retention
   ('a0000000-0000-0000-0000-000000000001', 'boiled', '0.90', 'b0000000-0000-0000-0000-000000000001'),
   ('a0000000-0000-0000-0000-000000000001', 'steamed', '0.95', 'b0000000-0000-0000-0000-000000000001'),
