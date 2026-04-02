@@ -109,30 +109,31 @@ export async function saveProfile(data: {
 
   const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
 
-  await db
-    .insert(profiles)
-    .values({
-      id: session.user.id,
-      firstName: data.firstName || null,
-      lastName: data.lastName || null,
-      displayName,
-      dateOfBirth: data.dateOfBirth,
-      gender: data.gender,
-      healthGoal: data.healthGoal,
-      avatarColor: data.avatarColor,
-    })
-    .onConflictDoUpdate({
-      target: profiles.id,
-      set: {
-        firstName: data.firstName || null,
-        lastName: data.lastName || null,
-        displayName,
-        dateOfBirth: data.dateOfBirth,
-        gender: data.gender,
-        healthGoal: data.healthGoal,
-        avatarColor: data.avatarColor,
-      },
-    });
+  const profileFields = {
+    firstName: data.firstName || null,
+    lastName: data.lastName || null,
+    displayName,
+    dateOfBirth: data.dateOfBirth,
+    gender: data.gender,
+    healthGoal: data.healthGoal,
+    avatarColor: data.avatarColor,
+  };
+
+  // Use UPDATE to avoid overwriting clinicalNotes (which is managed separately).
+  // The profile row is created by the handle_new_user trigger on signup.
+  const [updated] = await db
+    .update(profiles)
+    .set(profileFields)
+    .where(eq(profiles.id, session.user.id))
+    .returning({ id: profiles.id });
+
+  // Fallback: if no row existed (e.g. trigger didn't fire), create it
+  if (!updated) {
+    await db
+      .insert(profiles)
+      .values({ id: session.user.id, ...profileFields })
+      .onConflictDoNothing();
+  }
 
   revalidatePath("/settings");
   revalidatePath("/dashboard");
@@ -147,7 +148,21 @@ export async function saveMedicalNotes(notes: string): Promise<SubstanceLimitAct
     return { error: "You must be signed in." };
   }
 
-  await db.update(profiles).set({ clinicalNotes: notes }).where(eq(profiles.id, session.user.id));
+  const [updated] = await db
+    .update(profiles)
+    .set({ clinicalNotes: notes })
+    .where(eq(profiles.id, session.user.id))
+    .returning({ id: profiles.id });
+
+  if (!updated) {
+    await db
+      .insert(profiles)
+      .values({ id: session.user.id, clinicalNotes: notes })
+      .onConflictDoUpdate({
+        target: profiles.id,
+        set: { clinicalNotes: notes },
+      });
+  }
 
   revalidatePath("/settings");
   return { ok: true };

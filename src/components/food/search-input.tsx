@@ -7,6 +7,7 @@ import {
   aiDiscoverFoodsBySubstance,
   aiSearchFood,
   listSubstances,
+  resolveSubstanceSearchTerm,
   searchBySubstanceId,
   searchFoods,
   uploadSubstancePdf,
@@ -46,6 +47,16 @@ export function SearchInput() {
   const [substancesLoading, setSubstancesLoading] = useState(false);
   const [substancesLoaded, setSubstancesLoaded] = useState(false);
   const [selectedSubstance, setSelectedSubstance] = useState<SubstanceOption | null>(null);
+
+  const addSubstanceOption = useCallback((substance: SubstanceOption) => {
+    setSubstancesList((prev) => {
+      if (prev.some((item) => item.id === substance.id)) {
+        return prev;
+      }
+
+      return [...prev, substance].sort((a, b) => a.displayName.localeCompare(b.displayName));
+    });
+  }, []);
 
   // -- Mode switching --
   const handleModeSwitch = useCallback(
@@ -145,6 +156,54 @@ export function SearchInput() {
     setAiError(null);
     setAiSuccess(null);
   }, []);
+
+  const handleUnknownSubstanceSearch = useCallback(
+    async (term: string) => {
+      const trimmed = term.trim();
+      if (trimmed.length < 2) return;
+
+      setIsAiSearching(true);
+      setAiError(null);
+      setAiSuccess(null);
+      setFilters({});
+
+      try {
+        const resolved = await resolveSubstanceSearchTerm(trimmed);
+        if (resolved.status === "error") {
+          setAiError(resolved.message);
+          return;
+        }
+
+        setSubstancesLoaded(true);
+        addSubstanceOption(resolved.substance);
+        setSelectedSubstance(resolved.substance);
+
+        const result = await aiDiscoverFoodsBySubstance(resolved.substance.id);
+        const refreshed = await searchBySubstanceId(
+          resolved.substance.id,
+          {},
+          { page: 1, pageSize: PAGE_SIZE },
+        );
+        setSearchResult(refreshed);
+        setHasSearched(true);
+
+        if (result.status === "found") {
+          setAiSuccess(
+            resolved.status === "created"
+              ? `${resolved.message} ${result.summary}`
+              : result.summary,
+          );
+        } else {
+          setAiError(result.message);
+        }
+      } catch {
+        setAiError("Something went wrong. Please try again.");
+      } finally {
+        setIsAiSearching(false);
+      }
+    },
+    [addSubstanceOption],
+  );
 
   // -- Shared handlers --
   const handleFiltersChange = useCallback(
@@ -391,8 +450,10 @@ export function SearchInput() {
           <SubstancePicker
             substances={substancesList}
             isLoading={substancesLoading}
+            isResearchingUnknown={isAiSearching}
             selectedSubstance={selectedSubstance}
             onSelect={handleSubstanceSelect}
+            onSearchUnknown={handleUnknownSubstanceSearch}
             onClear={handleSubstanceClear}
           />
           {/* AI Discover button for substance mode */}
@@ -645,8 +706,8 @@ export function SearchInput() {
           <div className="relative z-10">
             <h4 className="text-2xl font-bold mb-2">Substance Explorer</h4>
             <p className="text-md-tertiary-fixed-dim text-sm max-w-[70%] leading-relaxed">
-              Select a substance above to discover which foods contain the highest amounts. Great
-              for targeted dietary planning.
+              Pick a saved substance or type a new one and we will research foods for it. Great for
+              targeted dietary planning and missing substances.
             </p>
           </div>
           <div className="absolute -right-8 -bottom-8 opacity-10 group-hover:scale-110 transition-transform duration-700">

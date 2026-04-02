@@ -9,16 +9,20 @@ import { cn } from "@/lib/utils";
 interface SubstancePickerProps {
   substances: SubstanceOption[];
   isLoading: boolean;
+  isResearchingUnknown?: boolean;
   selectedSubstance: SubstanceOption | null;
   onSelect: (substance: SubstanceOption) => void;
+  onSearchUnknown?: (query: string) => void;
   onClear: () => void;
 }
 
 export function SubstancePicker({
   substances,
   isLoading,
+  isResearchingUnknown = false,
   selectedSubstance,
   onSelect,
+  onSearchUnknown,
   onClear,
 }: SubstancePickerProps) {
   const [filterText, setFilterText] = useState("");
@@ -31,13 +35,12 @@ export function SubstancePicker({
     if (!filterText.trim()) return substances;
     const term = filterText.toLowerCase();
     return substances.filter(
-      (n) => n.displayName.toLowerCase().includes(term) || n.name.toLowerCase().includes(term),
+      (substance) =>
+        substance.displayName.toLowerCase().includes(term) ||
+        substance.name.toLowerCase().includes(term),
     );
   }, [substances, filterText]);
 
-  // Highlight reset is handled in the onChange handler below
-
-  // Scroll highlighted item into view
   useEffect(() => {
     if (highlightIndex >= 0 && listRef.current) {
       const items = listRef.current.querySelectorAll("[data-substance-item]");
@@ -67,12 +70,15 @@ export function SubstancePicker({
       } else if (e.key === "Enter" && highlightIndex >= 0 && highlightIndex < filtered.length) {
         e.preventDefault();
         handleSelect(filtered[highlightIndex]);
+      } else if (e.key === "Enter" && filtered.length === 0 && filterText.trim().length >= 2) {
+        e.preventDefault();
+        onSearchUnknown?.(filterText.trim());
       } else if (e.key === "Escape") {
         setIsOpen(false);
         setHighlightIndex(-1);
       }
     },
-    [filtered, highlightIndex, handleSelect],
+    [filterText, filtered, highlightIndex, handleSelect, onSearchUnknown],
   );
 
   if (selectedSubstance) {
@@ -115,25 +121,41 @@ export function SubstancePicker({
           }}
           onFocus={() => setIsOpen(true)}
           onBlur={() => {
-            // Delay close so clicks on items register
             setTimeout(() => setIsOpen(false), 200);
           }}
           onKeyDown={handleKeyDown}
           className="w-full bg-md-surface-container-lowest border-none py-5 pl-14 pr-6 rounded-2xl shadow-[0_10px_30px_rgba(0,68,147,0.06)] focus:ring-2 focus:ring-md-primary/20 text-md-on-surface placeholder:text-md-outline transition-all duration-300 outline-none"
-          placeholder={isLoading ? "Loading substances..." : "Type to filter substances..."}
-          disabled={isLoading}
+          placeholder={
+            isLoading ? "Loading substances..." : "Search substances or type a new one..."
+          }
+          disabled={isLoading || isResearchingUnknown}
         />
       </div>
 
-      {/* Dropdown */}
       {isOpen && !isLoading && (
         <div
           ref={listRef}
           className="absolute z-50 top-full mt-2 left-0 right-0 bg-md-surface-container-lowest rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-md-outline/10 max-h-72 overflow-y-auto"
         >
           {filtered.length === 0 ? (
-            <div className="px-5 py-4 text-sm text-md-outline text-center">
-              No substances found matching &ldquo;{filterText}&rdquo;
+            <div className="px-5 py-4 text-center space-y-3">
+              <p className="text-sm text-md-outline">
+                No saved substances found for &ldquo;{filterText}&rdquo;.
+              </p>
+              {filterText.trim().length >= 2 && onSearchUnknown && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => onSearchUnknown(filterText.trim())}
+                  disabled={isResearchingUnknown}
+                  className="inline-flex items-center gap-2 bg-md-primary text-white font-bold py-2 px-4 rounded-xl active:scale-95 transition-all duration-200 hover:bg-md-primary/90 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+                  {isResearchingUnknown
+                    ? "Researching..."
+                    : `Research "${filterText.trim()}" anyway`}
+                </button>
+              )}
             </div>
           ) : (
             filtered.map((substance, idx) => (

@@ -35,6 +35,72 @@ import { type SearchRow, mapSearchRows } from "./search-utils";
 
 const DEFAULT_PAGE_SIZE = 20;
 
+function createSubstanceSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function inferUnitForCustomSubstance(name: string) {
+  const normalized = name.trim().toLowerCase();
+
+  const explicitUnits: Record<string, string> = {
+    caffeine: "mg",
+    calcium: "mg",
+    carbohydrate: "g",
+    carbohydrates: "g",
+    cholesterol: "mg",
+    copper: "mg",
+    fat: "g",
+    fiber: "g",
+    folate: "mcg",
+    gluten: "g",
+    iodine: "mcg",
+    iron: "mg",
+    magnesium: "mg",
+    manganese: "mg",
+    niacin: "mg",
+    phosphorus: "mg",
+    potassium: "mg",
+    protein: "g",
+    riboflavin: "mg",
+    selenium: "mcg",
+    sodium: "mg",
+    sugar: "g",
+    sugars: "g",
+    thiamin: "mg",
+    zinc: "mg",
+  };
+
+  if (explicitUnits[normalized]) {
+    return explicitUnits[normalized];
+  }
+
+  if (normalized.startsWith("vitamin ")) {
+    if (
+      normalized === "vitamin a" ||
+      normalized === "vitamin b12" ||
+      normalized === "vitamin d" ||
+      normalized === "vitamin k"
+    ) {
+      return "mcg";
+    }
+
+    return "mg";
+  }
+
+  if (
+    normalized.includes("protein") ||
+    normalized.includes("fiber") ||
+    normalized.includes("gluten")
+  ) {
+    return "g";
+  }
+
+  return "mg";
+}
+
 /**
  * Check if query matches a substance name/display_name.
  * Returns the substance if found, null otherwise.
@@ -116,7 +182,7 @@ async function getCategoriesForSubstance(substanceId: string): Promise<string[]>
 }
 
 /**
- * Search foods by substance — paginated, with filters.
+ * Search foods by substance - paginated, with filters.
  */
 async function searchBySubstance(
   substanceId: string,
@@ -190,7 +256,7 @@ async function searchBySubstance(
 }
 
 /**
- * Standard food name/alias search — paginated, with filters.
+ * Standard food name/alias search - paginated, with filters.
  */
 async function searchByName(
   query: string,
@@ -325,8 +391,65 @@ export async function listSubstances(): Promise<SubstanceOption[]> {
   return rows;
 }
 
+export async function resolveSubstanceSearchTerm(
+  query: string,
+): Promise<
+  | { status: "matched"; substance: SubstanceOption }
+  | { status: "created"; substance: SubstanceOption; message: string }
+  | { status: "error"; message: string }
+> {
+  const parsed = searchInputSchema.safeParse({ query });
+  if (!parsed.success) {
+    return { status: "error", message: "Enter at least 2 characters." };
+  }
+
+  const existing = await findMatchingSubstance(parsed.data.query);
+  if (existing) {
+    return {
+      status: "matched",
+      substance: {
+        id: existing.id,
+        name: existing.name,
+        displayName: existing.displayName,
+        unit: existing.unit,
+      },
+    };
+  }
+
+  const session = await getSession();
+  if (!session) {
+    return { status: "error", message: "You must be signed in." };
+  }
+
+  const displayName = parsed.data.query;
+  const slug = createSubstanceSlug(displayName);
+  const unit = inferUnitForCustomSubstance(displayName);
+
+  const [created] = await db
+    .insert(substances)
+    .values({
+      name: `custom_${slug}_${session.user.id.slice(0, 8)}`,
+      displayName,
+      unit,
+      sortOrder: 999,
+      createdBy: session.user.id,
+    })
+    .returning({
+      id: substances.id,
+      name: substances.name,
+      displayName: substances.displayName,
+      unit: substances.unit,
+    });
+
+  return {
+    status: "created",
+    substance: created,
+    message: `Added "${created.displayName}" to your substance list.`,
+  };
+}
+
 /**
- * Search foods by substance ID — public server action wrapping the internal searchBySubstance.
+ * Search foods by substance ID - public server action wrapping the internal searchBySubstance.
  * Accepts a substanceId directly (no query matching needed).
  */
 export async function searchBySubstanceId(

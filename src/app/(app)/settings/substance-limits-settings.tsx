@@ -33,6 +33,9 @@ export type UserSubstanceLimitDto = {
   range_max: string | null;
 };
 
+const CUSTOM_UNIT_VALUE = "__custom__";
+const UNIT_OPTIONS = ["mg", "mcg", "g", "IU", "mEq", "kcal"] as const;
+
 type SubstanceLimitsSettingsProps = {
   substances: SubstanceOptionDto[];
   limits: UserSubstanceLimitDto[];
@@ -83,7 +86,18 @@ export function SubstanceLimitsSettings({
   const [notesSaved, setNotesSaved] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newUnit, setNewUnit] = useState("");
+  const [newUnitChoice, setNewUnitChoice] = useState<string>("");
+  const [customUnit, setCustomUnit] = useState("");
+
+  const resolvedNewUnit =
+    newUnitChoice === CUSTOM_UNIT_VALUE ? customUnit.trim() : newUnitChoice.trim();
+
+  // Derive initial mode from existing limits (majority wins), default to "strict"
+  const [activeMode, setActiveMode] = useState<"strict" | "stability">(() => {
+    if (limits.length === 0) return "strict";
+    const stabilityCount = limits.filter((l) => l.mode === "stability").length;
+    return stabilityCount > limits.length / 2 ? "stability" : "strict";
+  });
 
   const limitBySubstance = useMemo(() => {
     const m = new Map<string, UserSubstanceLimitDto>();
@@ -120,49 +134,72 @@ export function SubstanceLimitsSettings({
             <span className="material-symbols-outlined text-[20px]">
               {showAddForm ? "close" : "add_circle"}
             </span>
-            {showAddForm ? "Cancel" : "Add Substance"}
+            {showAddForm ? "Cancel" : "Track Something Else"}
           </button>
         </div>
 
         {showAddForm && (
           <div className="mb-8 p-5 bg-md-surface-container-low rounded-xl space-y-4">
-            <p className="text-sm font-bold text-md-on-surface">Add a custom substance to track</p>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-md-on-surface">
+                Track something that is not already in the list
+              </p>
+              <p className="text-xs text-md-on-surface-variant">
+                Give it a name, then choose the unit you want to track each day.
+              </p>
+            </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <input
                 className="flex-1 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
-                placeholder="Name (e.g. Gluten, Caffeine, Fiber)"
+                placeholder="Name to track (e.g. Gluten, Caffeine, Fiber)"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
-              <input
-                className="w-full sm:w-28 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
-                placeholder="Unit (e.g. mg)"
-                value={newUnit}
-                onChange={(e) => setNewUnit(e.target.value)}
-              />
+              <select
+                className="w-full sm:w-40 bg-md-surface-container-lowest border border-md-outline-variant/20 rounded-lg px-4 py-2.5 text-sm text-md-on-surface outline-none focus:ring-2 focus:ring-md-primary/20"
+                value={newUnitChoice}
+                onChange={(e) => setNewUnitChoice(e.target.value)}
+              >
+                <option value="">Choose unit</option>
+                {UNIT_OPTIONS.map((unit) => (
+                  <option key={unit} value={unit}>
+                    {unit}
+                  </option>
+                ))}
+                <option value={CUSTOM_UNIT_VALUE}>Custom unit</option>
+              </select>
+              {newUnitChoice === CUSTOM_UNIT_VALUE && (
+                <input
+                  className="w-full sm:w-32 bg-md-surface-container-lowest rounded-lg px-4 py-2.5 text-sm text-md-on-surface placeholder:text-md-outline/50 outline-none focus:ring-2 focus:ring-md-primary/20"
+                  placeholder="Custom unit"
+                  value={customUnit}
+                  onChange={(e) => setCustomUnit(e.target.value)}
+                />
+              )}
               <button
                 type="button"
-                disabled={pending || !newName.trim() || !newUnit.trim()}
+                disabled={pending || !newName.trim() || !resolvedNewUnit}
                 onClick={() => {
                   setError(null);
                   startTransition(async () => {
                     const res = await createCustomSubstance({
                       displayName: newName.trim(),
-                      unit: newUnit.trim(),
+                      unit: resolvedNewUnit,
                     });
                     if ("error" in res) {
                       setError(res.error);
                       return;
                     }
                     setNewName("");
-                    setNewUnit("");
+                    setNewUnitChoice("");
+                    setCustomUnit("");
                     setShowAddForm(false);
                     refresh();
                   });
                 }}
                 className="bg-md-primary text-white font-bold px-6 py-2.5 rounded-lg text-sm disabled:opacity-50 active:scale-95 transition-all whitespace-nowrap"
               >
-                {pending ? "Adding..." : "Add"}
+                {pending ? "Adding..." : "Track"}
               </button>
             </div>
           </div>
@@ -182,6 +219,7 @@ export function SubstanceLimitsSettings({
                 isFirst={i === 0}
                 isCustom={!!substance.created_by}
                 disabled={pending}
+                activeMode={activeMode}
                 onToggle={(on) => {
                   setError(null);
                   if (on) {
@@ -250,7 +288,11 @@ export function SubstanceLimitsSettings({
                     Hard stop notifications when limits are hit.
                   </p>
                 </div>
-                <ToggleSwitch checked={true} onCheckedChange={() => {}} />
+                <ToggleSwitch
+                  checked={activeMode === "strict"}
+                  disabled={pending}
+                  onCheckedChange={() => setActiveMode("strict")}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -259,7 +301,11 @@ export function SubstanceLimitsSettings({
                     Focuses on consistent day-to-day variance.
                   </p>
                 </div>
-                <ToggleSwitch checked={false} onCheckedChange={() => {}} />
+                <ToggleSwitch
+                  checked={activeMode === "stability"}
+                  disabled={pending}
+                  onCheckedChange={() => setActiveMode("stability")}
+                />
               </div>
             </div>
           </div>
@@ -273,7 +319,9 @@ export function SubstanceLimitsSettings({
                 <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
                 <span className="w-1.5 h-1.5 rounded-full bg-md-primary" />
               </div>
-              <span className="text-xs font-bold text-md-primary">High Confidence Active</span>
+              <span className="text-xs font-bold text-md-primary">
+                {activeMode === "strict" ? "High Confidence Active" : "Stability Tracking Active"}
+              </span>
             </div>
           </div>
         </section>
@@ -325,6 +373,7 @@ function SubstanceLimitField({
   isFirst,
   isCustom,
   disabled,
+  activeMode,
   onToggle,
   onSave,
   onRemoveSubstance,
@@ -335,6 +384,7 @@ function SubstanceLimitField({
   isFirst: boolean;
   isCustom: boolean;
   disabled: boolean;
+  activeMode: "strict" | "stability";
   onToggle: (on: boolean) => void;
   onSave: (payload: {
     substanceId: string;
@@ -347,6 +397,31 @@ function SubstanceLimitField({
   onRemoveSubstance: () => void;
 }) {
   const [dailyLimit, setDailyLimit] = useState(limit?.daily_limit ?? "");
+  const [rangeMin, setRangeMin] = useState(limit?.range_min ?? "");
+  const [rangeMax, setRangeMax] = useState(limit?.range_max ?? "");
+
+  function saveStrict() {
+    if (dailyLimit) {
+      void onSave({
+        substanceId: substance.id,
+        limitId: limit?.id,
+        mode: "strict",
+        dailyLimit,
+      });
+    }
+  }
+
+  function saveStability() {
+    if (rangeMin && rangeMax) {
+      void onSave({
+        substanceId: substance.id,
+        limitId: limit?.id,
+        mode: "stability",
+        rangeMin,
+        rangeMax,
+      });
+    }
+  }
 
   return (
     <div className="group border-b border-md-outline-variant/15 pb-4 focus-within:border-md-primary transition-all">
@@ -360,11 +435,6 @@ function SubstanceLimitField({
           >
             {substance.display_name}
           </label>
-          {isCustom && (
-            <span className="text-[10px] font-bold text-md-primary/60 bg-md-primary/8 px-1.5 py-0.5 rounded">
-              CUSTOM
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2">
           {isCustom && (
@@ -381,7 +451,7 @@ function SubstanceLimitField({
           <ToggleSwitch checked={isTracked} disabled={disabled} onCheckedChange={onToggle} />
         </div>
       </div>
-      {isTracked && (
+      {isTracked && activeMode === "strict" && (
         <div className="flex items-baseline gap-2">
           <input
             className="w-full bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
@@ -389,16 +459,31 @@ function SubstanceLimitField({
             type="text"
             value={dailyLimit}
             onChange={(e) => setDailyLimit(e.target.value)}
-            onBlur={() => {
-              if (dailyLimit) {
-                void onSave({
-                  substanceId: substance.id,
-                  limitId: limit?.id,
-                  mode: "strict",
-                  dailyLimit,
-                });
-              }
-            }}
+            onBlur={saveStrict}
+          />
+          <span className="text-md-on-surface-variant font-medium whitespace-nowrap">
+            {substance.unit}/day
+          </span>
+        </div>
+      )}
+      {isTracked && activeMode === "stability" && (
+        <div className="flex items-baseline gap-2">
+          <input
+            className="w-20 bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
+            placeholder="min"
+            type="text"
+            value={rangeMin}
+            onChange={(e) => setRangeMin(e.target.value)}
+            onBlur={saveStability}
+          />
+          <span className="text-md-on-surface-variant font-medium">-</span>
+          <input
+            className="w-20 bg-transparent border-none p-0 text-2xl font-bold text-md-on-surface focus:ring-0 outline-none"
+            placeholder="max"
+            type="text"
+            value={rangeMax}
+            onChange={(e) => setRangeMax(e.target.value)}
+            onBlur={saveStability}
           />
           <span className="text-md-on-surface-variant font-medium whitespace-nowrap">
             {substance.unit}/day
