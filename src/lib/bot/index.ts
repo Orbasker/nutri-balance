@@ -170,7 +170,27 @@ ${missing.includes("nutrient limits") ? "- Help them set at least one nutrient l
 
 Be conversational and natural. If the user provides multiple pieces of info in one message (e.g. "I'm Or, I take blood thinners and need to keep Vitamin K under 10mcg"), extract ALL of it and call the relevant tools in one go. Don't force them through rigid steps — adapt to what they give you.
 `
-      : "";
+      : `\nRETURNING USER:
+This user's profile is fully set up${isLinked ? " and their account is linked" : ""}. Do NOT ask onboarding questions (name, health goals, or what nutrients to track) — you already have all of this information in context.
+When they greet you or say hi, respond warmly by name and offer to help with something specific — like checking if they can eat something, logging a meal, or reviewing their daily summary. Be proactive: if they have nutrient limits configured, you can mention you're ready to help them track today's intake.
+`;
+
+  // Build a user profile summary so the AI knows who it's talking to
+  const profileLines: string[] = [];
+  if (profile?.displayName && profile.displayName !== "Bot User") {
+    profileLines.push(`- Name: ${profile.displayName}`);
+  }
+  if (profile?.healthGoal) {
+    profileLines.push(`- Health goal: ${profile.healthGoal}`);
+  }
+  if (profile?.clinicalNotes) {
+    profileLines.push(`- Clinical notes: ${profile.clinicalNotes}`);
+  }
+  if (isLinked) {
+    profileLines.push("- Account: linked to web dashboard (data syncs automatically)");
+  }
+
+  const profileBlock = profileLines.length > 0 ? `\nUSER PROFILE:\n${profileLines.join("\n")}` : "";
 
   return `You are NutriBalance Assistant, a specialized nutrition agent for ${profile?.displayName ?? "the user"}.
 
@@ -178,6 +198,7 @@ IMPORTANT PRIVACY RULES:
 - You ONLY discuss this specific user's dietary data, limits, and food logs. Never reference other users.
 - All data you access is private to this user, protected by row-level security.
 - If asked about other people's diets, politely decline.
+${profileBlock}
 ${setupBlock}${accountLinkBlock}
 YOUR CAPABILITIES:
 - Search for foods in the database and check their nutrient content
@@ -191,13 +212,12 @@ YOUR CAPABILITIES:
 USER'S NUTRIENT LIMITS:
 ${limitsContext || "No limits configured yet."}
 
-${profile?.clinicalNotes ? `CLINICAL NOTES:\n${profile.clinicalNotes}` : ""}
-
 ${getWebLinksBlock()}
 
 RESPONSE STYLE:
 - CRITICAL: You MUST always write a text response after using tools. Never end your turn with only tool calls. Summarize what you found and answer the user's question in plain language.
-- Be concise and direct
+- Be concise and direct. Use the user's name when greeting them.
+- Never ask the user for information you already have in context (their name, health goal, nutrient limits). Reference it naturally instead.
 - When checking if the user can eat something, always show: current intake, what the food would add, new total, and the limit
 - Use status indicators: safe (<80% of limit), caution (80-100%), exceed (>100%)
 - When recording a meal, confirm what was logged with the nutrient impact
