@@ -226,6 +226,65 @@ describe("bot handler error recovery", () => {
     expect(mockPost).toHaveBeenCalledWith("Test reply");
   });
 
+  it("uses tool-aware fallback text when Telegram gets no final model text", async () => {
+    const { getBot } = await import("../index");
+    const { streamText } = await import("ai");
+
+    vi.mocked(streamText).mockImplementationOnce(((options: {
+      onStepFinish?: (payload: { toolCalls?: unknown[]; toolResults?: unknown[] }) => void;
+    }) => {
+      options.onStepFinish?.({
+        toolCalls: [
+          {
+            type: "tool-call",
+            toolCallId: "tool-call-1",
+            toolName: "aiResearchFood",
+            input: { foodName: "אבטיח" },
+          },
+        ],
+        toolResults: [{ success: false, error: "Provider timeout" }],
+      });
+
+      return {
+        fullStream: (async function* () {})(),
+        text: Promise.resolve(""),
+      } as never;
+    }) as never);
+
+    getBot();
+    const handler = mockBot.onNewMention.mock.calls[0][0];
+
+    const mockPost = vi.fn().mockResolvedValue(undefined);
+    const mockThread = {
+      id: "telegram:chat-999",
+      post: mockPost,
+      subscribe: vi.fn().mockResolvedValue(undefined),
+      startTyping: vi.fn().mockResolvedValue(undefined),
+      allMessages: (async function* () {
+        yield { text: "תחקור על אבטיח" };
+      })(),
+    };
+    const mockMessage = {
+      text: "למה?",
+      author: { userId: "tg-123", userName: "tester", fullName: "Tester" },
+    };
+
+    vi.mocked(findOrCreatePlatformAccount).mockResolvedValueOnce({
+      id: "platform-account-3",
+      createdAt: new Date(),
+      userId: "user-123",
+      platform: "telegram",
+      platformUserId: "tg-123",
+      platformUsername: "tester",
+      onboardingState: "complete",
+      onboardingData: null,
+    });
+
+    await handler(mockThread, mockMessage);
+
+    expect(mockPost).toHaveBeenCalledWith(expect.stringContaining("Provider timeout"));
+  });
+
   it("onNewMention handler catches errors and posts error message", async () => {
     // Ensure bot is initialised so handlers are registered
     const { getBot } = await import("../index");
@@ -254,7 +313,7 @@ describe("bot handler error recovery", () => {
     await handler(mockThread, mockMessage);
 
     // Should have posted an error message to the thread
-    expect(mockPost).toHaveBeenCalledWith(expect.stringContaining("Sorry"));
+    expect(mockPost).toHaveBeenCalledWith(expect.stringContaining("went wrong"));
   });
 
   it("onSubscribedMessage handler catches errors and posts error message", async () => {
@@ -278,7 +337,7 @@ describe("bot handler error recovery", () => {
 
     await handler(mockThread, mockMessage);
 
-    expect(mockPost).toHaveBeenCalledWith(expect.stringContaining("Sorry"));
+    expect(mockPost).toHaveBeenCalledWith(expect.stringContaining("went wrong"));
   });
 
   it("keeps relinking available for users who want to switch to a different web account", async () => {

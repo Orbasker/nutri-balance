@@ -38,6 +38,27 @@ const VALID_PREP_METHODS = [
 
 type PrepMethod = (typeof VALID_PREP_METHODS)[number];
 
+export interface ResearchedFoodNutrient {
+  displayName: string;
+  unit: string;
+  valuePer100g: number;
+  confidence: number;
+}
+
+export interface ResearchedFoodVariantPreview {
+  id: string;
+  preparationMethod: PrepMethod;
+  servings: Array<{ label: string; grams: number }>;
+  nutrients: ResearchedFoodNutrient[];
+}
+
+export interface ResearchedFoodResult {
+  foodId: string;
+  foodName: string;
+  variantsCount: number;
+  defaultVariant: ResearchedFoodVariantPreview;
+}
+
 /**
  * Zod schema for the AI-generated food profile.
  * Using generateObject ensures type-safe structured output — no JSON parsing needed.
@@ -123,7 +144,7 @@ export async function aiResearchFood(
   options?: {
     source?: string;
   },
-): Promise<{ foodId: string } | { error: string }> {
+): Promise<ResearchedFoodResult | { error: string }> {
   const allNutrients = await db.select().from(nutrients).orderBy(nutrients.sortOrder);
 
   if (allNutrients.length === 0) {
@@ -229,6 +250,8 @@ Rules:
 
     const nutrientMap = new Map(allNutrients.map((n) => [n.name, n]));
 
+    const createdVariants: ResearchedFoodVariantPreview[] = [];
+
     for (const variant of foodData.variants) {
       const prepMethod: PrepMethod = VALID_PREP_METHODS.includes(variant.preparationMethod)
         ? variant.preparationMethod
@@ -248,6 +271,10 @@ Rules:
       const servings = foodData.commonServings?.length
         ? foodData.commonServings
         : [{ label: "per 100g", grams: 100 }];
+      const variantServings = servings.map((serving) => ({
+        label: serving.label,
+        grams: serving.grams,
+      }));
 
       for (const serving of servings) {
         await db.insert(servingMeasures).values({
@@ -257,10 +284,19 @@ Rules:
         });
       }
 
+      const previewNutrients: ResearchedFoodNutrient[] = [];
+
       // Create nutrient observations + resolved values
       for (const nutrientData of variant.nutrients) {
         const nutrient = nutrientMap.get(nutrientData.nutrientName);
         if (!nutrient) continue;
+
+        previewNutrients.push({
+          displayName: nutrient.displayName,
+          unit: nutrient.unit,
+          valuePer100g: nutrientData.valuePer100g,
+          confidence: Math.min(nutrientData.confidence, 80),
+        });
 
         const [record] = await db
           .insert(sourceRecords)
@@ -305,6 +341,13 @@ Rules:
           sourceSummary: `AI-generated: ${nutrientData.reasoning}`,
         });
       }
+
+      createdVariants.push({
+        id: fv.id,
+        preparationMethod: prepMethod,
+        servings: variantServings,
+        nutrients: previewNutrients,
+      });
     }
 
     await finishAiRun(aiRun, {
@@ -322,7 +365,20 @@ Rules:
     trace.update({ output: { foodId: food.id, name: foodData.name } });
     await flushLangfuse();
 
-    return { foodId: food.id };
+    const defaultVariant =
+      createdVariants[foodData.variants.findIndex((variant) => variant.isDefault)] ??
+      createdVariants[0];
+
+    if (!defaultVariant) {
+      return { error: "Research completed but no usable variant data was saved." };
+    }
+
+    return {
+      foodId: food.id,
+      foodName: foodData.name,
+      variantsCount: createdVariants.length,
+      defaultVariant,
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
 

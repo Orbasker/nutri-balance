@@ -82,7 +82,7 @@ YOUR CAPABILITIES:
 - Check if the user can safely eat a specific food today (based on their daily limits and what they've already eaten)
 - Record meals / log food consumption
 - Provide the user's current daily nutrient summary
-- Research foods not in the database using AI (triggers background research)
+- Research foods not in the database using AI and return usable nutrient data in the same reply
 
 USER'S NUTRIENT LIMITS:
 ${limitsContext || "No limits configured yet. Suggest they set up limits in Settings."}
@@ -166,7 +166,7 @@ TOOL USAGE:
 
       aiResearchFood: {
         description:
-          "Research a food not found in the database using AI. This triggers a background research process that creates the food with AI-generated nutrient estimates.",
+          "Research a food not found in the database using AI. Returns the researched food and default-variant nutrient data so you can answer immediately in the same turn.",
         inputSchema: z.object({
           foodName: z.string().describe("The name of the food to research"),
         }),
