@@ -1,4 +1,5 @@
 import { incrementAiRunUsage } from "@/lib/ai-run-audit";
+import { CONFIG_KEYS, getConfigValue } from "@/lib/app-config";
 import { sendResendEmailAlert } from "@/lib/ops-alerts";
 
 type JsonRecord = Record<string, unknown>;
@@ -80,8 +81,21 @@ export function parseAiPricingCatalog(raw: string | undefined): Record<string, P
   }
 }
 
-function getPricingForModel(model: string): PricingEntry | null {
-  const catalog = parseAiPricingCatalog(process.env.AI_MODEL_PRICING_JSON);
+async function getPricingForModel(model: string): Promise<PricingEntry | null> {
+  // Try DB-backed config first, then fall back to env var
+  const dbPricing = await getConfigValue<Record<string, Partial<PricingEntry>>>(
+    CONFIG_KEYS.AI_MODEL_PRICING,
+  );
+  const catalog = dbPricing
+    ? Object.fromEntries(
+        Object.entries(dbPricing).flatMap(([m, p]) =>
+          typeof p?.inputPer1M === "number" && typeof p?.outputPer1M === "number"
+            ? [[m, { inputPer1M: p.inputPer1M, outputPer1M: p.outputPer1M }]]
+            : [],
+        ),
+      )
+    : parseAiPricingCatalog(process.env.AI_MODEL_PRICING_JSON);
+
   const exactMatch = catalog[model];
 
   if (exactMatch) {
@@ -92,8 +106,11 @@ function getPricingForModel(model: string): PricingEntry | null {
   return simplifiedModel ? (catalog[simplifiedModel] ?? null) : null;
 }
 
-export function estimateAiUsageCost(model: string, usage: UsageMetrics): number | null {
-  const pricing = getPricingForModel(model);
+export async function estimateAiUsageCost(
+  model: string,
+  usage: UsageMetrics,
+): Promise<number | null> {
+  const pricing = await getPricingForModel(model);
 
   if (!pricing) {
     return null;
@@ -181,8 +198,12 @@ export async function finishJobRun(
   const completedAt = new Date();
   const durationMs = Math.max(0, completedAt.getTime() - handle.startedAt.getTime());
   const usageSummary = getRunUsageSummary(handle.id);
-  const successNotificationsEnabled = parseBooleanFlag(process.env.OPS_NOTIFY_ON_SUCCESS);
-  const costThreshold = parseNumberFlag(process.env.AI_JOB_COST_ALERT_THRESHOLD_USD);
+  const successNotificationsEnabled =
+    (await getConfigValue<boolean>(CONFIG_KEYS.OPS_NOTIFY_ON_SUCCESS)) ??
+    parseBooleanFlag(process.env.OPS_NOTIFY_ON_SUCCESS);
+  const costThreshold =
+    (await getConfigValue<number>(CONFIG_KEYS.AI_JOB_COST_ALERT_THRESHOLD)) ??
+    parseNumberFlag(process.env.AI_JOB_COST_ALERT_THRESHOLD_USD);
   const shouldSendCostAlert =
     usageSummary?.estimatedCostUsd != null &&
     costThreshold != null &&
@@ -232,7 +253,7 @@ export async function recordAiUsageEvent(input: {
   const inputTokens = input.usage.inputTokens ?? 0;
   const outputTokens = input.usage.outputTokens ?? 0;
   const totalTokens = input.usage.totalTokens ?? inputTokens + outputTokens;
-  const estimatedCostUsd = estimateAiUsageCost(input.model, {
+  const estimatedCostUsd = await estimateAiUsageCost(input.model, {
     inputTokens,
     outputTokens,
     totalTokens,
@@ -262,7 +283,9 @@ export async function recordAiUsageEvent(input: {
     });
   }
 
-  const eventThreshold = parseNumberFlag(process.env.AI_USAGE_ALERT_THRESHOLD_USD);
+  const eventThreshold =
+    (await getConfigValue<number>(CONFIG_KEYS.AI_USAGE_ALERT_THRESHOLD)) ??
+    parseNumberFlag(process.env.AI_USAGE_ALERT_THRESHOLD_USD);
   const shouldAlertOnEvent =
     estimatedCostUsd != null && eventThreshold != null && estimatedCostUsd >= eventThreshold;
 
