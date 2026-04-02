@@ -2,7 +2,9 @@
  * USDA FoodData Central API client.
  * Free API — works with DEMO_KEY or a registered key from https://fdc.nal.usda.gov/api-key-signup
  *
- * This fetches REAL measured substance data, not LLM-generated estimates.
+ * This fetches real measured USDA nutrient data, not LLM-generated estimates.
+ * Keep these response shapes aligned with the USDA API and map to the app's
+ * internal "substance" terminology in higher layers.
  */
 
 const USDA_BASE = "https://api.nal.usda.gov/fdc/v1";
@@ -11,10 +13,10 @@ function getApiKey(): string {
   return process.env.USDA_API_KEY ?? "DEMO_KEY";
 }
 
-export interface USDAFoodSubstance {
-  substanceId: number;
-  substanceName: string;
-  substanceNumber: string;
+export interface USDAFoodNutrient {
+  nutrientId: number;
+  nutrientName: string;
+  nutrientNumber: string;
   unitName: string;
   value: number;
 }
@@ -24,7 +26,7 @@ export interface USDAFood {
   description: string;
   dataType: string;
   foodCategory?: string;
-  foodSubstances: USDAFoodSubstance[];
+  foodNutrients: USDAFoodNutrient[];
 }
 
 export interface USDASearchResponse {
@@ -54,10 +56,10 @@ export async function searchFoodsBySubstance(
     sortOrder: "asc",
   });
 
-  // USDA substance numbers for common substances we track
-  const substanceNumber = mapSubstanceNameToUSDANumber(substanceName);
-  if (substanceNumber) {
-    params.set("sortBy", `substanceNumber_${substanceNumber}`);
+  // USDA nutrient numbers for common substances we track
+  const nutrientNumber = mapSubstanceNameToUSDANumber(substanceName);
+  if (nutrientNumber) {
+    params.set("sortBy", `nutrientNumber_${nutrientNumber}`);
     params.set("sortOrder", "desc");
   }
 
@@ -65,7 +67,7 @@ export async function searchFoodsBySubstance(
 }
 
 /**
- * Search USDA for a specific food by name and get its full substance profile.
+ * Search USDA for a specific food by name and get its full nutrient profile.
  */
 export async function searchFoodByName(
   foodName: string,
@@ -85,7 +87,7 @@ export async function searchFoodByName(
 }
 
 /**
- * Get detailed substance data for a specific USDA food by its FDC ID.
+ * Get detailed nutrient data for a specific USDA food by its FDC ID.
  */
 export async function getFoodDetails(fdcId: number): Promise<USDAFood> {
   const apiKey = getApiKey();
@@ -123,7 +125,7 @@ async function fetchWithRetry<T>(url: string, maxRetries = 3): Promise<T> {
 }
 
 /**
- * Map our internal substance display names to USDA substance numbers.
+ * Map our internal substance display names to USDA nutrient numbers.
  * See: https://fdc.nal.usda.gov/api-guide
  */
 function mapSubstanceNameToUSDANumber(name: string): string | null {

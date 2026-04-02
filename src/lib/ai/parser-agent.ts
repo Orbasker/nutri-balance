@@ -212,8 +212,8 @@ async function parseUSDASource(
 
   for (const usdaFood of source.usdaData.foods) {
     // Find the target substance in this food's data
-    const substanceData = usdaFood.foodSubstances?.find((fn) => {
-      const fnName = fn.substanceName?.toLowerCase() ?? "";
+    const substanceData = usdaFood.foodNutrients?.find((fn) => {
+      const fnName = fn.nutrientName?.toLowerCase() ?? "";
       const target = substanceName.toLowerCase();
       return fnName.includes(target) || target.includes(fnName.split("(")[0].trim().toLowerCase());
     });
@@ -241,13 +241,13 @@ async function parseUSDASource(
         confidence: 92,
         preparationMethod: prep,
         evidence: `USDA FoodData Central FDC#${usdaFood.fdcId}: ${usdaFood.description}`,
-        sourceUrl: `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/substances`,
+        sourceUrl: `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/nutrients`,
       },
       substanceId,
       substanceUnit,
       sourceId,
       `USDA FoodData Central (FDC#${usdaFood.fdcId})`,
-      `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/substances`,
+      `https://fdc.nal.usda.gov/food-details/${usdaFood.fdcId}/nutrients`,
     );
 
     if (foodId) created++;

@@ -196,11 +196,11 @@ export async function exploreSubstanceSources(
                 foods: result.foods.map((f) => ({
                   name: f.description,
                   fdcId: f.fdcId,
-                  substances: f.foodSubstances
+                  substances: f.foodNutrients
                     ?.filter((n) => n.value > 0)
                     .slice(0, 20)
                     .map((n) => ({
-                      name: n.substanceName,
+                      name: n.nutrientName,
                       value: n.value,
                       unit: normalizeUSDAUnit(n.unitName),
                     })),
