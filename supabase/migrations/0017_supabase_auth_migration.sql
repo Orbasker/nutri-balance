@@ -37,6 +37,9 @@ ALTER TABLE user_nutrient_limits DROP CONSTRAINT IF EXISTS user_nutrient_limits_
 ALTER TABLE chat_conversations DROP CONSTRAINT IF EXISTS chat_conversations_user_id_user_id_fk;
 ALTER TABLE food_feedback DROP CONSTRAINT IF EXISTS food_feedback_user_id_user_id_fk;
 
+-- Drop ai_runs FK to user (also references public.user)
+ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_trigger_user_id_user_id_fk;
+
 -- Also drop Better Auth internal table FKs
 ALTER TABLE account DROP CONSTRAINT IF EXISTS account_user_id_user_id_fk;
 ALTER TABLE session DROP CONSTRAINT IF EXISTS session_user_id_user_id_fk;
@@ -203,6 +206,7 @@ BEGIN
   DELETE FROM public.chat_conversations WHERE user_id = OLD.id::text;
   DELETE FROM public.food_feedback WHERE user_id = OLD.id::text;
   DELETE FROM public.platform_accounts WHERE user_id = OLD.id::text;
+  UPDATE public.ai_runs SET trigger_user_id = NULL WHERE trigger_user_id = OLD.id::text;
   RETURN OLD;
 END;
 $$;
