@@ -122,6 +122,58 @@ export function findMostRecentResearchFood(messages: unknown[]): string | null {
   return null;
 }
 
+/**
+ * Extract a food name from a bot message that offered to research a food
+ * (e.g. `couldn't find "pineapple"` or `"pineapple" isn't in my database`).
+ */
+export function extractFoodFromBotOffer(text: string): string | null {
+  if (!text) return null;
+
+  const patterns = [
+    /[""\u201c\u201d]([^""\u201c\u201d]+)[""\u201c\u201d]\s*(?:isn[''\u2019]t|is not)/i,
+    /(?:couldn[''\u2019]t find|could not find|no foods? found)[^""\u201c\u201d]*[""\u201c\u201d]([^""\u201c\u201d]+)[""\u201c\u201d]/i,
+    /לא מצאתי[^""\u201c\u201d]*[""\u201c\u201d]([^""\u201c\u201d]+)[""\u201c\u201d]/,
+    /[""\u201c\u201d]([^""\u201c\u201d]+)[""\u201c\u201d][^""\u201c\u201d]*במאגר/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      const name = cleanFoodName(match[1]);
+      if (name) return name;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Scan recent messages for a food name that was offered for research but not yet researched.
+ * Looks at bot "not found" messages to find the pending food.
+ */
+export function findPendingResearchFood(messages: unknown[]): string | null {
+  const recent = messages.slice(-6);
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const text = getMessageText(recent[i]);
+    const food = extractFoodFromBotOffer(text);
+    if (food) return food;
+  }
+  return null;
+}
+
+/**
+ * Check if the last bot message is a clarification asking which food to research.
+ * This happens when the bot couldn't recover the food name from context.
+ */
+export function isAwaitingFoodName(messages: unknown[]): boolean {
+  if (messages.length === 0) return false;
+  const lastText = getMessageText(messages[messages.length - 1]);
+  return (
+    lastText.includes("Which food would you like me to research?") ||
+    lastText.includes("איזה מזון תרצה שאחקור?")
+  );
+}
+
 export function buildClarifyResearchReply(prefersHebrew: boolean): string {
   return prefersHebrew
     ? "בשמחה. איזה מזון תרצה שאחקור?"

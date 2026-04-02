@@ -1,6 +1,6 @@
 "use server";
 
-import { generateObject } from "ai";
+import { Output, generateText } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -181,9 +181,9 @@ export async function aiResearchFood(
       input: { query, nutrients: nutrientNames },
     });
 
-    const { object: foodData, usage } = await generateObject({
+    const { output: foodData, usage } = await generateText({
       model,
-      schema: aiFoodSchema,
+      output: Output.object({ schema: aiFoodSchema }),
       prompt: `Research the full nutrient profile for: "${query}"
 
 Provide nutrient values for ALL of these nutrients: ${nutrientList}
@@ -223,7 +223,7 @@ Rules:
     });
 
     // Validate that we got useful data
-    if (!foodData.name || !foodData.variants?.length) {
+    if (!foodData || !foodData.name || !foodData.variants?.length) {
       await finishAiRun(aiRun, {
         status: "failed",
         resultSummary: "AI could not identify a valid food profile.",
