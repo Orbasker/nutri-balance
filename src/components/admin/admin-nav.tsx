@@ -6,8 +6,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { href: "/ai-runs", label: "AI Runs" },
   { href: "/foods", label: "Foods" },
   { href: "/review", label: "Review Queue" },
+  { href: "/ai-observations", label: "AI Items" },
   { href: "/foods-review", label: "Food Review" },
 ];
 

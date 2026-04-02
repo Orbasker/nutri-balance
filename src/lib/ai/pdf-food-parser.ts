@@ -17,6 +17,7 @@ import {
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
 import { getLangfuse } from "@/lib/langfuse";
 import { flushLangfuse } from "@/lib/langfuse";
+import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
 const PDF_SOURCE_NAME = "User-uploaded PDF";
 
@@ -156,6 +157,21 @@ Rules:
       },
     });
 
+    await recordAiUsageEvent({
+      feature: "pdf-food-parser",
+      operation: "parse-pdf-page",
+      model: modelName,
+      usage: {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+      },
+      metadata: {
+        pageNumber,
+        parsedCount: object.foods?.length ?? 0,
+      },
+    });
+
     return (object.foods ?? []).map((f) => ({
       name: f.n,
       valuePer100g: f.v,
@@ -235,6 +251,24 @@ export async function parsePdfToFoods(
           }
         : undefined,
     });
+
+    if (metaUsage) {
+      await recordAiUsageEvent({
+        feature: "pdf-food-parser",
+        operation: "get-pdf-meta",
+        model: modelName,
+        userId,
+        usage: {
+          inputTokens: metaUsage.inputTokens,
+          outputTokens: metaUsage.outputTokens,
+          totalTokens: metaUsage.totalTokens,
+        },
+        metadata: {
+          fileName,
+          totalPages: meta.totalPages,
+        },
+      });
+    }
 
     const totalPages = Math.min(meta.totalPages || 1, 20); // Cap at 20 pages
 

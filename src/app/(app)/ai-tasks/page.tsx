@@ -38,7 +38,6 @@ export default async function AiTasksPage() {
           Create tasks to automatically research nutrient data for all foods in the database.
         </p>
       </div>
-
       <CreateTaskForm nutrients={allNutrients} />
       <AiTaskList tasks={tasks} />
     </div>

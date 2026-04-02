@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { processNutrientResearchTask } from "@/lib/ai/nutrient-researcher";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
+import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 
 /**
  * POST /api/ai-tasks/process
@@ -17,26 +18,66 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const pendingTasks = await db
-    .select({ id: aiTasks.id, type: aiTasks.type })
-    .from(aiTasks)
-    .where(eq(aiTasks.status, "pending"))
-    .limit(5);
+  const run = await startJobRun({
+    jobKey: "ai-task-processor",
+    source: "cron",
+  });
 
-  if (pendingTasks.length === 0) {
-    return NextResponse.json({ message: "No pending tasks" });
-  }
+  try {
+    const pendingTasks = await db
+      .select({ id: aiTasks.id, type: aiTasks.type })
+      .from(aiTasks)
+      .where(eq(aiTasks.status, "pending"))
+      .limit(5);
 
-  const results: { taskId: string; status: string }[] = [];
+    if (pendingTasks.length === 0) {
+      await finishJobRun(run, {
+        status: "completed",
+        message: "No pending tasks",
+      });
 
-  for (const task of pendingTasks) {
-    try {
-      await processNutrientResearchTask(task.id);
-      results.push({ taskId: task.id, status: "processed" });
-    } catch {
-      results.push({ taskId: task.id, status: "error" });
+      return NextResponse.json({ message: "No pending tasks" });
     }
-  }
 
-  return NextResponse.json({ processed: results.length, results });
+    const results: { taskId: string; status: string }[] = [];
+
+    for (const task of pendingTasks) {
+      try {
+        await processNutrientResearchTask(task.id, "cron");
+        results.push({ taskId: task.id, status: "processed" });
+      } catch {
+        results.push({ taskId: task.id, status: "error" });
+      }
+    }
+
+    const errorCount = results.filter((result) => result.status === "error").length;
+
+    await finishJobRun(run, {
+      status: "completed",
+      message: `Processed ${results.length} queued task${results.length === 1 ? "" : "s"}`,
+      recordsProcessed: results.length,
+      errorCount,
+      metadata: {
+        results,
+      },
+    });
+
+    return NextResponse.json({ processed: results.length, results });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    await finishJobRun(run, {
+      status: "failed",
+      message: "AI task processor failed",
+      errorMessage,
+    });
+
+    return NextResponse.json(
+      {
+        error: "Task processor failed",
+        details: errorMessage,
+      },
+      { status: 500 },
+    );
+  }
 }

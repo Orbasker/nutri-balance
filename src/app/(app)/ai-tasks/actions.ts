@@ -51,7 +51,7 @@ export async function runAiTask(taskId: string): Promise<{ ok: true } | { error:
   }
 
   try {
-    await processNutrientResearchTask(taskId);
+    await processNutrientResearchTask(taskId, "manual");
     revalidatePath("/ai-tasks");
     return { ok: true };
   } catch (error) {

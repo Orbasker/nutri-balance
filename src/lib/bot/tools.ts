@@ -396,7 +396,9 @@ export async function getDailySummary(_params: Record<string, never>, ctx: ToolC
 export async function aiResearchFood(params: { foodName: string }, ctx: ToolContext) {
   try {
     const { aiResearchFood: doResearch } = await import("@/lib/ai/food-search-agent");
-    const result = await doResearch(params.foodName, ctx.userId);
+    const result = await doResearch(params.foodName, ctx.userId, {
+      source: "chat-tool",
+    });
 
     if ("error" in result) {
       console.error("[aiResearchFood] Research failed:", result.error);

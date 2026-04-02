@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/schema/observations";
 import { resolvedNutrientValues } from "@/lib/db/schema/reviews";
 import { flushLangfuse, getLangfuse } from "@/lib/langfuse";
+import { recordAiUsageEvent } from "@/lib/ops-monitoring";
 
 import type { DiscoveredSource } from "./explorer-agent";
 
@@ -308,6 +309,24 @@ RULES:
       ? { input: usage.inputTokens, output: usage.outputTokens, total: usage.totalTokens }
       : undefined,
   });
+
+  if (usage) {
+    await recordAiUsageEvent({
+      feature: "parser-agent",
+      operation: `parse-${source.type}`,
+      model: modelName,
+      usage: {
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+      },
+      metadata: {
+        sourceType: source.type,
+        sourceTitle: source.title,
+        entriesFound: object.foods?.length ?? 0,
+      },
+    });
+  }
 
   if (!object.foods?.length) {
     return { created: 0, skipped: 0, sourceType: source.type };
