@@ -165,6 +165,9 @@ If they want to connect this bot to a DIFFERENT web account, offer to generate a
 When helpful, include the Daily log and Dashboard links.
 `;
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const settingsUrl = `${appUrl}/settings`;
+
   const setupBlock =
     missing.length > 0
       ? `\nSETUP NEEDED:
@@ -172,6 +175,11 @@ This user still needs: ${missing.join(", ")}.
 ${missing.includes("name") ? "- Ask their name and save with updateProfile." : ""}
 ${missing.includes("health goal or dietary concern") ? "- Ask about their health goal / dietary concern and save with updateProfile." : ""}
 ${missing.includes("nutrient limits") ? "- Help them set at least one nutrient limit. Use listAvailableNutrients to find IDs, then setNutrientLimit." : ""}
+
+IMPORTANT: When mentioning missing setup, always let the user know they have TWO options:
+1. Tell you right here in the chat (e.g. "My health goal is managing blood thinners" or "Set my Vitamin K limit to 90 mcg")
+2. Fill it in on the web dashboard at ${settingsUrl}
+Keep it brief — one short sentence mentioning both options, not a lecture. If the user came to chat about something else (e.g. "can I eat pizza?"), help them with that FIRST, then briefly mention the missing setup at the end.
 
 Be conversational and natural. If the user provides multiple pieces of info in one message (e.g. "I'm Or, I take blood thinners and need to keep Vitamin K under 10mcg"), extract ALL of it and call the relevant tools in one go. Don't force them through rigid steps — adapt to what they give you.
 `
@@ -328,6 +336,50 @@ function buildTools(toolCtx: ToolContext) {
 
         if (Object.keys(updates).length > 0) {
           await db.update(profiles).set(updates).where(eq(profiles.id, toolCtx.userId));
+
+          // Verify the write persisted
+          const [saved] = await db
+            .select({
+              displayName: profiles.displayName,
+              healthGoal: profiles.healthGoal,
+              clinicalNotes: profiles.clinicalNotes,
+            })
+            .from(profiles)
+            .where(eq(profiles.id, toolCtx.userId));
+
+          if (!saved) {
+            console.error("[NutriBalance Bot] updateProfile: profile not found after write", {
+              userId: toolCtx.userId,
+            });
+            return {
+              success: false,
+              error: "Failed to save profile. Please try again or update it in the web dashboard.",
+            };
+          }
+
+          // Check each field we tried to set
+          const failed: string[] = [];
+          if (params.displayName && saved.displayName !== params.displayName) failed.push("name");
+          if (params.healthGoal && saved.healthGoal !== params.healthGoal)
+            failed.push("health goal");
+          if (params.clinicalNotes && saved.clinicalNotes !== params.clinicalNotes)
+            failed.push("clinical notes");
+
+          if (failed.length > 0) {
+            console.error("[NutriBalance Bot] updateProfile: some fields did not persist", {
+              userId: toolCtx.userId,
+              failed,
+            });
+            return {
+              success: false,
+              error: `Failed to save: ${failed.join(", ")}. Please try again or update in the web dashboard.`,
+            };
+          }
+
+          console.log("[NutriBalance Bot] updateProfile: verified", {
+            userId: toolCtx.userId,
+            updated: Object.keys(updates),
+          });
         }
         return { success: true, updated: Object.keys(updates) };
       },
@@ -377,16 +429,50 @@ function buildTools(toolCtx: ToolContext) {
             .update(userNutrientLimits)
             .set({ dailyLimit: String(params.dailyLimit), mode })
             .where(eq(userNutrientLimits.id, existing.id));
-          return { success: true, action: "updated" };
+        } else {
+          await db.insert(userNutrientLimits).values({
+            userId: toolCtx.userId,
+            nutrientId: params.nutrientId,
+            dailyLimit: String(params.dailyLimit),
+            mode,
+          });
         }
 
-        await db.insert(userNutrientLimits).values({
+        // Verify the write actually persisted
+        const [saved] = await db
+          .select({
+            id: userNutrientLimits.id,
+            dailyLimit: userNutrientLimits.dailyLimit,
+          })
+          .from(userNutrientLimits)
+          .where(
+            and(
+              eq(userNutrientLimits.userId, toolCtx.userId),
+              eq(userNutrientLimits.nutrientId, params.nutrientId),
+            ),
+          );
+
+        if (!saved) {
+          console.error("[NutriBalance Bot] setNutrientLimit: write did NOT persist", {
+            userId: toolCtx.userId,
+            nutrientId: params.nutrientId,
+            dailyLimit: params.dailyLimit,
+          });
+          return {
+            success: false,
+            error:
+              "Failed to save the nutrient limit. Please try again or set it in the web dashboard.",
+          };
+        }
+
+        console.log("[NutriBalance Bot] setNutrientLimit: verified", {
           userId: toolCtx.userId,
           nutrientId: params.nutrientId,
-          dailyLimit: String(params.dailyLimit),
-          mode,
+          savedLimit: saved.dailyLimit,
+          action: existing ? "updated" : "created",
         });
-        return { success: true, action: "created" };
+
+        return { success: true, action: existing ? "updated" : "created" };
       },
     },
   };
