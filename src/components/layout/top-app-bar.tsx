@@ -36,7 +36,7 @@ export function TopAppBar({
   const colors = avatarColors[avatarColor] ?? avatarColors.blue;
 
   return (
-    <header className="fixed top-0 w-full md:left-20 md:w-[calc(100%-5rem)] z-50 bg-white/70 backdrop-blur-xl">
+    <header className="fixed top-0 w-full md:left-64 md:w-[calc(100%-16rem)] z-50 bg-white/70 backdrop-blur-xl">
       <div className="flex justify-between items-center px-6 h-16 w-full max-w-screen-xl mx-auto">
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-3">
