@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { executeAiReviewRun } from "@/lib/ai/review-runner";
 import { processSubstanceResearchTask } from "@/lib/ai/substance-researcher";
+import { handleCronError, verifyCronAuth } from "@/lib/cron-auth";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
@@ -14,10 +15,8 @@ import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
  * Protected by CRON_SECRET header.
  */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const run = await startJobRun({
     jobKey: "ai-task-processor",
@@ -86,20 +85,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ processed: results.length, results, reviewResult });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const { message, logged } = handleCronError("AI task processor", error);
 
     await finishJobRun(run, {
       status: "failed",
-      message: "AI task processor failed",
-      errorMessage,
+      message,
+      errorMessage: logged,
     });
 
-    return NextResponse.json(
-      {
-        error: "Task processor failed",
-        details: errorMessage,
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
