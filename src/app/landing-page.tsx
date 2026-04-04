@@ -129,8 +129,15 @@ export function LandingPage() {
                   </div>
                   <h4 className="mb-1 font-bold text-md-on-surface">Verified Sources</h4>
                   <p className="text-sm leading-relaxed text-md-on-surface-variant">
-                    USDA FoodData Central, scientific papers, and government nutrition databases —
-                    not AI guesses.
+                    <a
+                      href="https://fdc.nal.usda.gov/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-emerald-300 underline-offset-2 hover:text-emerald-700 transition-colors"
+                    >
+                      USDA FoodData Central
+                    </a>
+                    , scientific papers, and government nutrition databases — not AI guesses.
                   </p>
                 </div>
 
@@ -228,6 +235,9 @@ export function LandingPage() {
           <div className="mx-auto flex max-w-screen-xl items-center justify-between text-sm text-md-on-surface-variant">
             <span className="font-semibold text-md-primary">NutriBalance</span>
             <div className="flex items-center gap-4">
+              <Link href="/search" className="hover:text-md-on-surface transition-colors">
+                Search Foods
+              </Link>
               <Link href="/methodology" className="hover:text-md-on-surface transition-colors">
                 Our Data
               </Link>

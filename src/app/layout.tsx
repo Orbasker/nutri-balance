@@ -17,13 +17,38 @@ const inter = Inter({
   weight: ["400", "500", "600", "700"],
 });
 
+const SITE_URL = "https://nutritionmasterbot.com";
+const SITE_NAME = "NutriBalance";
+const SITE_DESCRIPTION =
+  "Track substance intake for medical and dietary constraints. Search foods, get confidence-scored nutritional data, and know what's safe to eat today.";
+
 export const metadata: Metadata = {
-  title: "NutriBalance",
-  description: "Substance intake tracker for people with medical and dietary constraints",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_NAME,
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
   verification: {
     other: {
       "facebook-domain-verification": "h0brabaw3wwb7rcw3pulyxqud1asg8",
     },
+  },
+  alternates: {
+    canonical: "/",
   },
 };
 
@@ -35,12 +60,43 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${manrope.variable} ${inter.variable} h-full antialiased`}>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
           rel="stylesheet"
         />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "WebSite",
+                  name: SITE_NAME,
+                  url: SITE_URL,
+                  description: SITE_DESCRIPTION,
+                  potentialAction: {
+                    "@type": "SearchAction",
+                    target: {
+                      "@type": "EntryPoint",
+                      urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+                    },
+                    "query-input": "required name=search_term_string",
+                  },
+                },
+                {
+                  "@type": "Organization",
+                  name: SITE_NAME,
+                  url: SITE_URL,
+                },
+              ],
+            }),
+          }}
+        />
         {children}
         <AnalyticsProvider />
       </body>
