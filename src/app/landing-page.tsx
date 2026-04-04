@@ -237,6 +237,14 @@ export function LandingPage() {
               <Link href="/terms" className="hover:text-md-on-surface transition-colors">
                 Terms
               </Link>
+              <a
+                href="https://t.me/nutri_balance_master_bot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-md-on-surface transition-colors"
+              >
+                Telegram Bot
+              </a>
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
           </div>
