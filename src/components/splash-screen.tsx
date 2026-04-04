@@ -56,12 +56,7 @@ export function SplashScreen({ minDisplayMs = 1800, onComplete }: SplashScreenPr
           <div className="group relative">
             <div className="absolute -inset-4 rounded-full bg-md-primary/10 blur-xl transition-all duration-700 group-hover:bg-md-primary/20" />
             <div className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-md-surface-container-lowest shadow-[0px_10px_30px_rgba(0,68,147,0.06)]">
-              <span
-                className="material-symbols-outlined text-5xl text-md-primary"
-                style={{ fontVariationSettings: "'wght' 300" }}
-              >
-                bubble_chart
-              </span>
+              <span className="font-heading text-5xl font-extrabold text-md-primary">N</span>
             </div>
           </div>
 
