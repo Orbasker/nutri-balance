@@ -16,6 +16,7 @@
     "db:revert": "bash scripts/db-revert.sh",
     "db:lint": "bash scripts/lint-migrations.sh",
     "db:lint:changed": "bash scripts/lint-migrations.sh --changed-only origin/main",
+    "bones:build": "boneyard-js build http://localhost:3000/dev/bones --wait 1500",
     "db:check": "bunx drizzle-kit check",
     "db:generate": "bunx drizzle-kit generate",
     "db:push": "bunx drizzle-kit push"
@@ -38,6 +39,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "ai": "^6.0.134",
+    "boneyard-js": "^1.6.2",
     "chat": "^4.23.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

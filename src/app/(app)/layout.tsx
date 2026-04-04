@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import "@/bones/registry";
 import { eq } from "drizzle-orm";
 
 import { AppShell } from "@/components/app-shell";
