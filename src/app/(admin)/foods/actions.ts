@@ -139,6 +139,9 @@ export async function getAdminFoodDetail(foodId: string): Promise<AdminFoodDetai
 }
 
 export async function getAllSubstances(): Promise<SubstanceOption[]> {
+  const adminId = await requireAdmin();
+  if (!adminId) return [];
+
   const rows = await db
     .select({
       id: substances.id,

@@ -12,6 +12,8 @@ import {
   createCustomSubstanceSchema,
   deleteCustomSubstanceSchema,
   deleteUserSubstanceLimitSchema,
+  saveMedicalNotesSchema,
+  saveProfileSchema,
   saveUserSubstanceLimitSchema,
   toUserSubstanceLimitRow,
 } from "@/lib/validators";
@@ -94,19 +96,19 @@ export async function saveSubstanceLimit(raw: unknown): Promise<SubstanceLimitAc
   return { ok: true };
 }
 
-export async function saveProfile(data: {
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string | null;
-  gender: string | null;
-  healthGoal: string;
-  avatarColor: string;
-}): Promise<SubstanceLimitActionResult> {
+export async function saveProfile(raw: unknown): Promise<SubstanceLimitActionResult> {
+  const parsed = saveProfileSchema.safeParse(raw);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { error: first?.message ?? "Invalid input." };
+  }
+
   const session = await getSession();
   if (!session) {
     return { error: "You must be signed in." };
   }
 
+  const data = parsed.data;
   const displayName = [data.firstName, data.lastName].filter(Boolean).join(" ") || null;
 
   const profileFields = {
@@ -142,11 +144,19 @@ export async function saveProfile(data: {
   return { ok: true };
 }
 
-export async function saveMedicalNotes(notes: string): Promise<SubstanceLimitActionResult> {
+export async function saveMedicalNotes(raw: unknown): Promise<SubstanceLimitActionResult> {
+  const parsed = saveMedicalNotesSchema.safeParse(raw);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { error: first?.message ?? "Invalid input." };
+  }
+
   const session = await getSession();
   if (!session) {
     return { error: "You must be signed in." };
   }
+
+  const { notes } = parsed.data;
 
   const [updated] = await db
     .update(profiles)

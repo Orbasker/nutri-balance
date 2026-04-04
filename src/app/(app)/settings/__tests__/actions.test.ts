@@ -59,7 +59,7 @@ describe("saveMedicalNotes", () => {
     mockUpdateReturning.mockResolvedValueOnce([{ id: "user-1" }]);
 
     const { saveMedicalNotes } = await import("../actions");
-    const result = await saveMedicalNotes("Keep vitamin K intake steady");
+    const result = await saveMedicalNotes({ notes: "Keep vitamin K intake steady" });
 
     expect(result).toEqual({ ok: true });
     expect(mockUpdate).toHaveBeenCalledTimes(1);
@@ -72,7 +72,7 @@ describe("saveMedicalNotes", () => {
     mockInsertOnConflictDoUpdate.mockResolvedValueOnce(undefined);
 
     const { saveMedicalNotes } = await import("../actions");
-    const result = await saveMedicalNotes("Avoid potassium spikes");
+    const result = await saveMedicalNotes({ notes: "Avoid potassium spikes" });
 
     expect(result).toEqual({ ok: true });
     expect(mockInsert).toHaveBeenCalledTimes(1);
