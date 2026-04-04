@@ -1,9 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+import { eq } from "drizzle-orm";
 
 import { FeedbackForm } from "@/components/food/feedback-form";
 
 import { getSubstanceReferenceValues } from "@/lib/app-config";
+import { db } from "@/lib/db";
+import { foods } from "@/lib/db/schema/foods";
 
 import {
   getFoodDetail,
@@ -12,6 +17,44 @@ import {
   getUserSubstanceLimits,
 } from "./actions";
 import { FoodDetailClient } from "./food-detail-client";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const [food] = await db
+    .select({ name: foods.name, category: foods.category, description: foods.description })
+    .from(foods)
+    .where(eq(foods.id, id))
+    .limit(1);
+
+  if (!food) return {};
+
+  const title = food.name;
+  const description =
+    food.description ??
+    `Nutritional substance data for ${food.name}${food.category ? ` (${food.category})` : ""} — confidence-scored values with source attribution.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title: `${food.name} — NutriBalance`,
+      description,
+      type: "article",
+    },
+    twitter: {
+      card: "summary",
+      title: `${food.name} — NutriBalance`,
+      description,
+    },
+    alternates: {
+      canonical: `/food/${id}`,
+    },
+  };
+}
 
 export default async function FoodDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

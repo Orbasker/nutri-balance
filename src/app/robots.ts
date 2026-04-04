@@ -6,12 +6,13 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/dashboard", "/settings", "/log", "/review"],
+        disallow: ["/api/", "/dashboard", "/settings", "/log", "/review", "/chat"],
       },
       {
         userAgent: "facebookexternalhit",
         allow: "/",
       },
     ],
+    sitemap: "https://nutritionmasterbot.com/sitemap.xml",
   };
 }

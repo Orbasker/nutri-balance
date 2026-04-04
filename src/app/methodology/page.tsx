@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Our Data Methodology — NutriBalance",
+  title: "Our Data Methodology",
   description:
     "Learn how NutriBalance sources, verifies, and scores nutritional data to give you reliable substance tracking.",
+  alternates: { canonical: "/methodology" },
 };
 
 const SOURCE_TYPES = [
