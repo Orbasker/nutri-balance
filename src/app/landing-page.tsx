@@ -73,31 +73,37 @@ export function LandingPage() {
                   icon="search"
                   title="Search any food"
                   description="Look up substances backed by real data sources. No AI-generated guesses."
+                  href="/search"
                 />
                 <FeatureCard
                   icon="speed"
                   title="Confidence scores"
                   description="Know how reliable each substance value is before you make a decision."
+                  href="/methodology"
                 />
                 <FeatureCard
                   icon="skillet"
                   title="Cooking adjustments"
                   description="See how boiling, frying, or baking changes substance retention."
+                  href="/search"
                 />
                 <FeatureCard
                   icon="monitoring"
                   title="Daily tracking"
                   description="Log meals and watch your intake against personal medical limits."
+                  href="/register"
                 />
                 <FeatureCard
                   icon="warning"
                   title="Clear thresholds"
                   description="Safe, caution, and exceed zones so you never have to guess."
+                  href="/methodology"
                 />
                 <FeatureCard
                   icon="local_hospital"
                   title="Clinical notes"
                   description="Store your doctor's dietary instructions right alongside your data."
+                  href="/register"
                 />
               </div>
             </div>
@@ -276,13 +282,18 @@ function FeatureCard({
   icon,
   title,
   description,
+  href,
 }: {
   icon: string;
   title: string;
   description: string;
+  href: string;
 }) {
   return (
-    <div className="rounded-2xl bg-md-surface-container-low p-6">
+    <Link
+      href={href}
+      className="rounded-2xl bg-md-surface-container-low p-6 transition-shadow hover:shadow-md"
+    >
       <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-md-primary-fixed">
         <span className="material-symbols-outlined text-[20px] text-md-on-primary-fixed-variant">
           {icon}
@@ -290,6 +301,6 @@ function FeatureCard({
       </div>
       <h4 className="mb-1 font-bold text-md-on-surface">{title}</h4>
       <p className="text-sm leading-relaxed text-md-on-surface-variant">{description}</p>
-    </div>
+    </Link>
   );
 }

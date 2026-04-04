@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
       source: "/apple-icon.png",
       headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
     },
+    {
+      source: "/:path*.:ext(png|jpg|jpeg|gif|webp|avif|ico)",
+      headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+    },
   ],
 };
 
