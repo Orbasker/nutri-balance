@@ -3,9 +3,9 @@ import Link from "next/link";
 export function Footer() {
   return (
     <footer className="border-t border-md-outline-variant/20 px-6 py-8">
-      <div className="mx-auto flex max-w-screen-xl items-center justify-between text-sm text-md-on-surface-variant">
+      <div className="mx-auto flex max-w-screen-xl flex-col items-center gap-4 text-sm text-md-on-surface-variant sm:flex-row sm:justify-between">
         <span className="font-semibold text-md-primary">NutriBalance</span>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
           <Link href="/search" className="hover:text-md-on-surface transition-colors">
             Search Foods
           </Link>
