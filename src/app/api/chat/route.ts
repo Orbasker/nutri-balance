@@ -16,6 +16,7 @@ import {
 import { db } from "@/lib/db";
 import { substances } from "@/lib/db/schema/substances";
 import { profiles, userSubstanceLimits } from "@/lib/db/schema/users";
+import { checkChatRateLimit } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -27,6 +28,14 @@ export async function POST(req: Request) {
   }
 
   const user = session.user;
+
+  const rateLimit = await checkChatRateLimit(user.id);
+  if (rateLimit.limited) {
+    return new Response("Too many requests. Please slow down.", {
+      status: 429,
+      headers: { "Retry-After": String(rateLimit.retryAfter) },
+    });
+  }
 
   const { messages: uiMessages } = await req.json();
   const messages = await convertToModelMessages(uiMessages);

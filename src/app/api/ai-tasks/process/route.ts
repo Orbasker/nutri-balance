@@ -8,6 +8,7 @@ import { handleCronError, verifyCronAuth } from "@/lib/cron-auth";
 import { db } from "@/lib/db";
 import { aiTasks } from "@/lib/db/schema/ai-tasks";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
+import { checkCronRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/ai-tasks/process
@@ -17,6 +18,11 @@ import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 export async function POST(request: Request) {
   const authError = verifyCronAuth(request);
   if (authError) return authError;
+
+  const rateLimit = await checkCronRateLimit();
+  if (rateLimit.limited) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const run = await startJobRun({
     jobKey: "ai-task-processor",
