@@ -724,7 +724,7 @@ function registerHandlers(bot: Chat) {
         stopWhen: stepCountIs(8),
       });
 
-      await event.channel.post(result.textStream);
+      await event.channel.post(result.fullStream);
     } catch (error) {
       console.error("[NutriBalance Bot] Error handling slash command:", error);
       await event.channel.post("Sorry, something went wrong. Please try again.");
