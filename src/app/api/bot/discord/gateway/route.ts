@@ -1,3 +1,4 @@
+import type { DiscordAdapter } from "@chat-adapter/discord";
 import { after } from "next/server";
 
 import { getBot } from "@/lib/bot";
@@ -15,8 +16,7 @@ export async function GET(request: Request): Promise<Response> {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const bot = getBot();
-  const discord = bot.adapters.discord;
+  const discord = getBot().getAdapter("discord") as DiscordAdapter | undefined;
   if (!discord) {
     return new Response("Discord adapter not configured", { status: 500 });
   }
