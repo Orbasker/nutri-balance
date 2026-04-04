@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { AppShell } from "@/components/app-shell";
 import { AppNav } from "@/components/layout/bottom-nav";
+import { Footer } from "@/components/layout/footer";
 import { TopAppBar } from "@/components/layout/top-app-bar";
 
 import { isAdminEmail } from "@/lib/auth-admin";
@@ -52,6 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           avatarColor={profile?.avatarColor ?? "blue"}
         />
         <main className="pt-20">{children}</main>
+        <Footer />
         <AppNav />
       </div>
     </AppShell>
