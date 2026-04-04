@@ -582,7 +582,7 @@ export function SubstanceLimitsSettings({
               setError(null);
               setNotesSaved(false);
               startTransition(async () => {
-                const res = await saveMedicalNotes(notes);
+                const res = await saveMedicalNotes({ notes });
                 if ("error" in res) {
                   setError(res.error);
                   return;

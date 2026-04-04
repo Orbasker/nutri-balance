@@ -132,6 +132,25 @@ export const deleteCustomSubstanceSchema = z.object({
 
 export type DeleteCustomSubstanceInput = z.infer<typeof deleteCustomSubstanceSchema>;
 
+// Profile validators
+
+export const saveProfileSchema = z.object({
+  firstName: z.string().max(100),
+  lastName: z.string().max(100),
+  dateOfBirth: z.string().nullable(),
+  gender: z.string().max(20).nullable(),
+  healthGoal: z.string().max(500),
+  avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format"),
+});
+
+export type SaveProfileInput = z.infer<typeof saveProfileSchema>;
+
+export const saveMedicalNotesSchema = z.object({
+  notes: z.string().max(5000, "Notes must be under 5000 characters"),
+});
+
+export type SaveMedicalNotesInput = z.infer<typeof saveMedicalNotesSchema>;
+
 // Admin validators
 
 export const createFoodSchema = z.object({
