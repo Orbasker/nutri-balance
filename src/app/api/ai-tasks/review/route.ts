@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { executeAiReviewRun } from "@/lib/ai/review-runner";
+import { handleCronError, verifyCronAuth } from "@/lib/cron-auth";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 
 /**
@@ -10,10 +11,8 @@ import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
  * Protected by CRON_SECRET header.
  */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const run = await startJobRun({
     jobKey: "ai-review-agent",
@@ -44,21 +43,14 @@ export async function POST(request: Request) {
       ...result,
     });
   } catch (error) {
-    console.error("AI review agent error:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const { message, logged } = handleCronError("AI review agent", error);
 
     await finishJobRun(run, {
       status: "failed",
-      message: "AI review agent failed",
-      errorMessage,
+      message,
+      errorMessage: logged,
     });
 
-    return NextResponse.json(
-      {
-        error: "Review agent failed",
-        details: errorMessage,
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

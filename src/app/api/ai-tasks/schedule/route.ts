@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { findAndCreateGapTasks } from "@/lib/ai/substance-researcher";
+import { handleCronError, verifyCronAuth } from "@/lib/cron-auth";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 
 /**
@@ -9,10 +10,8 @@ import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
  * Protected by CRON_SECRET header.
  */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const run = await startJobRun({
     jobKey: "ai-task-scheduler",
@@ -33,20 +32,14 @@ export async function POST(request: Request) {
       tasksCreated,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const { message, logged } = handleCronError("AI task scheduler", error);
 
     await finishJobRun(run, {
       status: "failed",
-      message: "AI task scheduler failed",
-      errorMessage,
+      message,
+      errorMessage: logged,
     });
 
-    return NextResponse.json(
-      {
-        error: "Scheduler failed",
-        details: errorMessage,
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
