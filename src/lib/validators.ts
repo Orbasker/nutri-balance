@@ -140,7 +140,7 @@ export const saveProfileSchema = z.object({
   dateOfBirth: z.string().nullable(),
   gender: z.string().max(20).nullable(),
   healthGoal: z.string().max(500),
-  avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color format"),
+  avatarColor: z.enum(["blue", "purple", "green", "orange", "pink", "teal"]),
 });
 
 export type SaveProfileInput = z.infer<typeof saveProfileSchema>;
