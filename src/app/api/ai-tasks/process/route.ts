@@ -15,7 +15,9 @@ import { checkCronRateLimit } from "@/lib/rate-limit";
  * Picks up pending AI tasks and processes them.
  * Protected by CRON_SECRET header.
  */
-export { POST as GET };
+export async function GET(request: Request) {
+  return POST(request);
+}
 
 export async function POST(request: Request) {
   const authError = verifyCronAuth(request);

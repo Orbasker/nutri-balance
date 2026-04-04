@@ -11,7 +11,9 @@ import { checkCronRateLimit } from "@/lib/rate-limit";
  * Approves plausible values and rejects (+ deletes resolved data for) bad ones.
  * Protected by CRON_SECRET header.
  */
-export { POST as GET };
+export async function GET(request: Request) {
+  return POST(request);
+}
 
 export async function POST(request: Request) {
   const authError = verifyCronAuth(request);
