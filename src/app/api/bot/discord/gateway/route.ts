@@ -7,6 +7,8 @@ import { verifyCronAuth } from "@/lib/cron-auth";
 
 export const maxDuration = 800;
 
+export { POST as GET };
+
 export async function POST(request: Request): Promise<Response> {
   const authError = verifyCronAuth(request);
   if (authError) return authError;
