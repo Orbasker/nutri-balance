@@ -686,6 +686,51 @@ function registerHandlers(bot: Chat) {
     }
   });
 
+  // Handle slash commands (Discord /ask)
+  bot.onSlashCommand("/ask", async (event) => {
+    try {
+      const account = await resolveAccount(event.adapter.name, {
+        author: {
+          userId: event.user.userId,
+          userName: event.user.userName,
+          fullName: event.user.fullName,
+        },
+      });
+
+      const question = event.text?.trim();
+      if (!question) {
+        await event.channel.post(
+          "👋 **Welcome to NutriBalance!**\n\n" +
+            "I help you track substance intake against your medical limits.\n\n" +
+            "**Try these:**\n" +
+            "• `/ask can I eat banana today?`\n" +
+            "• `/ask how much potassium in chicken breast?`\n" +
+            "• `/ask log 200g rice for lunch`\n" +
+            "• `/ask what's my daily summary?`\n\n" +
+            "I'll check real data sources, calculate amounts, and tell you if you're within your limits.",
+        );
+        return;
+      }
+
+      const toolCtx: ToolContext = { userId: account.userId };
+      const { isLinked } = await getAccountLinkStatus(account.userId);
+      const systemPrompt = await buildSystemPrompt(account.userId, isLinked);
+
+      const result = streamText({
+        model: getModel(),
+        system: systemPrompt,
+        messages: [{ role: "user", content: question }],
+        tools: buildTools(toolCtx),
+        stopWhen: stepCountIs(8),
+      });
+
+      await event.channel.post(result.fullStream);
+    } catch (error) {
+      console.error("[NutriBalance Bot] Error handling slash command:", error);
+      await event.channel.post("Sorry, something went wrong. Please try again.");
+    }
+  });
+
   // Handle follow-up messages in subscribed threads
   bot.onSubscribedMessage(async (thread, message) => {
     try {
