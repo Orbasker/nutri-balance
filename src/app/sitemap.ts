@@ -3,6 +3,8 @@ import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { foods } from "@/lib/db/schema/foods";
 
+export const dynamic = "force-dynamic";
+
 const SITE_URL = "https://nutritionmasterbot.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
