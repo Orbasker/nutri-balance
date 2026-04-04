@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/ai-tasks/schedule", "schedule": "0 2 * * *" },
     { "path": "/api/ai-tasks/process", "schedule": "*/15 * * * *" },
-    { "path": "/api/ai-tasks/review", "schedule": "0 3 * * *" }
+    { "path": "/api/ai-tasks/review", "schedule": "0 3 * * *" },
+    { "path": "/api/bot/discord/gateway", "schedule": "*/9 * * * *" }
   ]
 }
