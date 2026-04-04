@@ -245,6 +245,14 @@ export function LandingPage() {
               >
                 Telegram Bot
               </a>
+              <a
+                href="https://discord.com/oauth2/authorize?client_id=1490013414997885080"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-md-on-surface transition-colors"
+              >
+                Discord Bot
+              </a>
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
           </div>
