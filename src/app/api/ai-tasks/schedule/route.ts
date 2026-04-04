@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { findAndCreateGapTasks } from "@/lib/ai/substance-researcher";
 import { handleCronError, verifyCronAuth } from "@/lib/cron-auth";
 import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
+import { checkCronRateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/ai-tasks/schedule
@@ -12,6 +13,11 @@ import { finishJobRun, startJobRun } from "@/lib/ops-monitoring";
 export async function POST(request: Request) {
   const authError = verifyCronAuth(request);
   if (authError) return authError;
+
+  const rateLimit = await checkCronRateLimit();
+  if (rateLimit.limited) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
 
   const run = await startJobRun({
     jobKey: "ai-task-scheduler",

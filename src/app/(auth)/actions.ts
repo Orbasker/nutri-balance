@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { checkAuthRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export type AuthState = {
@@ -9,6 +10,9 @@ export type AuthState = {
 } | null;
 
 export async function login(prevState: AuthState, formData: FormData): Promise<AuthState> {
+  const rateLimitError = await checkAuthRateLimit();
+  if (rateLimitError) return { error: rateLimitError };
+
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
@@ -27,6 +31,9 @@ export async function login(prevState: AuthState, formData: FormData): Promise<A
 }
 
 export async function register(prevState: AuthState, formData: FormData): Promise<AuthState> {
+  const rateLimitError = await checkAuthRateLimit();
+  if (rateLimitError) return { error: rateLimitError };
+
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const firstName = (formData.get("firstName") as string) || undefined;
