@@ -49,7 +49,13 @@ const cronLimiter = (() => {
 
 async function getClientIp(): Promise<string> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  // Use x-vercel-forwarded-for first (Vercel-set, cannot be spoofed)
+  // Fall back to x-forwarded-for for other environments
+  const ip =
+    h.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ??
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+  return ip;
 }
 
 type RateLimitResult = { limited: false } | { limited: true; reset: number; retryAfter: number };
@@ -79,7 +85,7 @@ export async function checkAuthRateLimit(): Promise<string | null> {
 
 /**
  * Rate limit chat API by user ID.
- * Returns null if allowed, or a Response if rate limited.
+ * Returns a RateLimitResult: { limited: false } or { limited: true, reset, retryAfter }.
  */
 export function checkChatRateLimit(userId: string): Promise<RateLimitResult> {
   return checkLimit(chatLimiter, userId);
@@ -87,7 +93,7 @@ export function checkChatRateLimit(userId: string): Promise<RateLimitResult> {
 
 /**
  * Rate limit cron endpoints by IP.
- * Returns null if allowed, or a Response if rate limited.
+ * Returns a RateLimitResult: { limited: false } or { limited: true, reset, retryAfter }.
  */
 export async function checkCronRateLimit(): Promise<RateLimitResult> {
   const ip = await getClientIp();
