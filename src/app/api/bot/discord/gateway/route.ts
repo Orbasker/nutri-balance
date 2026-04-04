@@ -1,5 +1,6 @@
-import type { DiscordAdapter } from "@chat-adapter/discord";
 import { after } from "next/server";
+
+import type { DiscordAdapter } from "@chat-adapter/discord";
 
 import { getBot } from "@/lib/bot";
 
@@ -21,7 +22,8 @@ export async function GET(request: Request): Promise<Response> {
     return new Response("Discord adapter not configured", { status: 500 });
   }
 
-  const host = process.env.VERCEL_URL ?? process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "");
+  const host =
+    process.env.VERCEL_URL ?? process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, "");
   const webhookUrl = host ? `https://${host}/api/bot/discord` : undefined;
 
   const durationMs = 600_000; // 10 minutes
