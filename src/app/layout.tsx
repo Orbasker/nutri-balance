@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
+import Script from "next/script";
 
 import { AnalyticsProvider } from "@/components/analytics-provider";
 
@@ -108,6 +109,7 @@ export default function RootLayout({
         />
         {children}
         <AnalyticsProvider />
+        <Script src="/rb/script.js" data-site-id="93aa9ad235d7" strategy="afterInteractive" />
       </body>
     </html>
   );
