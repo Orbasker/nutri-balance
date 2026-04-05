@@ -10,6 +10,10 @@ import { checkCronRateLimit } from "@/lib/rate-limit";
  * Daily cron: finds substance data gaps and creates AI tasks to fill them.
  * Protected by CRON_SECRET header.
  */
+export async function GET(request: Request) {
+  return POST(request);
+}
+
 export async function POST(request: Request) {
   const authError = verifyCronAuth(request);
   if (authError) return authError;
