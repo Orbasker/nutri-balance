@@ -14,11 +14,11 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://app.rybbit.io",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      "connect-src 'self' https://*.supabase.co https://va.vercel-scripts.com https://vitals.vercel-insights.com",
+      "connect-src 'self' https://*.supabase.co https://va.vercel-scripts.com https://vitals.vercel-insights.com https://app.rybbit.io",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -26,8 +26,26 @@ const securityHeaders = [
   },
 ];
 
+const RYBBIT_HOST = "https://app.rybbit.io";
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ["zlib-sync", "@discordjs/ws", "discord.js", "@chat-adapter/discord"],
+  rewrites: async () => [
+    // Rybbit analytics proxy (ad-blocker bypass)
+    { source: "/rb/script.js", destination: `${RYBBIT_HOST}/api/script.js` },
+    { source: "/rb/replay.js", destination: `${RYBBIT_HOST}/api/replay.js` },
+    { source: "/rb/metrics.js", destination: `${RYBBIT_HOST}/api/metrics.js` },
+    { source: "/rb/track", destination: `${RYBBIT_HOST}/api/track` },
+    { source: "/rb/identify", destination: `${RYBBIT_HOST}/api/identify` },
+    {
+      source: "/rb/session-replay/record/:siteId",
+      destination: `${RYBBIT_HOST}/api/session-replay/record/:siteId`,
+    },
+    {
+      source: "/rb/site/tracking-config/:siteId",
+      destination: `${RYBBIT_HOST}/api/site/tracking-config/:siteId`,
+    },
+  ],
   headers: async () => [
     {
       source: "/(.*)",
