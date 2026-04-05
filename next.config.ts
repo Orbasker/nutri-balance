@@ -31,13 +31,19 @@ const RYBBIT_HOST = "https://app.rybbit.io";
 const nextConfig: NextConfig = {
   serverExternalPackages: ["zlib-sync", "@discordjs/ws", "discord.js", "@chat-adapter/discord"],
   rewrites: async () => [
+    // Rybbit analytics proxy (ad-blocker bypass)
+    { source: "/rb/script.js", destination: `${RYBBIT_HOST}/api/script.js` },
+    { source: "/rb/replay.js", destination: `${RYBBIT_HOST}/api/replay.js` },
+    { source: "/rb/metrics.js", destination: `${RYBBIT_HOST}/api/metrics.js` },
+    { source: "/rb/track", destination: `${RYBBIT_HOST}/api/track` },
+    { source: "/rb/identify", destination: `${RYBBIT_HOST}/api/identify` },
     {
-      source: "/rb/script.js",
-      destination: `${RYBBIT_HOST}/api/script.js`,
+      source: "/rb/session-replay/record/:siteId",
+      destination: `${RYBBIT_HOST}/api/session-replay/record/:siteId`,
     },
     {
-      source: "/rb/track",
-      destination: `${RYBBIT_HOST}/api/track`,
+      source: "/rb/site/tracking-config/:siteId",
+      destination: `${RYBBIT_HOST}/api/site/tracking-config/:siteId`,
     },
   ],
   headers: async () => [
